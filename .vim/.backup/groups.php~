@@ -1,0 +1,68 @@
+<?php
+class groups extends controller{
+
+  function __construct(){
+    parent::__construct();
+    $this->_list_tpl = TEMPLATE_ROOT . 'management/groups.tpl';
+    $this->_edit_tpl = TEMPLATE_ROOT . 'management/edit-group.tpl';
+    $this->_create_tpl = TEMPLATE_ROOT . 'management/create-group.tpl';
+    $this->_ANYONE_CAN_EDIT = False;
+  }
+
+  function POST($id){
+    global $_SESSION;
+    if(count($id) > 2){
+      if($this->_user['is_superuser'] && isset($_POST['owner'])){
+        $owner_id = $_POST['owner'];
+      } else {
+        $owner_id = $this->_user['id'];
+      }
+      $newGroup = $id[2] == 'new';
+      $group = Group::fromData($_POST['label'], $owner_id);
+      if(!$newGroup){
+        // an id was provided. We're updating the given id.
+        $group->id = $id[2];
+        $id = $group->update($this->_db);
+      } else {
+        $id = $group->create($this->_db);
+      }
+      $this->all($id);
+    } else {
+      // no id was provided. Which user are we trying to update??
+      // TODO: this might have to result in creating a new group 
+      throw new Exception('Tried to alter group without providing ID');
+    }
+  }
+
+  function edit($id){
+    $group = Group::get_auth_assoc($this->_db, $id, $this->_user);
+    if($group == NULL){
+      $this->_response_not_authorized(
+        'Oops',
+        "Couldn't find Group with id '$id'"
+      );
+    }
+    $data = array(
+      'group' => $group,
+      'user' => $this->_user,
+      'users' => User::get_dropdown_options($this->_db, $this->_user)
+    );
+    parent::output($this->_edit_tpl, $data);
+  }
+
+  function delete($id){
+    $result = Group::delete($this->_db, $id);
+    $this->all($this->_db);
+  }
+
+  function all($highlightId=FALSE){
+    $data = array(
+      'groups'       => Group::get_all_auth_assoc($this->_db,
+                                                  $this->_user),
+      'highlight_id' => $highlightId,
+      'user'         => $this->_user
+    );
+    parent::output($this->_list_tpl, $data);
+  }
+}
+?>

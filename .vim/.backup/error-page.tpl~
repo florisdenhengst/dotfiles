@@ -1,0 +1,27 @@
+{extends "base.tpl"}
+
+{block "custom-css"}
+    <link rel="stylesheet" href="/css/errorpage.css">
+{/block}
+
+{block "title"}
+  {$summary}
+{/block}
+
+{block "content"}
+     <div class="error-body">
+				<div class="alert alert-danger" role="alert">
+					<span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span>
+					<span class="sr-only">Error:</span>
+          {$body}
+				</div>
+        <div>
+        <p>
+          When the problem persists, please contact the system administrator.
+        </p>
+        <p>
+          <a class='btn btn-primary' href='/' role='button'>take me out of here.</a>
+        </p>
+      </div>
+{/block}
+

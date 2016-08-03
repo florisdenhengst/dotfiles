@@ -1,0 +1,54 @@
+(function(){
+  /**
+   * Load the kapstok module, to add our directives
+   */
+
+  var kapstok = angular.module('kapstok');
+
+  /**
+   * The UserInfo factory constructs the global state for the currently logged in
+   * user
+   */ 
+  kapstok.factory('userInfoFactory', function($http) {
+    /**
+     * Fetches data about the currently logged in user
+     */
+    var url = "/user.json";
+    var options = { responseType: 'json' };
+
+    var obj = {
+      firstName: null,
+    lastName: null,
+    username: null
+    };
+
+    return $http.get(url, options);  
+  });
+
+  /**
+   * Implements the <logout> element, used for global nav and logging out.
+   * It retrieves its own user login data and can be used like this:
+   *
+   * <logout></logout> 
+   *
+   */
+  kapstok.directive('menulogout', function(userInfoFactory){
+    return {
+      restrict: 'E',
+      replace: true,
+      scope: {},
+      controller: function($scope, userInfoFactory){
+        userInfoFactory.success(function(data){
+          $scope.user = data; 
+        });
+      },
+    templateUrl: '/menu/logout.html'
+    };
+  });
+
+
+  /**
+   * Close and execute the wrapper function
+   */
+
+})();

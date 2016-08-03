@@ -1,0 +1,134 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models, migrations
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('database', '0033_auto_20150112_0841'),
+    ]
+
+    operations = [
+#        migrations.AlterField(
+#            model_name='employee',
+#            name='grade',
+#            field=models.ForeignKey(db_column='grade_id', to='database.Grade'),
+#            preserve_default=True,
+#        ),
+#        migrations.AlterField(
+#            model_name='employee',
+#            name='mobility',
+#            field=models.ForeignKey(db_column='mobility_id', to='database.Mobility'),
+#            preserve_default=True,
+#        ),
+#        migrations.AlterField(
+#            model_name='employee',
+#            name='potential',
+#            field=models.ForeignKey(db_column='potential_id', to='database.Potential'),
+#            preserve_default=True,
+#        ),
+#        migrations.AlterField(
+#            model_name='employee',
+#            name='retention_risk',
+#            field=models.ForeignKey(db_column='retentionrisk_id', to='database.RetentionRisk'),
+#            preserve_default=True,
+#        ),
+#        migrations.AlterField(
+#            model_name='employee',
+#            name='retention_risk_reason',
+#            field=models.ForeignKey(db_column='retentionriskreason_id', to='database.RetentionRiskReason'),
+#            preserve_default=True,
+#        ),
+#        migrations.AlterField(
+#            model_name='employee',
+#            name='talent_status',
+#            field=models.ForeignKey(db_column='talentstatus_id', to='database.TalentStatus'),
+#            preserve_default=True,
+#        ),
+#        migrations.AlterField(
+#            model_name='job',
+#            name='performance_status',
+#            field=models.ForeignKey(db_column='performancestatus_id', to='database.PerformanceStatus'),
+#            preserve_default=True,
+#        ),
+#        migrations.AlterField(
+#            model_name='job',
+#            name='status',
+#            field=models.ForeignKey(to='database.JobStatus'),
+#            preserve_default=True,
+#        ),
+#        migrations.AlterField(
+#            model_name='multiposition',
+#            name='gender_count_female',
+#            field=models.PositiveIntegerField(db_column='gendercountfemale'),
+#            preserve_default=True,
+#        ),
+#        migrations.AlterField(
+#            model_name='multiposition',
+#            name='gender_count_male',
+#            field=models.PositiveIntegerField(db_column='gendercountmale'),
+#            preserve_default=True,
+#        ),
+#        migrations.AlterField(
+#            model_name='multiposition',
+#            name='gender_count_other',
+#            field=models.PositiveIntegerField(db_column='gendercountother'),
+#            preserve_default=True,
+#        ),
+#        migrations.AlterField(
+#            model_name='multiposition',
+#            name='gender_count_unknown',
+#            field=models.PositiveIntegerField(db_column='gendercountunknown'),
+#            preserve_default=True,
+#        ),
+#        migrations.AlterField(
+#            model_name='multiposition',
+#            name='grade',
+#            field=models.ForeignKey(to='database.Grade'),
+#            preserve_default=True,
+#        ),
+#        migrations.AlterField(
+#            model_name='multiposition',
+#            name='headcount',
+#            field=models.PositiveIntegerField(),
+#            preserve_default=True,
+#        ),
+#        migrations.AlterField(
+#            model_name='multiposition',
+#            name='total_fte',
+#            field=models.PositiveIntegerField(db_column='totalfte'),
+#            preserve_default=True,
+#        ),
+#        migrations.AlterField(
+#            model_name='person',
+#            name='first_name',
+#            field=models.CharField(max_length=200, db_column='firstname'),
+#            preserve_default=True,
+#        ),
+        migrations.AlterField(
+            model_name='person',
+            name='gender',
+            field=models.CharField(max_length=1, default='U', choices=[('M', 'Male'), ('F', 'Female'), ('U', 'Other')]),
+            preserve_default=True,
+        ),
+        migrations.AlterField(
+            model_name='person',
+            name='last_name',
+            field=models.CharField(max_length=200, db_column='lastname'),
+            preserve_default=True,
+        ),
+        migrations.AlterField(
+            model_name='position',
+            name='grade',
+            field=models.ForeignKey(to='database.Grade'),
+            preserve_default=True,
+        ),
+        migrations.AlterField(
+            model_name='position',
+            name='position_id',
+            field=models.CharField(max_length=200, unique=True, null=True, db_column='positionid'),
+            preserve_default=True,
+        ),
+    ]

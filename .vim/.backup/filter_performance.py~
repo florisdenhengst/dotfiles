@@ -1,0 +1,156 @@
+#!/usr/bin/env python3 
+from django.core.management.base import BaseCommand
+import os
+from database.models import *
+from survey.models import *
+from django.contrib.auth.models import User
+import django.db.models
+from django.test import Client
+from django.db import transaction, OperationalError
+import csv
+import inspect
+import json
+import time
+from optparse import make_option
+
+
+class Command(BaseCommand):
+  """Generates fake requests using the django.test.Client class and measures
+  performances for a series of urls using a series of filter selections.
+  
+  To perform a series of requests, use the following command::
+
+    $ ./manage.py filter_performance username password ~/path/to/selections/*.json ~/path/to/urls.json
+  
+  The filter selections should be in separate json files, with as format the FilterFormat
+  (as used by the frontend to request for filtered data).
+  
+  The request urls' are in a single file of the following structure::
+
+    {
+      "http://localhost:8000/my_first_app/":
+        [
+          "first/url/",
+          "second/url/"
+        ],
+      "http://localhost:8000/my_second_app/":
+        [
+          "again/a/first/url/",
+          "again/a/second/url/"
+        ]
+    }
+
+  The requests are made using the django.test.Client class. This is an acceptable approximation
+  of real-world requests, as manually validated.
+  """
+  args = 'username password <selection1.json selection2.json ... selectionN.json> urls_file.json'
+  help = 'Measures performances of requests for a set of (filter) selections'
+
+  def __init__(self, *args, **kwargs):
+    super(Command, self).__init__(*args, **kwargs)
+    self.c = Client()
+
+  @staticmethod
+  def print_usage():
+    """Prints usage for this command."""
+    usage = "Usage: $ ./manage.py filter_test username password ~/path/to/selections/*.json ~/path/to/urls.json"
+    print(usage)
+
+  def print_usage_exit(self):
+    """Prints usage for this commands and exits."""
+    self.print_usage()
+    exit(1)
+
+  def time_request(self, url, data):
+    """Sends a request containing data and returns a (duration in s, django.http.response object) tuple.
+    
+    Arguments:
+
+    * url -- the url to send a post request to.
+    * data -- a dictionary containing the data to include in the post request."""
+    start = time.time()
+    result = self.c.post(url, data)
+    end = time.time()
+    return (end - start, result)
+
+  @staticmethod
+  def print_result_table(response_result, url, duration):
+    """Prints results for a url in a table format.
+    
+    Arguments:
+
+    * response_result -- a django.https.response object.
+    * url  -- the url the request was made to.
+    * duration -- the duration before a response was received, in seconds."""
+    print("\t{:<13} {:<40} {:<7.3}".format(
+      "status code",
+      "request url",
+      "secs",
+      ))
+    print("\t{:<13} {:<40} {:<7.3f}".format(
+      response_result.status_code,
+      url,
+      duration,
+      ))
+
+
+  def request_selections(self, selection_file, urls):
+    """Do all requests for a selections-file and print the results.
+    
+    Arguments:
+
+    * selection_file -- a JSON containing the selections in a correct FilterFormat.
+    * urls -- the set of urls to post the requests to."""
+    selection_name = os.path.basename(selection_file)
+    # read file
+    selection_json = open(selection_file, 'r').read()
+    # load to validate json
+    selection = json.loads(selection_json)
+    # create request
+    request_data = {
+        'filter_state': selection_json,
+        'multipos': 'false',
+    }
+    print('')
+    print(os.path.basename(selection_file))
+    for base, extensions in urls.items():
+      for ext in extensions:
+        url = "{}{}".format(base, ext)
+        duration = self.time_request(url, request_data)
+        self.print_result_table(duration[1], ext, duration[0])
+
+
+
+  def handle(self, *args, **options):
+    file_list = list(args)
+
+    try:
+      urls_file = file_list.pop()
+      username = file_list.pop(0)
+      password = file_list.pop(0)
+    except IndexError:
+      self.print_usage_exit()
+
+    if len(file_list) < 1:
+      self.print_usage_exit()
+
+    print("Using selections from:")
+    for _file in file_list:
+      print("\t{}".format(_file))
+
+    print("Using urls from {}".format(urls_file))
+
+    print("Logging in as '{}' using password '{}'...".format(username, password))
+    self.c.login(username=username, password=password)
+
+    urls_json = open(urls_file, 'r').read()
+    urls = json.loads(urls_json)
+    
+    for _file in file_list:
+      self.request_selections(_file, urls)
+
+#    for base, extension in urls.items():
+#      print(base)
+#      print(extension)
+    
+

@@ -1,0 +1,155 @@
+/**
+ * Wrap everything inside a self-executing function to prevent creating globals
+ */
+
+(function() {
+
+/**
+ * Load the kapstok module, to add our directives
+ */
+
+var kapstok = angular.module('kapstok');
+
+
+
+/**
+ * Google Bar directive using Google Chart
+ *
+ * You can use it like this: <fo-google-bar data="myData" />. The chart will automatically determine the number of
+ * data series and their ranges, and it will automatically update when the data changes. The data bound should be an
+ * object with an xTitle, yTitle and an array of data series. Each data series is an array of values. Example:
+ * <pre>
+ * $scope.myData = {
+ *   title: "Graph Title",
+ *   cols: [
+ *       {"label": "FTE",
+ *        "type": "number",
+ *      "id": "fte",
+ *     "show": true
+ *     }
+ *   ],
+ *   rows: [
+ *       {"c": [
+ *           {"v": 1, "f": "100%"}
+ *       ]
+     },
+ *   ]
+ * };
+ * </pre>
+ */
+kapstok.directive('foGoogleBar', ['HttpPostService', function(HttpPostService) {
+  function barChart(div, xTitle, yTitle) {
+    var defaultOptions = {
+        orientation: 'horizontal',
+        isStacked: false,
+        width: 654,
+        height: 333,  
+        animation: {
+            duration: 1000,
+            easing: 'out',
+        },
+        backgroundColor: {
+          fill: '14212C'
+        },
+        colors: ['90c142', '61d9fd'],
+        legend: {
+          position: 'none',
+          textStyle: {
+            color: 'white'
+          }
+        },
+        tooltip: {isHtml: true},
+        vAxis: {
+          'title': yTitle,
+          'titleTextStyle': {
+            'color': 'white'
+          },
+          textStyle: {
+            'color': 'white'
+          },
+          gridlines: {
+            'color': '#2d3d50'
+          },
+          baselineColor: 'white',
+        },
+        hAxis: {
+          title: xTitle,
+          titleTextStyle: {
+            'color': 'white'
+          },
+          textStyle: {
+            'color': 'white'
+          },
+          gridlines: {
+            'color': '14212C'
+          },
+          baselineColor: 'white'
+        }
+    };
+    
+    var chart;
+    
+    google.load('visualization', '1', {
+        packages: ['corechart'], 
+        callback: function() { chart = new google.visualization.BarChart(div); }
+    });
+    
+    this.update = function(data) {
+        if( data == null) return;
+        
+        google.load('visualization', '1', {
+            packages:['corechart'], 
+            callback: draw
+        });
+            
+        function draw() {
+            var chartData = new google.visualization.DataTable(data)
+                
+            var options = {
+              //title: data.title;
+            }
+            
+            defaultOptions.hAxis.gridlines.count = chartData.getNumberOfRows();
+            
+            chart.draw(chartData, $.extend(options, defaultOptions));
+        }
+    }
+  }
+
+  return {
+    restrict: 'E',
+    scope: {
+      data: '=?',
+      postParms: '=?'
+    },
+    controller: function($scope, $attrs) {
+      if($attrs.url) {
+        function getData() {
+          HttpPostService($attrs.url, $scope.postParms).success(function(data) {
+            $scope.data = data.dataTables[0];
+          });
+        }
+
+        getData();
+        
+        $scope.$on('filterChanged', function() {
+          getData();
+        });
+        
+      }
+    },
+    link: function(scope, element, attrs) {
+      var chart = new barChart(element[0], attrs.xtitle, attrs.ytitle);
+      scope.$watch('data', chart.update, true);  
+    } 
+  };  
+}]);
+
+
+
+
+/**
+ * Close and execute the wrapper function
+ */
+
+})();

@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+from django.core.management.base import BaseCommand, CommandError
+from database.models import *
+from django.core.management import execute_from_command_line
+from optparse import make_option
+
+class Command(BaseCommand):
+  args = '<app_label> <model_label.modelname>...'
+  help = 'Creates a JSON fixture based on the current contents of the database. All models drived from CrunchrViewModel are skipped because these are views'
+  option_list = BaseCommand.option_list + (
+      make_option('--exclude',
+        '-e',
+        action="append",
+        dest='exclude',
+        help='Excludes a table from the output'),
+      )
+
+  def handle(self, *args, **options):
+    """
+    Creates a fixture and excludes the views
+    """
+    excluded_models = options.get('exclude')
+    if excluded_models is None:
+      excluded_models = [] 
+
+    excluded_models = excluded_models +  ["contenttypes", "auth.Permission"]
+
+    excluded_views = [(viewclass.__module__.split('.',1)[0])+"."+viewclass.__name__ 
+        for viewclass 
+        in CrunchrViewModel.__subclasses__()]
+    excluded = excluded_views + excluded_models
+
+
+    # Build and execute dumpdata command
+    commandline = ["manage.py", "dumpdata"]
+    commandline += args
+    commandline += ["--format", "json","--indent", "2", "--natural", "--all"]
+    for e in excluded:
+      commandline.append("--exclude="+e)
+    print("commandline: {}".format(' '.join(map(str,commandline))))
+    execute_from_command_line(commandline)

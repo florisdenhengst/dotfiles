@@ -1,0 +1,10 @@
+Resultaat van 5-fold CV met optimale parameters
+
+Methode / dataset     MEAN F1       STDEV F1
+SVC (thyroid dataset) 0.13649266276 0.0435371395436
+SSAD (thyroid dataset) 0.0192199278925 0.0236620079788
+SSAD (abalone dataset) 0.0 0.0
+SVC (domain data set) 0.489366946779 0.336715632769
+SSAD (domain data set) 0.123810055824 0.126048233074
+SVC (abalone dataset) 0.0381993002008 0.00999637150708
+

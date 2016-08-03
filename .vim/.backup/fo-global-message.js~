@@ -1,0 +1,35 @@
+kapstok.service('GlobalMessageService', function($state){
+  this._contents = {}
+
+  this.isVisible = false;
+
+  this.hide = function(){
+    this.isVisible = false;
+  }
+
+  this.show = function(){
+    this.isVisible = true;
+  }
+
+  this.setContents = function(contents){
+    this._contents = contents
+  }
+
+});
+
+kapstok.directive('foGlobalMessage', function($log, GlobalMessageService){
+  return {
+    restrict: 'E',
+    replace: true,
+    scope: {},
+    link: function($scope, $element, $attrs){
+      /***
+       * Functions
+       */
+
+      $scope.setContents = GlobalMessageService.setContents;
+
+    },
+    templateUrl: 'static/kapstok/html/widgets/fo-global-message.html'
+  };
+});

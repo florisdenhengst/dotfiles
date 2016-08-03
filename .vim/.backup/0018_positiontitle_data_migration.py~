@@ -1,0 +1,49 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models, migrations, transaction
+from database.models import *
+
+def update_position_title_ids(apps, schema_editor):
+  for model in ['Position', 'MultiPosition']:
+    Position = apps.get_model('database', model)
+    PositionTitle = apps.get_model('database', model + 'Title')
+    field = Position._meta.get_field('title_tmp')
+    for pos in Position.objects.all():
+      pt = PositionTitle.objects.get(base=pos.title)
+      setattr(pos, 'title_tmp', pt)
+      pos.save()
+      pos.title = None
+      pos.save() 
+
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('database', '0017_auto_20150206_0954'),
+    ]
+
+    operations = [
+        migrations.RunPython(update_position_title_ids),
+        # References in new models have been created, temporary fields for reference are in place.
+        # Set the references.
+        migrations.RemoveField(
+            model_name='position',
+            name='title',
+        ),
+        migrations.RemoveField(
+            model_name='multiposition',
+            name='title'
+        ),
+        migrations.RenameField(
+            model_name='position',
+            old_name='title_tmp',
+            new_name='title',
+        ),
+        migrations.RenameField(
+            model_name='multiposition',
+            old_name='title_tmp',
+            new_name='title',
+        ),
+    ]

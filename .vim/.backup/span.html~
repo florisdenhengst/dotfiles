@@ -1,0 +1,292 @@
+<fo-message>
+  In this section, you will find the average number of people that reports into each manager
+  within your organisation. The graphs show the span of control distribution across the
+  reporting layers. You can use the filters on the top left to look at the data from any
+  organisation perspective. Below the span of control, you will find the average percentage
+  of your employees that is listed as manager, including the distribution across reporting
+  layers. Again, use the filter to generate different perspectives.
+</fo-message>
+
+<div class="row">
+  <div class="col-xs-12">
+    <h1>Span of Control</h1>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-xs-12">
+    <div class="content-divider" />
+  </div>
+</div>
+
+<div class="row" />
+
+<!-- Span of control -->
+<fo-include data="/api/organisation/structure/span/avg">
+  <div class="row">
+    <div class="col-xs-offset-1 col-xs-3">
+      <fo-stat
+          label="$parent.dataTable.getColumnLabelByColumnName('avg-span')"
+          value="$parent.dataTable.getFormattedValueByColumnName(0, 'avg-span')">
+        <fo-loading ready="$parent.$parent.$parent.ready"></fo-loading>
+      </fo-stat>
+
+    </div>
+
+    <div class="col-xs-7">
+      <div class="textbox">
+        This is the average span of control, indicating how many employees report into one manager.
+        This is an important number: the higher the number, the lower the amount of reporting
+        layers required. With the filter, you can compare different parts of your business. Use
+        the PowerReport to make comparisons between regions, functions and businesses.
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+
+    <!-- Compare options -->
+    <div class="col-xs-11 col-xs-push-1 compare-row">
+
+      <div class="col-xs-3 compare-options group-by" ng-show="avgSPOC.isVisible">
+        GROUP BY
+
+        <fo-multi-select
+            name="avgSPOC-attrib"
+            value="attribLabels"
+            ng-model="avgSPOC.compareData.selectedAttrib"
+            input-data-ready="avgSPOC.inputDataReady"
+            single-mode="true"
+            overlay-checkbox="true"
+            show-search-box="false"
+            close-on-click="true">
+        </fo-multi-select>
+      </div>
+
+      <div class="col-xs-5 col-xs-push-3 compare-options" ng-show="avgSPOC.isVisible">
+        <div class="row">
+          <div class="col-xs-12">
+            COMPARE {{attribLabels[avgSPOC.compareData.selectedAttrib[0]].name | uppercase }}
+          </div>
+        </div>
+        <div class="row overflowable">
+          <div class="col-xs-6">
+            <fo-multi-select
+                name="avgSPOC-attribValues1"
+                label="Selection 1"
+                value="avgSPOC.compareData.attribValues"
+                ng-model="avgSPOC.compareData.selectedAttribValues[0]"
+                input-data-ready="avgSPOC.inputDataReady"
+                overlay-checkbox="true"
+                show-search-box="avgSPOC.compareData.showAttribValuesSearchBox">
+            </fo-multi-select>
+          </div>
+          <div class="col-xs-6">
+            <fo-multi-select
+                name="avgSPOC-attribValues2"
+                label="Selection 2"
+                value="avgSPOC.compareData.attribValues"
+                ng-model="avgSPOC.compareData.selectedAttribValues[1]"
+                input-data-ready="avgSPOC.inputDataReady"
+                overlay-checkbox="true"
+                show-search-box="avgSPOC.compareData.showAttribValuesSearchBox">
+            </fo-multi-select>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xs-4 right">
+          <div class="col-xs-12">
+            TYPE OF GRAPH
+          </div>
+          <div class="col-xs-3 graph-picker-min-width" ng-click="barSpoc=false">
+            <ng-include src="'/static/kapstok/logos/graph.svg'"
+                class="graph-picker" ng-class="{'clicked': !barSpoc}"></ng-include>
+          </div >
+          <div class="col-xs-3 graph-picker-min-width" ng-click="barSpoc=true">
+            <ng-include src="'/static/kapstok/logos/bar_graph.svg'"
+                class="graph-picker" ng-class="{'clicked': barSpoc}"></ng-include>
+          </div>
+      </div>
+    </div>
+
+    <fo-include data="/api/organisation/structure/span" post-parms="avgSPOC.compareSendData">
+      <div class="col-xs-7 col-xs-offset-1">
+        <div class="chart-container">
+          <fo-google-line
+              ng-show="!barSpoc"
+              data="$parent.dataTable"
+             xtitle="Layer"
+             ytitle="Average span of control">
+          </fo-google-line>
+          <fo-google-bar
+              ng-show="barSpoc"
+              data="$parent.dataTable"
+             xtitle="Layer"
+             ytitle="Average span of control">
+          </fo-google-bar>
+        </div>
+        <div><fo-loading ready="$parent.$parent.$parent.ready"></div>
+      </div>
+    </fo-include>
+
+    <div class="col-xs-1 col-xs-push-3">
+      <div class="graph-options">
+        <ul>
+          <fo-learn-widget></fo-learn-widget>
+          <li class="dividerLine"  ng-class="{'selected': avgSPOC.isVisible}" ng-click="avgSPOC.toggleCompare()">
+            <ng-include src="'/static/kapstok/logos/compare.svg'"></ng-include>COMPARE
+          </li>
+          <!--
+          <li><ng-include src="'/static/kapstok/logos/export.svg'"></ng-include>EXPORT</li>
+          <li><a href="#/organisation?page=powerreport">
+            <ng-include src="'/static/kapstok/logos/power report.svg'"></ng-include>POWER REPORT
+          </a></li>
+          -->
+        </ul>
+      </div>
+    </div>
+    <div class="col-xs-11 col-xs-push-1 compare-row compare-legend">
+      <div class="col-xs-2 col-xs-offset-2" ng-show="avgSPOC.isVisible">
+        <ng-include class="selection-1" src="'/static/kapstok/logos/square.svg'"></ng-include> selection 1
+      </div>
+      <div class="col-xs-2" ng-show="avgSPOC.isVisible">
+        <ng-include class="selection-2" src="'/static/kapstok/logos/square.svg'"></ng-include> selection 2
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-xs-12">
+      <div class="content-divider" />
+    </div>
+  </div>
+
+  <div class="row" />
+
+  <!-- s managers -->
+  <div class="row">
+    <div class="col-xs-offset-1 col-xs-3">
+      <fo-stat
+          label="$parent.dataTable.getColumnLabelByColumnName('avg-percentage-manager')"
+          value="$parent.dataTable.getFormattedValueByColumnName(0, 'avg-percentage-manager')">
+        <fo-loading ready="$parent.$parent.$parent.ready"></fo-loading>
+      </fo-stat>
+    </div>
+
+    <div class="col-xs-6 col-xs-push-1">
+      <div class="textbox">
+        This is the average percentage of managers at your organisation. Crunchr does not look at
+        job title, but actually checks if there is a reporting line between a manager and a direct
+        report. With the filter, you can compare different parts of your business. Use the
+        PowerReport to make comparisons between regions, functions and businesses.
+      </div>
+    </div>
+  </div>
+
+  <div class="row overflowable">
+
+    <!-- Compare options -->
+    <div class="col-xs-11 col-xs-push-1 compare-row">
+      <div class="col-xs-3 compare-options group-by" ng-show="percManager.isVisible" >
+        GROUP BY
+
+        <fo-multi-select
+            name="percManager-attrib"
+            value="attribLabels"
+            ng-model="percManager.compareData.selectedAttrib"
+            input-data-ready="percManager.inputDataReady"
+            single-mode="true"
+            overlay-checkbox="true"
+            show-search-box="false"
+            close-on-click="true">
+        </fo-multi-select>
+      </div>
+
+      <div class="col-xs-5 col-xs-push-3 compare-options" ng-show="percManager.isVisible">
+        <div class="row">
+          <div class="col-xs-12">
+            COMPARE {{attribLabels[percManager.compareData.selectedAttrib[0]].name | uppercase }}
+          </div>
+        </div>
+        <div class="row overflowable">
+          <div class="col-xs-6">
+            <fo-multi-select
+              name="percManager-attribValues1"
+              label="Selection 1"
+              value="percManager.compareData.attribValues"
+              ng-model="percManager.compareData.selectedAttribValues[0]"
+              input-data-ready="percManager.inputDataReady"
+              overlay-checkbox="true"
+              show-search-box="percManager.compareData.showAttribValuesSearchBox">
+            </fo-multi-select>
+          </div>
+          <div class="col-xs-6">
+            <fo-multi-select
+                name="percManager-attribValues2"
+                label="Selection 2"
+                value="percManager.compareData.attribValues"
+                ng-model="percManager.compareData.selectedAttribValues[1]"
+                input-data-ready="percManager.inputDataReady"
+                overlay-checkbox="true"
+                show-search-box="percManager.compareData.showAttribValuesSearchBox">
+            </fo-multi-select>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xs-4 right">
+          <div class="col-xs-12">
+            TYPE OF GRAPH
+          </div>
+          <div class="col-xs-3 graph-picker-min-width" ng-click="barPerc=false">
+            <ng-include src="'/static/kapstok/logos/graph.svg'"
+                class="graph-picker" ng-class="{'clicked': !barPerc}"></ng-include>
+          </div >
+          <div class="col-xs-3 graph-picker-min-width" ng-click="barPerc=true">
+            <ng-include src="'/static/kapstok/logos/bar_graph.svg'"
+                class="graph-picker" ng-class="{'clicked': barPerc}"></ng-include>
+          </div>
+      </div>
+    </div>
+
+    <fo-include data="/api/organisation/structure/span/managers" post-parms="percManager.compareSendData">
+      <div class="col-xs-7 col-xs-offset-1">
+        <div class="chart-container">
+          <fo-google-area
+              ng-show="!barPerc"
+              data="$parent.dataTable"
+             xtitle="Layer"
+             ytitle="Percentage manager">
+          </fo-google-area>
+              <fo-google-bar
+              ng-show="barPerc"
+              data="$parent.dataTable"
+             xtitle="Layer"
+             ytitle="Percentage manager">
+          </fo-google-bar>
+        </div>
+        <div><fo-loading ready="$parent.$parent.$parent.ready"></fo-loading></div>
+      </div>
+    </fo-include>
+
+    <div class="col-xs-1 col-xs-push-3">
+      <div class="graph-options">
+        <ul>
+          <fo-learn-widget></fo-learn-widget>
+          <li class="dividerLine"  ng-class="{'selected': percManager.isVisible}" ng-click="percManager.toggleCompare()">
+            <ng-include src="'/static/kapstok/logos/compare.svg'"></ng-include>COMPARE
+          </li>
+          <!--
+          <li><ng-include src="'/static/kapstok/logos/export.svg'"></ng-include>EXPORT</li>
+          <li><a href="#/organisation?page=powerreport">
+            <ng-include src="'/static/kapstok/logos/power report.svg'"></ng-include>POWER REPORT
+          </a></li>
+          -->
+        </ul>
+      </div>
+    </div>
+  </div>
+
+
+</fo-include>

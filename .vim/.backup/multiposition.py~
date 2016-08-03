@@ -1,0 +1,174 @@
+#!/usr/bin/env python3
+
+from database.models import DataSource
+from database.models import core
+from database.models import Grade
+from database.models import PositionTitle
+from database.models import BusinessUnit
+from database.models import FunctionalArea
+from database.models import Location
+from database.models import Position
+from database.csvtool import base
+from database.csvtool import columns
+from database.csvtool import EnumColumnMapper
+from database.csvtool import TableColumnMapper
+from database.csvtool import TaxonomyColumnMapper
+from database.csvtool import consts
+from database.csvtool import validate_multiposition_solid_lines
+from database.csvtool import validate_multiposition_dotted_lines
+from django.db import transaction
+from django.db import DatabaseError
+import traceback
+
+def can_import_multiposition(capture_month, log, **options):
+  """Ensure that there is exactly one core dataset for this capture month"""
+  if (DataSource.objects.filter(timeslice__capture_month=capture_month,
+                               csv_format=DataSource.CSV_CORE)
+                         .count() != 1):
+    return False
+  return True
+
+def parse_multiposition_csv(csv_reader, log, capture_month, *args, **options):
+  timeslice = Timeslice.objects.get(capture_month=capture_month)
+
+  add_taxonomy = (options.get(consts.OPT_ADD_TAXONOMY) == True)
+  import_reporting_lines = (options.get(consts.OPT_REPORTING_LINES) == True)
+  add_title = (options[consts.OPT_ADD_TITLE] == True)
+
+  csv_column_names = csv_reader.__next__()
+  for column_name in consts.MULTIPOSITION_REQUIRED_CSV_COLUMNS:
+    if column_name not in csv_column_names:
+      log.report_error("Missing csv column {}".format(column_name))
+
+  grade_cm           = EnumColumnMapper.create_from_db('grade', 'Grade', log, Grade.missing_in_input_id())
+  business_unit_tm   = TaxonomyColumnMapper.create_from_db('business_unit'        ,'BusinessUnit'        ,log ,csv_column_names ,required = True, auto_add = add_taxonomy)
+  functional_area_tm = TaxonomyColumnMapper.create_from_db('functional_area'      ,'FunctionalArea'      ,log ,csv_column_names ,required = True, auto_add = add_taxonomy)
+  location_tm        = TaxonomyColumnMapper.create_from_db('location'             ,'Location'            ,log ,csv_column_names ,required = True, auto_add = add_taxonomy)
+  multiposition_tm   = TableColumnMapper(log, 'MultiPosition', 'crunchr_multiposition_id', 
+                                         consts.MULTIPOSITION_REQUIRED_CSV_COLUMNS + \
+                                         ['business_unit', 'functional_area', 'location'])
+
+  # Create a set of all known position titles
+  position_titles = {t.title for t in list(PositionTitle.objects.all())}
+
+  rowdicts = base.rows_to_rowdicts(csv_reader, csv_column_names, log)
+  for rowdict in rowdicts:
+    try:
+      log.row_nr = rowdict[consts.CSV_ROW_KEY]
+      base.process_integer(log, rowdict, 'crunchr_multiposition_id')
+      base.process_string(log, rowdict, 'multiposition_id', max_length=core.ID_STRING_LENGTH)
+      base.process_string(log, rowdict, 'title', max_length=core.POSITION_TITLE_LENGTH,
+                          regex_pattern=consts.POSITION_TITLE_PATTERN)
+      base.process_string(log, rowdict, 'dotted_line', max_length=core.ID_STRING_LENGTH)
+      base.process_string(log, rowdict, 'solid_line', max_length=core.ID_STRING_LENGTH)
+      base.process_integer(log, rowdict, 'solid_line_layer',
+                           min_val=consts.MIN_LAYER, max_val=consts.MAX_LAYER)
+      base.process_integer(log, rowdict, 'headcount', required=True, min_val=0)
+      base.process_float(log, rowdict, 'total_fte', required=True, min_val=consts.MIN_FTE)
+      base.process_integer(log, rowdict, 'gender_count_male', min_val=0)
+      base.process_integer(log, rowdict, 'gender_count_female', min_val=0)
+      base.process_integer(log, rowdict, 'gender_count_other', min_val=0)
+      base.process_integer(log, rowdict, 'gender_count_unknown', min_val=0)
+      base.process_float(log, rowdict, 'age_average', min_val=0)
+      base.process_float(log, rowdict, 'years_of_service_avg', min_val=0)
+      base.process_float(log, rowdict, 'years_in_position_avg', min_val=0)
+
+      # Convert FTE total to database representation
+      rowdict['total_fte'] *= consts.ONE_FTE
+
+      # When auto-adding position titles, report all unknown titles!
+      if rowdict['title'] not in position_titles:
+        if add_title:
+          log.report_info("New Position Title \"{}\"".format(rowdict['title']))
+        else:
+          log.report_error("Position Title \"{}\" does not exist.".format(rowdict['title']))
+
+      # Sum of gender counts must equal headcount
+      gender_count_male    = rowdict['gender_count_male']
+      gender_count_female  = rowdict['gender_count_female']
+      gender_count_other   = rowdict['gender_count_other']
+      gender_count_unknown = rowdict['gender_count_unknown']
+      if gender_count_male != None and gender_count_female != None and \
+         gender_count_other != None and gender_count_unknown != None:
+        gender_total = gender_count_male + gender_count_female + \
+                       gender_count_other + gender_count_unknown
+        if gender_total != rowdict['headcount']:
+          log.report_error('sum of gender counts ({}) is not equal to headcount ({})'
+                           .format(gender_total, rowdict['headcount']))
+
+      # Process grade and taxonomies
+      grade_cm.process(rowdict)
+      business_unit_tm.process(rowdict)
+      functional_area_tm.process(rowdict)
+      location_tm.process(rowdict)
+
+      # Map fields into a multiposition table entry
+      rowdict['multiposition'] = multiposition_tm.process(rowdict)
+    except Exception as ex:
+      # We catch all exceptions and log them. We want to try finishing the entire
+      # import procedure so we have the full list of errors instead of only the first
+      # one
+      log.report_error("Exception caught: {}".format(ex))
+      log.report_error("Stacktrace: {}".format(traceback.format_exc()))
+
+  # Extract multipositions from rowdicts
+  multipositions = {rowdict['multiposition'] for rowdict in rowdicts}
+
+  # Validates the solid lines and the layers
+  validate_multiposition_solid_lines(multipositions, timeslice, log)
+
+  # Validates the dotted lines
+  validate_multiposition_dotted_lines(multipositions, timeslice, log)
+
+  return rowdicts
+
+
+def import_multiposition(rowdicts, datasource, log, **options):
+  timeslice = datasource.timeslice
+  # Fetch flags
+  add_taxonomy = (options[consts.OPT_ADD_TAXONOMY] == True)
+  add_title = (options[consts.OPT_ADD_TITLE] == True)
+
+  # Retrieve the unique multipositions in the database
+  unique_multipositions = {r['multiposition']  for r in rowdicts if r['multiposition'] != None}
+
+  # Create all missing position titles
+  position_titles = {t.title: t.id for t in list(PositionTitle.objects.all())}
+  if add_title:
+    base.create_missing_position_titles(unique_multipositions, position_titles, log)
+  else:
+    # Translate all position titles to position title id's
+    for multiposition in unique_multipositions:
+      multiposition.fields['title'] = position_titles[multiposition.fields['title']]
+
+  if add_taxonomy:
+    columns.extend_taxonomy(unique_multipositions, 'business_unit', BusinessUnit, log)
+    columns.extend_taxonomy(unique_multipositions, 'functional_area', FunctionalArea, log)
+    columns.extend_taxonomy(unique_multipositions, 'location', Location, log)
+
+  # Create position_id to position.id map
+  position_id_map = {p[0]: p[1] for p in
+                     Position.objects.values_list('position_id', 'id') \
+                                     .distinct()
+                                     .filter(job__data_source__timeslice=timeslice)
+                     }
+  try:
+    for batch in base.transaction_batches(rowdicts):
+      with transaction.atomic():
+        for rowdict in batch:
+          log.row_nr = rowdict[consts.CSV_ROW_KEY]
+          multiposition = rowdict['multiposition']
+          dotted_line_id = None
+          solid_line_id = None
+          if 'dotted_line' in multiposition.fields:
+            multiposition.fields['dotted_line'] = position_id_map[multiposition.fields['dotted_line']]
+          if 'solid_line' in multiposition.fields:
+            multiposition.fields['solid_line'] = position_id_map[multiposition.fields['solid_line']]
+          multiposition.fields['data_source'] = datasource.id
+          multiposition.insert()
+  except DatabaseError as dbe:
+    # We catch all exceptions and log them. We want to try finishing the entire
+    # import procedure so we have the full list of errors instead of only the first
+    # one
+    log.report_error("Exception caught: {}".format(dbe))
+    log.report_error("Stacktrace: {}".format(traceback.format_exc()))

@@ -1,0 +1,77 @@
+#!/usr/bin/env python
+import csv
+import sys
+import pprint
+from collections import OrderedDict
+
+
+def sprint(string):
+  print(string, end=" ")
+
+if len(sys.argv) < 2:
+  print('Usage: python LibSVMToCsv <inputfile> <?scaling_file> > output_file')
+  exit(1)
+
+input_file = sys.argv[1]
+scaling_file = sys.argv[2]
+SCALING_DELIMITER = ' '
+
+def read_scaling(scaling_file):
+  log = []
+  row_count = 0
+  scales = OrderedDict() # use ordereddict to ensure that vars are placed in a correct order in csv
+  with open(scaling_file) as sc_file:
+    # read first line, it contains an 'x'
+    sc_file.readline()
+    scale = sc_file.readline().split(SCALING_DELIMITER)
+    scale_min = scale[0]
+    scale_max = scale[1]
+    for line in sc_file:
+      scale = line.split(SCALING_DELIMITER)
+      var_name = scale[0]
+      scales[var_name] = (float(scale[1]), float(scale[2]))
+  return scales
+
+def get_default(var_name, scales):
+  DEFAULT_INDEX = 1
+  return scales[var_name][DEFAULT_INDEX]
+
+def read_file(input_file, scales):
+  log = []
+  row_count = 0 
+  max_col_count = 0 
+  with open(input_file) as libsvmfile:
+    csv_reader = csv.reader(libsvmfile, delimiter=' ', quotechar='"')
+    for row in csv_reader:
+      # print first element (class name)
+      to_print = []
+      to_print.append(row.pop(0))
+      # remove last element (empty string)
+      row.pop(-1)
+      splitted = [(x.split(':')[0], x.split(':')[1]) for x in row]
+      var_values = {split[0]:split[1] for split in splitted}
+
+      for var_name, (min_val, _) in scales.items():
+        if var_name in var_values.keys():
+          to_print.append('{.9}'.format(float(var_values[var_name])))
+        else:
+          # no value is known for this row, use default
+          to_print.append(str(min_val))
+          log.append('Setting default value {} for var {} at row {}'.format(min_val,var_name, row_count))
+      row_count += 1
+      print(','.join(to_print))
+
+  return (row_count, log)
+
+
+if scaling_file is not None:
+  scales = read_scaling(scaling_file)
+
+# not required for OC-SVM?
+(row_count, log) = read_file(input_file, scales)
+[print(l, file=sys.stderr) for l in log]
+
+print('Processed {} rows'.format(row_count), file=sys.stderr)
+# Recommend redirecting to file if STDOUT is output
+if sys.stdout.isatty():
+  print('Redirect output using >, fool!')

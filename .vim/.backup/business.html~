@@ -1,0 +1,75 @@
+<fo-message>
+  This section lists the FTE per business unit or operating company, including headquarters or other 
+  business segment that applies to your organisation. In the left column, you will find a list of
+  all the businesses within your organisation. The second column provides the total number of FTE
+  within each business, followed by the percentage of total staff. Use the filter to zoom in on 
+  different aspects of the organisation.
+</fo-message>
+
+<div class="row">
+  <div class="col-lg-12">
+    <h1>Business Unit</h1>               
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-12">
+    <div class="content-divider" />
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-12">
+    <h2>FTE per Business Unit</h2>        
+  </div>
+</div>  
+
+<fo-distribution data="organisation/headcount/business" fo-loading="!ready"/>  
+
+
+<!--
+<div class="row">
+  <div class="col-lg-offset-3 col-lg-6">
+    <table class="datatable" ng-init="busOrder={orderBy: 'OPCO'}">
+      <thead>
+        <tr>
+          <th ng-class="{'sort': busOrder.orderBy == 'OPCO'}" 
+              ng-click="busOrder={orderBy: 'OPCO', reverse:!busOrder.reverse}">
+            Business Unit
+            <img ng-class="{'flip': busOrder.reverse}" src="/static/kapstok/logos/arrowDown.png">
+          </th>
+          <th ng-class="{'sort': busOrder.orderBy == 'fte'}" 
+              ng-click="busOrder={orderBy: 'fte', reverse:!busOrder.reverse}">
+            FTE
+            <img ng-class="{'flip': busOrder.reverse}" src="/static/kapstok/logos/arrowDown.png">
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="uppercase" ng-repeat="b in hc.bus | orderBy:busOrder.orderBy:busOrder.reverse">
+          <td>{{b.OPCO}}</td>
+          <td>{{b.fte}} <span class="right">{{b.perc}} %</span></td>
+        </tr>
+        <tr class="table-line">
+          <td></td>
+          <td>{{summary.fte}}</td>
+        </tr>
+      </tbody>
+    </table> 
+  </div>
+  
+  <div class="col-lg-1 col-lg-push-1">
+    <div class="graph-options">
+      <ul>
+        <li ng-click="learn.toggle()" class="dividerLine">
+            <ng-include src="'/static/kapstok/logos/learn.svg'"></ng-include>LEARN
+        </li>
+        <li><ng-include src="'/static/kapstok/logos/export.svg'"></ng-include>EXPORT</li>
+        <li><a href="#/organisation?page=powerreport">
+            <ng-include src="'/static/kapstok/logos/power report.svg'"></ng-include>POWER REPORT
+        </a></li>
+      </ul>
+    </div>
+  </div>     
+</div>
+-->

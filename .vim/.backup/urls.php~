@@ -1,0 +1,33 @@
+<?php
+$urls = array(
+  '(.*)'                                        => 'presentations',
+
+  '(/management/users)'                         => 'users',
+  '(/management/users)/(\d+)'                   => 'users',
+  '(/management/users)/(new)'                   => 'users',
+  '(/management/users)/(delete)/(\d+)'          => 'users',
+
+  '(/management/groups)'                        => 'groups',
+  '(/management/groups)/(\d+)'                  => 'groups',
+  '(/management/groups)/(new)'                  => 'groups',
+  '(/management/groups)/(delete)/(\d+)'         => 'groups',
+
+  '(/management/timeslots)'                     => 'timeslots',
+  '(/management/timeslots)/(\d+)'               => 'timeslots',
+  '(/management/timeslots)/(new)'               => 'timeslots',
+  '(/management/timeslots)/(delete)/(\d+)'      => 'timeslots',
+
+  '(/management/presentations)'                 => 'presentations',
+  '(/management/presentations)/(\d+)'           => 'presentations',
+  '(/management/presentations)/(new)'           => 'presentations',
+  '(/management/presentations)/(delete)/(\d+)'  => 'presentations',
+
+  '(/management/clients)'                       => 'clients',
+  '(/management/clients)/(\d+)'                 => 'clients',
+  '(/management/clients)/(new)'                 => 'clients',
+  '(/management/clients)/(delete)/(\d+)'        => 'clients',
+
+  '/request'                                  => 'requests',
+  '/request/(\d+)'                            => 'requests'
+);
+?>

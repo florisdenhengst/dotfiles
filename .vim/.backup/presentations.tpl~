@@ -1,0 +1,75 @@
+{extends "base.tpl"}
+
+{block "title"}
+Presentations
+<a class="btn btn-primary"
+  href="/management/presentations/new">
+  <span class='glyphicon glyphicon-plus'></span>
+</a>
+{/block}
+
+
+{block "content"}
+  <div class="row header">
+    <div class="col-xs-2">
+      &nbsp;
+    </div>
+    <div class="col-xs-1">
+      ID
+    </div>
+    <div class="col-xs-2">
+      Group 
+    </div>
+    <div class="col-xs-2">
+      Url 
+    </div>
+    <div class="col-xs-2">
+      Timeslot
+    </div>
+    <div class="col-xs-2">
+      Label 
+    </div>
+    <div class="col-xs-1">
+      &nbsp;
+    </div>
+  </div>
+  {foreach $presentations, index, presentation}
+  <div class="row 
+              {if $index mod 2 == 1}odd{else}even{/if}
+              {if $presentation.id == $highlight_id} bg-success init-fade-out{/if}">
+    <div class="col-xs-1">
+      <a class="btn btn-primary"
+        href="/management/presentations/{$presentation.id}">
+        <span class='glyphicon glyphicon-edit'></span>
+      </a>
+    </div>
+    <div class="col-xs-2">
+      {$presentation.id}
+    </div>
+    <div class="col-xs-2">
+      <a href='/management/groups/{$presentation.group}'>
+        {$presentation.group_label}
+      </a>
+    </div>
+    <div class="col-xs-2">
+      <a href='{$presentation.url}' target='_blank'>
+        {$presentation.url}
+      </a>
+    </div>
+    <div class="col-xs-2">
+      <a href='/management/timeslots/{$presentation.timeslot}'>
+        {$presentation.timeslot_label}</a>
+      ({$presentation.start} to {$presentation.end})
+    </div>
+    <div class="col-xs-2">
+      {$presentation.label}
+    </div>
+    <div class="col-xs-1">
+      <a class="btn btn-danger"
+        href="/management/presentations/delete/{$presentation.id}">
+        <span class='glyphicon glyphicon-remove'></span>
+      </a>
+    </div>
+  </div>
+  {/foreach}
+{/block}

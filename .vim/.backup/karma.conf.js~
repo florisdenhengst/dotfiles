@@ -1,0 +1,41 @@
+module.exports = function(config){
+  config.set({
+
+    files : [
+      'bower/jquery/dist/jquery.js',
+      'bower/angular/angular.js',
+      'bower/angular-route/angular-route.js',
+      'bower/angular-mocks/angular-mocks.js',
+      
+      'bower/d3/d3.js',
+      'bower/jquery-ui/ui/jquery-ui.js',
+      'bower/jquery-ui-multiselect-widget/src/jquery.multiselect.js',
+      'bower/jquery-ui-multiselect-widget/src/jquery.multiselect.filter.js',
+      'bower/taffydb/taffy.js',
+      
+      'kapstok/static/kapstok/kapstok.js',
+      'kapstok/static/kapstok/sidebar.js',
+      'kapstok/static/kapstok/home-controller.js',
+      
+      'kapstok/static/kapstok/home-controller-test.js',
+    ],
+
+    autoWatch : true,
+
+    frameworks: ['jasmine'],
+
+    browsers : ['Chrome'],
+
+    plugins : [
+      'karma-chrome-launcher',
+      'karma-firefox-launcher',
+      'karma-jasmine'
+    ],
+    
+    junitReporter : {
+      outputFile: 'test_out/unit.xml',
+      suite: 'unit'
+    }
+    
+  });
+};

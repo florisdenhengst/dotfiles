@@ -1,0 +1,41 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models, migrations
+import database.models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('database', '0016_auto_20150120_1316'),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='MultiPositionHierarchy',
+            fields=[
+                ('multi_position', models.OneToOneField(primary_key=True, to='database.MultiPosition', serialize=False, db_column='multiposition_id')),
+                ('layer', models.IntegerField(default=0)),
+            ],
+            options={
+                'ordering': ['layer'],
+                'db_table': 'multipositionhierarchy',
+            },
+            bases=(models.Model, database.models.Protected),
+        ),
+        migrations.CreateModel(
+            name='PositionHierarchy',
+            fields=[
+                ('position', models.OneToOneField(primary_key=True, to='database.Position', serialize=False, db_column='position_id')),
+                ('layer', models.IntegerField(default=0)),
+                ('direct_span', models.IntegerField(default=0, db_column='directspan')),
+                ('indirect_span', models.IntegerField(default=0, db_column='indirectspan')),
+            ],
+            options={
+                'ordering': ['layer', '-direct_span'],
+                'db_table': 'positionhierarchy',
+            },
+            bases=(models.Model, database.models.Protected),
+        ),
+    ]

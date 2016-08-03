@@ -1,0 +1,100 @@
+<fo-message>
+The table below includes all your reported functional areas, including sub-categories within each area. The first column lists all functional areas throughout your organization. You can use the filter function to zoom in on any particular area or business unit. The second column is the so-called service ratio, which indicates the ratio from one FTE in a functional area to how many FTE’s in the organization. The last column shows you how many FTE are deployed in one area, relative to your total workforce.
+</fo-message>
+
+<div class="row">
+  <div class="col-xs-12">
+    <h1>Functional Area</h1>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-xs-12">
+    <div class="content-divider" />
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-xs-12">
+    <h2 class="col-xs-6 col-xs-offset-3">{{stat}} per Functional Area</h2>
+    <div class="basedOnSwitch col-xs-2 col-xs-offset-1" ng-click="toggleDistributionParm()"
+      ng-class="{'on': stat=='Headcount', 'off': stat=='FTE'}">
+      <div class="body">
+      </div>
+      <div class="knob">
+      </div>
+    </div>    
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-xs-8 col-xs-offset-2">
+    <fo-distribution 
+        data="/api/organisation/headcount/function"
+        stat="stat"
+        post-parms="distributionParm"
+        id="function-distribution">
+      <fo-loading ready="$parent.ready">
+    </fo-distribution>
+  </div>
+  <div class="col-xs-1">
+    <div class="graph-options">
+      <ul>
+        <fo-learn-widget></fo-learn-widget>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!--
+<div class="row">
+  <div class="col-xs-offset-3 col-xs-6">
+    <table class="datatable" ng-init="funcOrder={orderBy: 'GBL'}">
+      <thead>
+        <tr>
+          <th ng-class="{'sort': funcOrder.orderBy == 'GBL'}"
+              ng-click="funcOrder={orderBy: 'GBL', reverse:!funcOrder.reverse}">
+            Business Unit
+            <img ng-class="{'flip': funcOrder.reverse}" src="/static/kapstok/logos/arrowDown.png">
+          </th>
+          <th ng-class="{'sort': funcOrder.orderBy == 'fte'}"
+              ng-click="funcOrder={orderBy: 'fte', reverse:!funcOrder.reverse}">
+            FTE
+            <img ng-class="{'flip': funcOrder.reverse}" src="/static/kapstok/logos/arrowDown.png">
+          </th>
+          <th ng-class="{'sort': funcOrder.orderBy == 'ratio'}"
+              ng-click="funcOrder={orderBy: 'ratio', reverse:!funcOrder.reverse}">
+            Ratio
+            <img ng-class="{'flip': funcOrder.reverse}" src="/static/kapstok/logos/arrowDown.png">
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="uppercase" ng-repeat="f in hc.func | orderBy:funcOrder.orderBy:funcOrder.reverse">
+          <td>{{f.GBL}}</td>
+          <td>{{f.fte}} <span class="right">{{f.perc}} %</span></td>
+          <td>1:{{f.ratio}}</td>
+        </tr>
+        <tr class="table-line">
+          <td></td>
+          <td>{{summary.fte}}</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+
+  <div class="col-xs-1 col-xs-push-1">
+    <div class="graph-options">
+      <ul>
+        <fo-learn-widget></fo-learn-widget>
+        <li><ng-include src="'/static/kapstok/logos/export.svg'"></ng-include>EXPORT</li>
+        <li><a href="#/organisation?page=powerreport">
+            <ng-include src="'/static/kapstok/logos/power report.svg'"></ng-include>POWER REPORT
+        </a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+-->

@@ -1,0 +1,36 @@
+ALTER VIEW view_shorttermsuccessors
+RENAME TO shorttermsuccessors;
+
+ALTER VIEW view_midtermsuccessors
+RENAME TO midtermsuccessors;
+
+ALTER VIEW view_longtermsuccessors
+RENAME TO longtermsuccessors;
+
+ALTER VIEW view_shorttermavailablesuccessors
+RENAME TO shorttermavailablesuccessors;
+
+ALTER VIEW view_midtermavailablesuccessors
+RENAME TO midtermavailablesuccessors;
+
+ALTER VIEW view_longtermavailablesuccessors
+RENAME TO longtermavailablesuccessors;
+
+-- REPLACE RULES FOR NEW VIEWS
+CREATE OR REPLACE RULE stdelete AS
+ON DELETE TO view_shorttermsuccessors DO INSTEAD NOTHING;
+
+CREATE OR REPLACE RULE mtdelete AS
+ON DELETE TO view_midtermsuccessors DO INSTEAD NOTHING;
+
+CREATE OR REPLACE RULE ltdelete AS
+ON DELETE TO view_longtermsuccessors DO INSTEAD NOTHING;
+
+CREATE OR REPLACE RULE stadelete AS
+ON DELETE TO view_shorttermavailablesuccessors DO INSTEAD NOTHING;
+
+CREATE OR REPLACE RULE stadelete AS
+ON DELETE TO view_midtermavailablesuccessors DO INSTEAD NOTHING;
+
+CREATE OR REPLACE RULE stadelete AS
+ON DELETE TO view_longtermavailablesuccessors DO INSTEAD NOTHING;

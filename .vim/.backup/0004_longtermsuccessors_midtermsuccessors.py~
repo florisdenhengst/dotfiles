@@ -1,0 +1,51 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models, migrations, connection
+import os
+
+def get_file(file_name):
+  f = open(os.path.join(os.path.dirname(__file__), file_name))
+  query = f.read()
+  return query
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('database', '0003_view_shorttermsuccessors'),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='LongTermSuccessors',
+            fields=[
+                ('id', models.IntegerField(serialize=False, primary_key=True)),
+                ('original_name', models.CharField(max_length=200, null=True, db_column='originalname')),
+                ('description', models.CharField(max_length=200, null=True, blank=True)),
+                ('score', models.IntegerField()),
+            ],
+            options={
+                'managed': False,
+                'db_table': 'view_longtermsuccessors',
+            },
+            bases=(models.Model,),
+        ),
+        migrations.CreateModel(
+            name='MidTermSuccessors',
+            fields=[
+                ('id', models.IntegerField(serialize=False, primary_key=True)),
+                ('original_name', models.CharField(max_length=200, null=True, db_column='originalname')),
+                ('description', models.CharField(max_length=200, null=True, blank=True)),
+                ('score', models.IntegerField()),
+            ],
+            options={
+                'managed': False,
+                'db_table': 'view_midtermsuccessors',
+            },
+            bases=(models.Model,),
+        ),
+
+        migrations.RunSQL(get_file("0004_longtermsuccessors_midtermsuccessors.sql"),"DROP VIEW IF EXISTS view_longtermsuccessors, view_midtermsuccessors"),
+
+    ]

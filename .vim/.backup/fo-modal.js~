@@ -1,0 +1,157 @@
+/**
+ * Wrap everything inside a self-executing function to prevent creating globals
+ */
+
+(function() {
+
+/**
+ * Load the kapstok module, to add our directives
+ */
+
+var kapstok = angular.module('kapstok');
+
+kapstok.directive('foModal', ['$http', '$log', '$timeout', '$state', 'DataTable',
+    function($http, $log, $timeout, $state, DataTable) {
+  return {
+      restrict: 'E',
+      replace: true,
+      templateUrl: 'static/kapstok/html/widgets/fo-modal.html',
+      scope: {
+        lightBoxIsVisible: "=show",
+        positionDetails: "=",
+        callback: "&",
+        closeCallback: "&"
+      },
+      controller: function($scope, $attrs) {
+        $scope.lightBoxIsVisible = false;
+        $scope.toggleModal = function(){
+          $scope.lightBoxIsVisible = !$scope.lightBoxIsVisible;
+        };
+      },
+      link: function($scope, $element, $attrs) {
+/*        $($element).on('shown.bs.modal', function(){
+          $log.info('shown.bs.modal')
+          $scope.$apply(function(){
+            $scope.$parent[$attrs.visible] = true;
+          });
+        });
+
+        $($element).on('hidden.bs.modal', function(){
+          $log.info('hidden.bs.modal')
+          $scope.$apply(function(){
+            $scope.$parent[$attrs.visible] = false;
+          });
+        }); */
+        
+        $scope.title = $attrs.title;
+        /**
+         * Functions
+         */
+        
+        // Show lightbox
+        function showLightBox() {
+          $scope.lightBoxIsVisible = true;
+        }
+        
+        var onClose = false;
+        var goingToReportingLayer = false;
+        
+        // Close lightbox
+        function closeLightBox() {
+          $scope.lightBoxIsVisible = false;
+        }
+        
+        function onCloseLightBox() {
+          if(goingToReportingLayer) {
+            goingToReportingLayer = false;
+            return;
+          }
+          
+          onClose = true;
+          //$scope.lightBoxIsVisible = false;
+          $timeout(function() {
+            $scope.lightBoxIsVisible = false;
+          });
+
+          $scope.callCloseCallbackFunction();
+        }
+        
+        /**
+         * Scope functions
+         */
+        
+        // Call the callback function that is to be called when the user
+        // clicks on the boss field in the profile lightbox
+        $scope.callCallbackFunction = function(level, id) {
+          $scope.callback({
+            layerLevel: level,
+            id: id
+          });
+        }
+        
+        // Call the close callback function that is to be called when the user
+        // closes the profile lightbox
+        $scope.callCloseCallbackFunction = function() {
+          $scope.closeCallback({});
+        }
+        
+        // Go to the reporting layer (on the organisation/structure/overview/layer page)
+        $scope.goToReportingLayer = function() {
+          goingToReportingLayer = true;
+          
+          if($state.current.name == "organisation.structure.overview.layer.profile") {
+            closeLightBox();
+            onCloseLightBox();
+          }
+            
+          $state.go("organisation.structure.overview.layer", 
+            { level: $scope.positionDetails['layer'].v});
+        }
+      
+        /**
+         * Main code
+         */
+        
+        $scope.$watch('lightBoxIsVisible', function(newValue, oldValue) {
+          $log.info('lightboxisvisible', newValue);
+          if(newValue == true)
+            $($element).modal('show');
+          else
+            $($element).modal('hide');
+          /* Ignore change in lightBoxIsVisible if it occurs after an onClose event
+          if(onClose == true) {
+            onClose = false;
+            return;
+          }
+            
+          if(newValue == true)
+            showLightBox();
+          else
+              closeLightBox();*/
+        });
+         
+        $attrs.$observe('id', function(value) {
+          $log.info(value);
+          $log.info($scope.lightBoxIsVisible);
+          if(!value)  // Undefined means: don't retrieve profile info
+            return;
+          
+          $http.get("/api/organisation/detail/position/" + $attrs.id + "/", {responseType: 'json'}).success(function(data) {
+            var dataTable = new DataTable(data.dataTables[0]);
+            $scope.positionDetails = dataTable.toAssocArayList()[0];
+          }).error(function(data, status, headers, config) {
+            $log.error("/api/organisation/detail/position/" + $attrs.id + " could not be loaded");
+          });
+        });
+      }
+  };
+}]);
+
+
+
+/**
+ * Close and execute the wrapper function
+ */
+
+})();
+

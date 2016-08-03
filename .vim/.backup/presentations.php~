@@ -1,0 +1,102 @@
+<?php
+class presentations extends controller{
+  function __construct(){
+    parent::__construct();
+    $this->_list_tpl = TEMPLATE_ROOT . 'management/presentations.tpl';
+    $this->_edit_tpl = TEMPLATE_ROOT . 'management/edit-presentation.tpl';
+    $this->_create_tpl = TEMPLATE_ROOT . 'management/create-presentation.tpl';
+    $this->_ANYONE_CAN_EDIT = TRUE;
+  }
+
+  function POST($id){
+    global $_SESSION;
+    $this->_matches = $id;
+
+    if(count($id) > 2){
+      $newPresentation = $id[2] == "new";
+
+      if(!$this->checkUrl($_POST['url'])){
+        throw new Exception(sprintf("This is not a valid url: %s", $_POST['url']));
+      }
+      $presentation = Presentation::fromData($_POST['group'], $_POST['url'],
+          $_POST['timeslot'], $_POST['label']);
+      if(!$newPresentation){
+        // an id was provided. We're updating the given id.
+        $presentation->id = $id[2];
+        $id = $presentation->update($this->_db);
+      } else {
+        $id = $presentation->create($this->_db);
+      }
+      $this->all($id);
+    } else {
+      // no id was provided. Which presentation are we trying to update??
+      // TODO: this might have to result in creating a new timeslot 
+      throw new Exception('Tried to alter presentation without providing ID');
+    }
+  }
+
+  function create(){
+    if($this->_ANYONE_CAN_EDIT || $this->_user['is_superuser']){
+      $groups = Group::get_dropdown_options($this->_db, $this->_user);
+      $timeslots = TimeSlot::get_dropdown_options($this->_db, $this->_user);
+      $data = array(
+        'groups'        => $groups,
+        'timeslots'     => $timeslots
+      );
+      parent::output($this->_create_tpl, $data);
+    }else{
+      $this->_response_not_authorized(
+        "Not authorized",
+        "You do not have authorization to perform this action"
+      );
+    }
+  }
+
+  function edit($id){
+
+    $presentation = Presentation::get_auth_assoc($this->_db, $id, $this->_user, "id");
+    if($presentation== NULL){
+      $this->_response_not_authorized(
+        'Oops',
+        "Couldn't find Presentation with id '$id'"
+      );
+    } else {
+    $groups = Group::get_dropdown_options($this->_db, $this->_user);
+    $timeslots = TimeSlot::get_dropdown_options($this->_db, $this->_user);
+    $data = array(
+      'presentation'  => $presentation,
+      'groups'        => $groups,
+      'timeslots'     => $timeslots
+    );
+    parent::output($this->_edit_tpl, $data);
+  }
+
+  function delete($id){
+    $result = Presentation::delete($this->_db, $id);
+    $this->all($this->_db);
+  }
+
+  function all($highlightId=FALSE){
+    $data = array(
+      'presentations' => Presentation::get_all_auth_assoc($this->_db,
+                                                          $this->_user),
+      'highlight_id' => $highlightId
+    );
+    parent::output($this->_list_tpl, $data);
+  }
+
+  /***
+   * Checks whether $input is a valid URL.
+   */
+  function checkUrl($input){
+    $regex = "((https?|ftp)\:\/\/)?"; // SCHEME 
+    $regex .= "([a-z0-9+!*(),;?&=\$_.-]+(\:[a-z0-9+!*(),;?&=\$_.-]+)?@)?"; // User and Pass 
+    $regex .= "([a-z0-9-.]*)\.([a-z]{2,3})"; // Host or IP 
+    $regex .= "(\:[0-9]{2,5})?"; // Port 
+    $regex .= "(\/([a-z0-9+\$_-]\.?)+)*\/?"; // Path 
+    $regex .= "(\?[a-z+&\$_.-][a-z0-9;:@&%=+\/\$_.-]*)?"; // GET Query 
+    $regex .= "(#[a-z_.-][a-z0-9+\$_.-]*)?"; // Anchor 
+    return (preg_match("/^$regex$/", $input));
+  }
+}
+?>

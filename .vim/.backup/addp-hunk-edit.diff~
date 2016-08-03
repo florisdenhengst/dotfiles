@@ -1,0 +1,21 @@
+# Manual hunk edit mode -- see bottom for a quick guide
+@@ -1,10 +1,11 @@
+ from django.apps import apps
+ from django.contrib.auth.models import Group
+ from django.contrib.auth import get_user_model
+ from django.db import connection
+ from django.db.models import Q
+ from django.core.exceptions import FieldError
++from database.csvtool.csvtool import CsvTool
+ from database.q_factory import *
+ from database.models.core import *
+ from database.models.auth import *
+# ---
+# To remove '-' lines, make them ' ' lines (context).
+# To remove '+' lines, delete them.
+# Lines starting with # will be removed.
+#
+# If the patch applies cleanly, the edited hunk will immediately be
+# marked for staging. If it does not apply cleanly, you will be given
+# an opportunity to edit again. If all lines of the hunk are removed,
+# then the edit is aborted and the hunk is left unchanged.

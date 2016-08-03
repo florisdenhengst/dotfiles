@@ -1,0 +1,49 @@
+GENERIC FILTERING - DJANGO IMPLEMENTATION
+
+Generic Filtering in itself is not an extremely hard problem.
+We can't avoid having to define all possible filter Fields for every Django
+Model, since the interpretation of the generic filter lies at the level of
+the Django Model.
+
+The main challenge thus becomes abstracting this behavior from Business Logic
+(BL) in a way that:
+ - is transparant internally: it should be clear what a generic filter does 
+   on an object.
+ - could be transparent externally: it should be clear what a generic filter
+   does to end users (how many records are *not* shown). An application of
+   this can be found in the generic filter, which should work like the
+   Tweakers pricewatch filter.
+ - should be composable. The filter should not restrict what other operations
+   can be performed on a QuerySet. 
+ - should be DRY and as efficient as possible. The latter probably implies
+   that we have to try to.
+
+
+Suggestions
+We can implement a method that performs generic filtering, similar to the
+authorized() method.
+This function should then receive an object containing the current state - that is,
+the current setting of the generic filter from each view that calls the
+function.
+This function could be implemented in our CrunchrQuerySet, making it
+accessible to all of our Models.
+
+Managing Filter State
+Managing the state of the filter (checking for updates in the filter state and
+storing the filter state over multiple requests) can be done by a piece of
+custom Middleware.
+
+Implementation in CrunchrQuerySet
+
+Implementation in each model.
+
+ Usage of `request` object, serialization, caching, middleware
+    - We might be able to store results in cache, but we have to take
+      authorization into account as well.
+ - Server-side representation of generic filter
+   - Separate class or set of separate classes
+ - Usage of CrunchrQuerySet()
+   - Alternative might be using separate CustomQuerySets for Authorization and
+     GenericFiltering and use multiple inheritance to combine them. This will
+     have some implications for using CrunchrQuerySet.as_manager()
+- 

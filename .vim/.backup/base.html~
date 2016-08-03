@@ -1,0 +1,33 @@
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <title>{block "title"}Control centre{/block}</title>
+
+    <!-- jQuery -->
+    <script 
+      src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js">
+    </script>
+    
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet"
+      href="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+    <!-- Bootstrap JavaScript -->
+    <script 
+      src="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js">
+    </script>
+
+    <link rel="stylesheet"
+      href="/css/main.css">
+  </head>
+
+  <h1>{block "title"}Welcome!{/block}</h1>
+  <body>
+    <div class='container-fluid'>
+      {block "content"}
+      Welcome to the index page.
+      {/block}
+    </div>
+  </body>
+</html>

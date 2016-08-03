@@ -1,0 +1,29 @@
+<?php
+class DataObject{
+  private $id;      //Each DB row should have an ID
+
+  public function __construct(...$vars){
+    // Do nothing
+  }
+
+  public function getPublicVars(){
+    // Returns only the public variables in the DataObject.
+    // All public variables are stored in the DB.
+    return call_user_func('get_object_vars', $this);
+  }
+
+  public function create($dbh, $prepared_string){
+    try{ 
+      //create prepared statement
+      $statement = $dbh->prepare($prepared_string);
+      //format data for insertion 
+      $data = $this->getPublicVars();
+      //run query
+      $result = $statement->execute($data);
+      print_r($dbh->errorInfo());
+    } catch(PDOException $e){
+      print($e->getMessage());
+    }
+  }
+}
+?>

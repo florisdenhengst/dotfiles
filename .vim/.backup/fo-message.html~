@@ -1,0 +1,13 @@
+
+<div class="row" ng-show="message.isVisible()">
+  <div class="col-lg-offset-1 col-lg-10">
+    <div class="textbox">
+      <ng-include
+          ng-click="message.hide()"
+          class="close"
+          src="'/static/kapstok/logos/close.svg'">
+      </ng-include>
+      <div ng-transclude></div>
+    </div>
+  </div>
+</div>

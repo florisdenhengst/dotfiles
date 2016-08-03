@@ -1,0 +1,7 @@
+Cookies
+  A cookie without the HttpOnly flag was sent when  requesting ...
+  - https://www.owasp.org/index.php/HttpOnly#Mitigating_the_Most_Common_XSS_attack_using_HttpOnly
+  - We should enforce the 'CSRF_COOKIE_HTTPONLY = True'
+    https://docs.djangoproject.com/en/1.6/ref/settings/#std%3asetting-CSRF_COOKIE_HTTPONLY
+
+Fine otherwise

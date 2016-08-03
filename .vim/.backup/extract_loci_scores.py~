@@ -1,0 +1,86 @@
+import numpy as np
+import os
+from os import listdir
+from os.path import isfile, join
+import sys
+
+def get_files(path, ignore_exts = ['.csv',]):
+  return [join(path, f) for f in listdir(path) if
+      isfile(join(path, f)) and not (os.path.splitext(f)[1] in ignore_exts)]
+
+def param_from_path(path):
+  return os.path.basename(path)
+
+COMMENT_CHAR = '#'
+DELIMITER = ' '
+OUTPUT_DELIMITER = ','
+ELKI_ID_STRING = 'ID='
+LOCI_SCORE_FLAG = 'loci-mdef-outlier='
+N_ELEMS = 1262 # usg
+N_ELEMS = 1946 # thyroid
+N_ELEMS = 2675 # abalone
+
+if len(sys.argv) < 2:
+  print('Usage: python extract_loci_scores <score_dir>', file=sys.stderr)
+  exit(1)
+
+path = sys.argv[1]
+
+files = get_files(path)
+print("extracting scores from {} files".format(len(files)), file=sys.stderr)
+
+# outlier scores
+
+result_matrix = np.empty([N_ELEMS, len(files)], dtype=float)
+params = []
+for count, f_path in enumerate(files):
+  run_scores = {}
+  params.append(param_from_path(f_path))
+  with open(f_path) as f:
+    print(f_path, file=sys.stderr)
+    # skip all comments
+    for line in f:
+      if len(run_scores) == N_ELEMS:
+        break
+      if line[0] == COMMENT_CHAR:
+        continue
+      elements = line.split(DELIMITER)
+      elki_id = elements[0]
+      if elki_id[0:3] != ELKI_ID_STRING:
+        if 'PR-AUC' in line:
+          break
+        else:
+          print('Expected "PR-AUC" in line: "{}"'.format(line), file=sys.stderr)
+          exit(1)
+
+      original_item_index = int(elki_id.split('=')[1]) - 1
+      assert original_item_index >= 0
+
+      # skip all data that we don't need
+      i = 0
+      while(elements[i][0:len(LOCI_SCORE_FLAG)] != LOCI_SCORE_FLAG): i += 1
+
+      # extract the loci-flag and check whether its correct
+      loci_score = elements[i].split(LOCI_SCORE_FLAG[-1])
+      assert loci_score[0] + LOCI_SCORE_FLAG[-1] == LOCI_SCORE_FLAG
+
+      # extract the actual score and save it
+      loci_score = float(loci_score[1])
+      run_scores[original_item_index] = loci_score
+
+  # scores are stil a dict, we want a list ordered by original indexes
+  run_scores = sorted(run_scores.items())
+  #assert min(run_scores)[0] == 0
+  #assert max(run_scores)[0] == N_ELEMS - 1
+  run_scores = [score[1] for score in run_scores]
+    
+  # now we can add the result as a 'column' to the final output
+  assert len(result_matrix[:,count]) == len(run_scores)
+  result_matrix[:, count] = run_scores
+
+header = OUTPUT_DELIMITER.join(params)
+np.savetxt(sys.stdout.buffer,
+           result_matrix,
+           delimiter=OUTPUT_DELIMITER,
+           header=header,
+    comments='')

@@ -1,0 +1,498 @@
+\section{Supervised Scenario}
+% - Relate to upper section?
+% - Clarify difference between outlier models & ML methods
+% Definition of ML?
+%   - Finding patterns in data?
+%   - Relate to anomaly detection case:
+%     - Pattern = model of normal data or of outliers as opposed to opposite
+%     class
+%   - Unsupervised = usually revolves around describing normal data
+%   - Semi-supervised
+%     - Normal-only: describe normal data when normal data available
+%       - Possibly contains noise
+%     - Outlier-only: describe outlier data when outlier data available
+%       - Possibly contains noise
+% denote one class SVMs and SVDD.
+% describe LOF and LOCI
+
+
+% - Definition of ML
+%   - what is the 'pattern' in anomaly detection?
+% - Categorization in unsupervised, supervised and semi-supervised: what do they
+%   mean in the anomaly detection domain?
+% - Unsupervised
+%   - absense of labels
+%   - All previously described mehtods
+%   - discovery-oriented
+% - Supervised
+%   - presence of labels
+%   - useful for finding outliers in future data
+%   - added info could improve performance (when available)
+%   - both classes are known
+%   - boosting, costs, resampling, (generation of new examples?)
+%     - might not create enough contrast
+%       - existing outliers should be representative
+%   - Should be based on unsupervised mehtods (towards supervised outlier
+%   detection)
+% - Semi-supervised
+%   - Part of labels is known
+%   - Deals in finding description of presented data
+%   - SVDD, etc.
+%   - Special case of 'active learning'
+%     - examples in anomaly detection (OBE, Pelleg & Moore, \ldots 'Outlier
+%     detection by active learning'?) and what's different about them.
+In contrast to the scenario described in the previous section, labels are
+available to some extent in a \emph{supervised} scenario. The use of labelled
+instances can improve performance drastically when employed correctly. In this
+section, we will look at some methods that can be used when all instances are
+labelled (fully supervised), when some of the instances are labelled
+(semi-supervised) or can be obtained by interaction with an expert (active
+learning). Whereas the goal in unsupervised outlier detection is to find
+outliers based on some implicit definition (model) of the term `outlier', the
+goal of its supervised counterpart is to elicit a descriptive pattern that
+captures the difference between normal points and anomalies -- a `definition' --
+from examples.
+
+The field of Machine Learning (ML) is associated with finding patterns in data
+\cite{bishop2006pattern}. Mitchell gives a formal definition in
+\cite{mitchell1997machine}:
+\begin{displayquote}
+  A computer program is said to learn from experience $E$ with respect to some
+  class of tasks $T$ and performance measure $P$, if its performance at tasks in
+  $T$, as measured by $P$, improves with experience $E$.
+\end{displayquote}
+Supervised anomaly detection is a `class of tasks'. Some human input is required
+to separate between noise and anomalies due to the domain-specific nature of this
+separation (see Section~\ref{sec:motivation}). When combined with previous
+output, this input can be seen as `experience'. Obviously, we aim for the
+performance of the method to increase as the number of inputs (i.e. the
+experience) increases.
+
+Out of the typical ML tasks, supervised anomaly detection resembles the
+classification task most. A reduction from anomaly detection to classification
+is provided in \cite{abe2006outlier}. The main differences originate from the
+importance of class imbalances. Whereas in anomaly detection the domination of
+normal points over outliers is a central part of the problem definition, it is
+viewed as a possible complicating factor in general classification. Besides
+this, however, there are no fundamental differences between classification and
+supervised anomaly detection. 
+
+This section provides an overview of anomaly detection with supervision. First
+we treat some methods that require class labels for \emph{all} instances to be
+present. These \emph{fully supervised} methods often form the basis for other
+methods which can handle label absences as well. The supervised scenario does
+not fit our use case well, so the overview is not comprehensive. We will
+continue with some exemplary methods that \emph{can} handle the absence of
+labels. These \emph{semi-supervised} methods are closely related to methods that
+actively search for instance of which the labels would improve performance most.
+These \emph{active learning} methods are suitable when an expert is available,
+as in our use case.
+
+\subsection{Fully Supervised}
+\label{subsec:fully_supervised}
+% relation to classification problem
+% - Rare class detection
+% - Effectively, every classifier can be used.
+% - The class imbalance can be solved by:
+%   - artificially change class distribution through resampling
+%   - change errorfunction to optimise to penalize missing outliers more
+%   - boosting
+%   - generation of artifical examples. The trouble with the above methods is
+%   that they might not construct a representative constrast for the normal
+%   class. Generation of artificial examples may not always be feasible /
+%   meaningful.
+% - Application-specific \cite{aggarwal} -- because it bears some subjectivity
+In the fully supervised scenario labels for \emph{all instances} are available
+initially. When employed correctly, available class labels can improve
+performance drastically, because of the domain-specific definition of `anomaly'
+\cite{aggarwal2013outlier}.  Virtually all supervised classification methods can
+be transformed into anomaly detection methods via these adaptations:
+\begin{description}
+  \item[Misclassification costs] since most classifiers try to minimize some
+    error function, class imbalance can lead to classifiers that label all
+    points as the majority class. A \emph{cost} of misclassification can be
+    introduced to this error function \cite{tang2009svms}
+    \cite{ting1998inducing}. By penalizing misclassifications of the minority
+    class more than misclassifications of the majority class, a bias towards
+    labelling as the minority class can be introduced. The number of true
+    positives is expected to increase at the cost of a rise in number of false
+    positives. Some examples of including costs to move decision boundaries for
+    specific algorithm as well as a classifier-independent are discussed next.
+
+    % Naive Bayes classifiers:
+    %   - Leads to a probability for all (/both) available classes
+    %   - Probability can be shifted to include cost directly
+    % Decision trees use some metric to find 'next best' split:
+    %   - gini coefficient (measure of error -> per-instance difference can be weighted)
+    %   - Check 'using Random Forest to Learn Imbalanced Data'
+    % SVM:
+    %   - SVM-WEIGHT (SVMs Modeling for Highly Imbalanced Classification)
+    %		  - Penalize False Negatives more severy than False Positives in the
+    %		  penalty term (which is given by the SVM Definition).
+    Naive Bayes classifiers can provide class probabilities for all classes
+    given an instance. In the general case, the class with the highest
+    probability for this instance is selected. This decision rule can be altered
+    to prefer one class over the other by multiplying the probabilities by some
+    factor $c$ for the anomaly class and some factor $1 - c$ for the normal
+    class \cite{maloof2003learning}. When we prefer more true positives at the
+    expense of some false positives, we can choose $c > 0.5$.
+
+    Decision trees recursively split the data set in an `optimal' way according
+    to some criterion by providing a series of attribute-value tests (e.g.
+    `$\text{feature 1} >  2.0$'). The attribute-value tests form the internal
+    nodes of the tree. When a stop condition is reached, a leaf node is created
+    in which class probabilities for all data points are determined by their
+    presence in this part of the split. An instance is classified in two steps:
+    first, the tree is traversed from the root to a leaf node by following the
+    path denoted by the splits in internal nodes. When a leaf node is reached,
+    the class with highest probability in this leaf node forms the prediction
+    for the new instance. The criterion (\emph{Gini impurity}, information gain)
+    used can often be weighted to influence the `optimal' split. For instance,
+    in \cite{chen2004using}, the Gini impurity is weighted to influence the
+    final decision in leaf nodes (i.e. shifting class probabilities as in Naive
+    Bayes).
+
+    \emph{Support Vector Machines} (SVMs) can find an optimal linear hyperplane
+    separating two classes (i.e. the decision boundary).  They can be formulated
+    in terms of dot products and are therefore suitable for applying
+    \emph{kernels}, to enable non-linear decision boundaries in input space (see
+    above). For additional details on kernels, see
+    section~\ref{subsec:extreme_value_model}. They have become popular because
+    of the uncommon ability to find an optimal result.  A full description is
+    outside of the scope of this research, but a relatively large description is
+    required to outline the application of misclassification costs in SVMs.
+    
+    The original formulation of the SVM can be found in
+    \cite{cortes1995support}. Consider a training set of points $x_1, \dotsc,
+    x_i, \dotsc, x_n$, and their classes $y_1, \dotsc, y_i, \dotsc, y_n$ where
+    $y_i = -1$ or $y_i = 1$ for both classes. All separating hyperplanes satisfy
+    \begin{equation}
+      \label{eq:svm_separating_hyperplanes}
+      \langle w, x \rangle - b = 0
+    \end{equation}
+    where $w$ denotes the normal vector to the hyperplane (i.e. a vector
+    perpendicular to the hyperplane), $b$ denotes a constant and $\langle A, B
+    \rangle$ denotes the dot product of $A$ and $B$. Assuming linear
+    separability, the distance between two hyperplanes should be maximized to
+    find the optimal separating hyperplane:
+    \begin{equation}
+      \label{eq:svm_positive_hyperplane}
+      \langle w, x \rangle - b = 1
+    \end{equation}
+    \begin{equation}
+      \label{eq:svm_positive_hyperplane}
+      \langle w, x \rangle - b = -1
+    \end{equation}
+    The distance between these hyperplanes is $\frac{2}{\norm{w}}$, so the goal
+    becomes to minimize $\norm{w}$. Note that $\norm{w} = \sqrt{\langle w, w
+    \rangle}$ when $w \in \mathbb{R}^n$, so that the object of minimization can
+    be simplified to $\langle w, w \rangle$. In order to prevent training
+    instances to fall into the margin, the following constraints are added:
+    \begin{equation}
+      \label{eq:svm_linear_error}
+      \begin{aligned}
+        & \langle w, x_i \rangle - b \geq 1 
+        & & \text{for } y_i = 1 \\
+        & \langle w, x_i \rangle -b \leq -1
+        & & \text{for } y_i = -1
+      \end{aligned}
+    \end{equation}
+    which can be rewritten as
+    \begin{equation}
+      \label{eq:svm_constraint}
+      y_i(\langle w, x_i \rangle - b) \geq 1
+    \end{equation}
+    The optimization goal then becomes:
+    \begin{equation}
+      \label{eq:svm_no_slack}
+      \begin{aligned}
+        & \text{minimize}
+        & &  \langle w, w \rangle \\
+        & \text{subject to}
+        & & y_i \big( \langle w, x_i \rangle + b \big) \geq 1 
+      \end{aligned}
+    \end{equation}
+    In order to allow for training instances to lie at the `wrong' side of the
+    decision boundary, per-point errors $\xi_i$ known as \emph{slack
+    variables} are introduced in \cite{cortes1995support} as well:
+    \begin{equation}
+      \label{eq:svm_slack_definition}
+      \begin{aligned}
+        & \xi_i > 1 & \text{misclassification of } i\\
+        & 0 < \xi_i \leq 1 & \text{margin violation of } i\\
+      \end{aligned}
+    \end{equation}
+    Including the slack variables results in the following optimization problem
+    \cite{cortes1995support}:
+    \begin{equation}
+    \label{eq:svm_soft_margin}
+    \begin{aligned}
+      & \text{minimize}
+      & & C \sum \xi_i + \langle w, w \rangle \\
+      & \text{subject to}
+      & & y_i \big( \langle w, x_i \rangle + b \big) \geq 1 - \xi_i \text{, with }
+      \xi_i \geq 0
+    \end{aligned}
+    \end{equation}
+    where $C$ denotes how severely violations should be punished (e.g. $C =
+    \infty$ turns definition~\ref{eq:svm_soft_margin} into
+    \ref{eq:svm_no_slack}). In \cite{veropoulos1999controlling} it is shown how
+    the decision boundary can be moved to favour one class over the other by
+    using different values of $C$ for both classes, of which an application can
+    be found in \cite{akbani2004applying} where it is combined with
+    under-sampling the minority class.
+
+    \emph{MetaCost} provides a framework for applying misclassification costs
+    for arbitrary classifiers based on a cost matrix consisting of
+    misclassifications costs for every combination of classes $C_{actual}$ and
+    $C_{predicted}$ \cite{domingos1999metacost}: first, multiple copies of a
+    classifiers are trained on different samples of the data. Predictions of
+    these classifiers for all instances are aggregated by voting. Per-instance
+    classification probabilities (i.e. the probability of an instance to be
+    classified as class $C$ in the vote-based classification) are thus defined
+    as the fraction of votes for that class.  Next, each instance is relabelled
+    to the class that minimizes the result of the multiplication of the class
+    probabilities with the misclassification cost for each class. Classes with a
+    low misclassification cost (e.g.  anomalous classes) can be expected to have
+    more members when compared to original input. This can be thought of as a
+    bias towards these classes.  Finally, the classifiers are retrained on the
+    relabelled set. Predictions for new instances are aggregated by voting as
+    well.
+  \item[Resampling] sampling the minority and majority classes differently, so
+    that the data on which the model is trained (the \emph{training sample})
+    does not reflect the class-distribution in the original sample. There are
+    two basic ways to achieve this \cite{drummond2003c4}:
+    \begin{description}
+      \item[Oversampling minority] instances of the minority class are
+        duplicated in the training sample to increase the number of available
+        examples. This can be advantageous when there is little data available
+        and removing instances is undesirable. The duplication is sometimes
+        extended to generation of new examples by adding noise
+        \cite{abe2006outlier}.
+      \item[Under-sampling majority] not all instances of the majority class are
+        included in training sample. This is preferred when enough data is
+        present so that (ideally) only duplicate information is removed and the
+        resulting training sample is smaller -- resulting in faster training
+        times.
+    \end{description}
+    The sampling probabilities can be set to reflect the costs of
+    misclassification.  Cost-based resampling is extremely similar to
+    cost-sensitive classification.  Under-sampling, however, may be beneficial
+    to efficiency when representative samples can be constructed (i.e. enough
+    data is present).  A major advantage of resampling is that can be employed
+    on top of any classifier.  An extensive overview of resampling to correct
+    for class imbalance can be found in \cite{estabrooks2004multiple}.
+
+  \item[Boosting] training multiple simple (or \emph{weak}) classifiers and
+    aggregating their output to produce a final label can be beneficial when
+    classes are imbalanced. Such a group of classifiers is generally known as an
+    \emph{ensemble}. AdaBoost from \cite{freund1997decision} is a classic
+    example. In each round, a classifier is trained on a training set annotated
+    with per-instance misclassification cost (the \emph{weight}).  These are
+    adjusted, so that misclassified items receive heavier weights in the next
+    round. The confidence or \emph{strength} of the weak classifiers is
+    decreased as a function of the number of previously misclassified items in a
+    per-round fashion. The final label is determined by summing the
+    strength-weighted outputs of all classifiers.
+\end{description}
+
+The above techniques can be applied both in `generic' classification and anomaly
+detection. An important --often implicit-- assumption they rely on, however, is
+that the original dataset contains a sufficiently representative set of
+outliers. This might pose a problem due to the limited availability of a
+representative set of anomalies. When data changes over time, new kinds of
+anomalies may enter the data set \cite{gornitz2013toward}. A convincing example
+of this can be found in anomaly detection for intrusion detection, where a model
+should be able to detect attacks of an entirely new \emph{kind} as well as known
+attacks. A method that takes detecting unknown anomalies into account can be found
+in the next section.
+
+\subsection{Semi Supervised}
+\label{subsec:semi_supervised}
+% Separate cases
+%  - data is known to be 'normal' -> fit model to describe data
+%  - novel class detection. data is known to be normal -> fit model to describe
+%    data.
+% - Barely any real-life applications
+% - Mostly artificial data (it seems)
+% - Check 'Semi-Supervised Outlier Detection'
+%   -> "The key of our approach is an objective function that punishes poor
+%      clustering results and deviation from known labels as well as restricts the
+%      number of outliers.
+% - Check 'Unsupervised Outlier Detection and Semi-Supervised Learning'
+%   - Appears to focus on clustering and finding points that do not belong to
+%     a cluster.
+%   - ....
+%   -> 
+% - Check 'Semi-supervised outlier detection based on fuzzy rough C-means
+%   clustering' 
+%   -> objective function minimizing sum sq. error of clustering
+%      results, deviation from known labelled examples and n0 of outliers
+% - Not a lot of real-life applications.
+
+% - can be reduced to binary semi-supervised binary classification
+%   (Semi-Supervised Novelty Detection).
+% - SVDD^neg
+Semi-supervised methods can be applied when some class labels are present and
+some are missing. Every supervised method can be `transformed' into a
+semi-supervised method by completely ignoring the unlabelled instances.
+Although such an approach would lead to a method that adheres to the strict
+definition, only methods that actually take the unlabelled instances into
+account during training and classification are meant in most literature.  In
+this section, some examples of semi-supervised anomaly detection methods are
+treated.
+
+Similarly to the fully-supervised scenario, classification methods for the
+semi-supervised scenario can be adapted for the anomaly detection domain by
+weighting, resampling and boosting. A large variety of semi-supervised
+classification methods can be found in \cite{zhu2005semi}. The two methods
+specifically designed for anomaly detection in \cite{gao2006semi} and
+\cite{xue2010semi} follow a different scheme: both rely on existing
+semi-supervised clustering techniques with an adapted objective function. The
+semi-supervised clustering methods they rely on are K-means clustering from
+\cite{macqueen1967some} and fuzzy rough C-Means clustering from
+\cite{hu2005improved}.  The objective function to minimize contains an overall
+clustering score, deviation from known instances and number of outliers. There
+are no test results of the algorithm proposed in \cite{gao2006semi}. The tests
+results in \cite{xue2010semi} indicate that results vary strongly on the chosen
+number of clusters, their precalculated centres and various other parameters.
+A method for obtaining these is part of future work. All of these
+semi-supervised methods originate from a supervised method and also require a
+representative sample of all anomalies in the training sample, which might be
+hard in some situations.
+
+Another approach is taken in \cite{gornitz2013toward}. The authors argue that
+because of lacking information on possible (future) anomalies, it might be
+better to adapt unsupervised methods for semi-supervised learning instead of
+using generic semi-supervised classification methods as a basis. An SVM-inspired
+unsupervised technique from \cite{tax1999support} by the name of \emph{Support
+Vector Data Description} (SVDD) is used as a basis. This SVDD can be seen as an
+unsupervised one-class classifier: it forms a sphere around the data with radius
+$R$. The objective is to minimize the sphere, i.e. to minimize volume $R^2$
+while still containing most of training examples.  To enable non-spherical
+shapes, the problem can be solved in feature space by applying a kernel (see
+Section~\ref{subsec:extreme_value_model}).  Slack variables are used to allow
+for points to lie outside of the `ball'. In the original paper, an adaptation
+that includes negative examples (i.e.  labelled anomalies) in the optimization
+goal is described. It uses a similar approach as the weighted two-class SVM
+described in Section~\ref{subsec:fully_supervised}: all unlabelled points are
+assumed to be normal and the slack variables are weighted differently for
+wrongly classified anomalous and (assumed) normal points. However, in
+\cite{gornitz2013toward}, it is shown that this problem is not guaranteed to be
+convex. This makes it possible for the solving algorithm to get stuck in local
+optima. Therefore, its authors propose an alternative formulation which is
+convex when combined with some types of kernel functions (most notably the
+popular \emph{Radial Basis Function} (RBF) kernels), which they call
+Semi-Supervised Anomaly Detection (SSAD). This method outperforms existing
+methods on data sets in which new types of anomalies are introduced after
+training the model.
+
+\subsection{Active Learning}
+\label{subsec:active_learning}
+% Active Learning for Anomaly and Rare-Category Detection
+% - Pelleg & Moore
+% - 
+In this section we will treat some methods that can actively request labels for
+instances. Initially, all points are unlabelled. For a number of iterations,
+instances to be labelled are selected. Different criteria can be used for
+selecting these instances. The working model should be updated to reflect the
+feedback by the expert correctly. This setting is known as \emph{Active
+Learning}. In active learning, the aim is to build some model while requesting
+as little labels as possible, i.e. to iteratively select unlabelled instances
+that would lead to the largest improvement of model performance. Generally, the
+expert is assumed to provide correct class labels all of the time.
+
+The method in \cite{pelleg2004active} assumes a mixture model fit to the data
+and its design is specific to be effective on large data sets with extremely few
+anomalies (0.001\% outliers in a set of 10,000 instances). The method starts by
+clustering using the EM algorithm (see
+Section~\ref{subsec:probabilistic_model}). Next, the following steps are
+performed in an iterative fashion: selecting the top-35 instances for labelling
+(1) and performing a semi-supervised alternative to EM (2). The following
+criteria are used alternately for selecting instances in step 1: instances which
+are far away from the clusters they have been assigned to by the EM algorithm
+and instances for which the likelihoods are similar for all components in the
+mixture according to the EM algorithm. These criteria are named \emph{low
+likelihood} and \emph{ambiguity} respectively the authors. Using these criteria
+in an alternating fashion yields the best results. The alternating of the low
+likelihood and ambiguity criteria is dubbed \emph{interleave} and has proved
+successful in other settings as well \cite{stokes2008aladin}. The adaptation of
+the EM algorithm to include class labels for step 2 consists of overriding the
+class-probabilities to $1$ for the actual class and $0$ for all other classes
+after the E-step.
+
+% ALADIN
+% - extension of Pelleg & Moore
+% - Usage of unsupervised classifier and semi-supervised anomaly detector
+% - Assumption that points in same cluster are the same
+%   -> cluster points
+%   -> check which points might be outliers <- HOW?
+%   -> 
+% Better skip for now..
+
+% Outlier By Example (OBE)
+% -
+Another active learning approach is presented in \cite{zhu2004obe}, where the
+unsupervised method LOCI (see Section~\ref{subsec:proximity_model}) is combined
+with a two-class SVM. First, the MDEF values for all points for multiple radii
+$r$ are computed. Next, all instances are sorted descending based on the maximum
+MDEF across all $r$. A number of suspected anomalies and normal points are
+selected from the top and bottom of this sorted list. Let POS and NEG denote the
+top and bottom of the list respectively. A two-class SVM is trained on the set,
+where POS and NEG form the training data. Next, the element closest to the
+margin on the negative (e.g. non-anomaly) side is selected. If the selected
+instance is an anomaly according to the expert, the subsequent next instance on
+the negative side of the decision boundary is selected. If the selected instance
+is not anomalous according to the expert, an instance is selected in between the
+last reported anomaly and the last reported normal instance. When no instances
+have been reported to be anomalous by the expert, an artificial instance on the
+decision boundary or the closest instance to the positive (i.e. anomalous) side
+can be used. The selection mechanism used here is generally known as the
+\emph{margin strategy} for SVMs.  It was originally presented in
+\cite{tong2002support}, where it was shown why it can be expected to lead to
+maximal classifier improvement in the general case.
+%NOTE: why not take one of the support vectors, i.e. one of the classified
+%anomaly points close to the anomaly decision boundary?
+The feedback from the expert adds instances to POS and NEG, after which a new
+model is trained in the next iteration. Convergence is defined as receiving a
+negative answer on both type of queries to the expert. The robustness against
+the multi-granularity problem and against differences in local density and the
+SVMs guaranteed optimal separating hyperplane are presented as the methods main
+strengths.
+
+% Toward Supervised Anomaly Detection (SVM-based)
+% - Toward Supervised Anomaly Detection
+The semi-supervised SSAD method presented in the previous section has been
+extended with a selection mechanism as well. As it is based on the unsupervised
+method SVDD, the first round does not have to be treated as a special case: the
+method bootstraps using vanilla SVDD. In subsequent rounds, points are queried
+by a combination of the margin strategy and a term that selects points that have
+little labelled neighbours. This latter term is used to maintain performance
+when new types of outliers are introduced.  It consists of an adjacency matrix
+of training instances where all \emph{verified} labels for each instance's $k$
+nearest neighbours are stored. By calculating the sum over all $k$ nearest
+neighbours, clusters of previously unknown data points can be found. Points in
+these clusters will have a low resulting sum. Class labels for positive
+(normal) and negative (anomaly) classes are encoded as $1$ and $-1$ respectively
+in SSAD, so that points which neighbour to both classes are also preferred in
+the next labelling round.
+
+% TODO: add a visualisation of SVM & the active learning extension
+% - decision boundary (max-margin)
+
+ 
+% Nearest Neighbor-based Active learning for Rare Category Detection
+% - mwah..
+% - Mostly used on rare-category detection (i.e. not single points, but rather
+%   small clusters of outliers.
+% - so...skip for now
+
+% An interactive approach to Outlier Detection
+% - Konijn & Kowalczyk
+% - 1 citation... skip for now
+
+% Active learning and subspace clustering for anomaly detection
+% 1 Bayesian Network for estimating likelihood of pojnts
+% 2 Subspace clustering on result of (1) 
+%   - CLIQUE for subspace clustering
+% 3 ??? Active learning

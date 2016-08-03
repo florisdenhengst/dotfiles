@@ -1,0 +1,9 @@
+{% verbatim %}
+<li class='theme' ng-class="{'active-tab':selectedPage == title}">
+  <a href='{{url}}'>{{title}}</a>
+ 
+  <ul class='theme-nav'>
+    <ng-transclude></ng-transclude>
+  </ul>
+</li>
+{% endverbatim %}

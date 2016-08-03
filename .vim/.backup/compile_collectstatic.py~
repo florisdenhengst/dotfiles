@@ -1,0 +1,23 @@
+from django.core.management.base import BaseCommand, CommandError
+from django.contrib.management.staticfiles.management.collectstatic import collectstatic
+import sys
+
+class Command(NoArgsCommand):
+  """
+  Compiles files that need to be compiled and moves all resulting and normal
+  static files to the static root. 
+  Should be performed prior to the runserver command in development.
+  Should be performed prior to deployment in production.
+  """
+
+  args = ''
+  help = """Compiles files that need to be compiled and moves all resulting and
+  normal static files to the static root"""
+
+  def handle_noargs(self, **options):
+    #if(len(*args) > 0 or len(**options) > 0):
+    #  raise CommandError("""compile_collectstatic takes nog additional
+    #                        arguments!""")
+    sys.stdout.write('Collecting staticfiles:')
+    collectstatic.handle_noargs()
+    raise CommandError("Not yet implemented!")

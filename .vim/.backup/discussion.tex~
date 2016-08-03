@@ -1,0 +1,192 @@
+\chapter{Discussion}
+\label{ch:discussion}
+% main goal: What do the findings mean?
+% DO
+% - restate research focus (echo from introduction)
+%   - Why was this research done?
+% - link results to research question
+%   - Restate / Summarize findings
+%   - Interpret findings
+%     - explain the extent to which the original research question was answered.
+%     What are limitations?
+%     - state whether / how data supports the hypothesis (N/A? -- how to fill
+%     this up then?)
+%     - account for results that differ from expectation (N/A? -- probably just
+%     explain 'bad performance')
+%   - Fit results into bigger picture
+%     - Compare to other studies
+%     - Explain differences or similarities
+% - make suggestion for further action
+%   - Discuss strengths of study (what is new)
+%   - Discuss limitations
+%   - State implications of results for specific issues or for the field as a
+%   whole (idea: make separate recommendations for Crunchr and the field)
+%   - recommendation of further research
+
+% DO NOT
+% - repeat results
+
+
+% - Restate research focus: ``Why did we do it?''
+In this chapter, we reflect on the choices made in this research and investigate
+key assumptions and their implications. First, we treat a contradiction in the
+requirement of being able to handle a lack of \emph{a priori} knowledge and the
+varying definitions of outliers. Secondly, we investigate the contribution of
+this research to existing work. We continue this chapter by a discussion on some
+of the results in order to enlarge the comprehension of the problem and methods
+used in this chapter, including some suggestions for further research. This
+chapter is closed by some remarks on the usage of the proposed method in a
+real-world scenario.
+
+\section{Lacking \emph{a priori} Knowledge}
+The task of detecting outliers without \emph{a priori} knowledge requires some
+closer inspection. From the analysis of related work in
+Chapter~\ref{ch:related_work}, we have seen how a taxonomy of methods can be
+built from different definitions of the term outlier. It can be understood that
+different definitions of the term outlier are expected to lead to different
+performance on a given data set: when the definition of outlier that is encoded
+into the data set by the actual class labels or by judgement of the expert
+matches the definition that drives the method being applied to the data, we can
+expect performance to be optimal. Consequently, there is a relation between the
+choice for unsupervised outlier detection methods and up-front knowledge on the
+data or problem domain. We proceed to investigate how this relation of
+unsupervised methods with predefined definitions of `outlier' affects our `no
+\emph{a priori} knowledge' requirement.
+
+An up-front notion of what an outlier looks like, is of course a form of \emph{a
+priori} knowledge. Any choice for an unsupervised method should come from some
+notion of outlier, which conflicts with our goal of finding outliers without
+\emph{a priori} knowledge. This contradiction could be seen as the end point for
+any research in this direction. A further inspection of the various unsupervised
+methods, however, shows that the various definitions of outliers make
+assumptions that are of a different nature and of a different strictness. Some
+methods, for example, require an assumption on the underlying distribution of
+the data or on the presence of globally consistent correlations, whereas others
+have less far-reaching assumptions such as data being clustered in some form or a
+distance metric being applicable to the data set.
+
+We have attempted to go on with our research by selecting unsupervised methods
+with relatively narrow assumptions and robustness against specific
+characteristics of the data set, by using density-based methods with robustness
+against differences in local density. Although this alleviates the problems with
+a lack of up-front knowledge somewhat, it does not solve these problems
+completely. Some further research in this direction could be to find a
+definition of outlier that matches definition of the expert more explicitly.  An
+alternative approach to solving the problem in this research is to reformulate
+it as learning the correct outlier definitions based on user feedback. A simple
+approach would be to create multiple models simultaneously and select the one
+with the best performance. Labels could be queried via the \emph{ambiguity} and
+\emph{low likelihood} strategy as in \cite{pelleg2004active}. A more
+sophisticated approach would consist of applying user feedback in finding the
+best combination of multiple unsupervised models, a technique that is known as
+\emph{ensemble learning}. The former suggestion is more straightforward than the
+latter, whereas the latter is more flexible. The latter suggestion is
+specifically interesting in the light of the requirement of lacking \emph{a
+priori} knowledge, as it also does not require the assumption of a single
+definition of `outlier' that matches all of the data well.
+
+\section{Novelty of Proposed Method}
+The notion of separating noise and anomalies through a combination of
+unsupervised and supervised methods as presented in this research is uncommon in
+this domain. The lack of an expert that is willing and accessible to provide
+correct labels might be one of the causes for this. We note that in our use
+case, such an expert is not only accessible, but would have to do the labelling
+regardless of our method being in place. The costs that are introduced by
+adopting the proposed method would therefore fully consist of training the model
+during data set validation once a robust implementation has been made.
+
+The novelty in the approach taken lies in iteratively training a (possibly
+fully) supervised component by feeding a selection mechanism with the results
+from both a supervised and an unsupervised model. Similar attempts either use an
+unsupervised model only once or contain a single semi-supervised model to
+achieve `active learning' \cite{zhu2004obe} \cite{tong2002support}
+\cite{pelleg2004active}. We believe this contribution could be extended by
+populating the unsupervised component by an ensemble of unsupervised models.
+This opens the direction for finding different \emph{kinds} of outliers
+efficiently, from which the supervised component might benefit heavily.  Another
+extension would be incorporating outlier scores produced by the unsupervised
+component in the final classification. Both of these suggestions are possible
+directions for further research.
+
+\section{Limitations of Selection Mechanism}
+Our proposed selection mechanism is based on (1) the rank-based disagreement of
+the supervised and unsupervised component and (2) the margin strategy. We derive
+anomaly ranks for the supervised component from the distances of instances to
+the decision boundary. Since the margin strategy is also based on distance to
+the decision boundary (see Section~\ref{sec:selection_mechanism} for details),
+both elements of the proposed selection mechanism are based on the same
+heuristic.  This might result in some regions of the data set not being
+investigated properly. When instances in a region are far from the decision
+boundary, we fully depend on the unsupervised method to flag these these points
+as possible outliers. We propose two extensions to our method that could be
+investigated in future work.
+
+The first proposed extension  relies on employing a \emph{stochastic} margin
+strategy in which a selection probability is assigned to each instance; the
+actual selection is by random selection based on the selection probabilities.
+The selection probabilities can be determined as a function of the distance to
+the decision boundary. The most straightforward approach would sum all distances
+and give each instance part of a roulette wheel that matches its distance as a
+proportion of this sum. This `roulette wheel' approach can be modified into more
+elaborate schemes, such as ranking all instances based on distance and sampling
+them according to some distribution based on the order. For example, sampling
+from the ranked instances by the exponential distribution would lead to the
+closest instances having a high chance of being selected.
+
+Another more direct strategy to counteract the problem of only querying
+instances in a specific region of the data domain can be found in
+\cite{gornitz2013toward}. An \emph{adjacency matrix} in which instances that are
+close-by is built up. Labelled instances propagate their labels to their
+\emph{k}-nearest neighbours as `dummy labels'. Regions of the data that have not
+been inspected by the expert can be found by looking for clusters that have no
+or little labels after propagation. Extending this adjacency matrix to include
+robustness against differences in local density is to be investigated in future
+work.
+
+\section{Generation of Labels}
+As noted in Section~\ref{sec:ground_truth}, not all instances in the Domain data
+set were labelled by the expert. An original labelling as done by the expert was
+extended by a second labelling round in which instances which flagged as outlier
+from various methods (LOF, LOCI, SSAD) with various parameter settings. This way
+of establishing ground truth has introduced some bias towards these methods in
+this research. It is unclear how many instances were originally investigated,
+but 10 instances were flagged as anomaly prior to this research. The remaining
+19 anomalies were found after labelling about 52 instances elicited by anomaly
+detection methods. The bias introduced by this practice could be significant,
+which is subject to further investigation. Note that this bias is only present
+for the
+domain data set.
+
+\section{A Note on Generalisability}
+\label{sec:note_generalisability}
+As we have seen from the Recall learning curve in
+Figure~\ref{fig:learning_curve_recall_single} the method can aid in finding
+anomalies in a single data set more quickly. It does not require any class
+labels to be present initially. The model, however, fails to find a satisfactory
+number of anomalies on unseen data
+(Figure~\ref{fig:learning_curve_recall_multiple}). A simple unsupervised method
+(e.g. LOF) outperforms our proposed method on test data in terms of its optimal
+F1 score -- taking into account that the unsupservised methods were optimized on
+F1 score directly (e.g. by influencing decision threshold $\theta$) and the
+supervised methods were optimized on unseen data indirectly (e.g. by influencing
+model hyperparameter $C$ and $\gamma$).  Incorporating the output of the
+unsupervised method as suggested previously in this chapter could boost
+performance here too as apparently the unsupervised method can elicit outliers
+on previously unseen data better than the trained supervised models. In addition
+to this possibility for further research, we advise to always put some of the
+previously unseen data up for labelling to the expert and not rely on a model
+that was trained exclusively on a single data upload.
+
+We did not investigate whether the differences between performance of the
+unsupervised and supervised methods are statistically significant. Some of the
+differences appear significant, e.g. the $max(F1)$ for LOF is slightly over two
+times as much as its LOCI counterpart on the Domain data set in
+Table~\ref{tab:unsupervised_results}, whereas other differences may be
+attributable to noise, e.g. the comparison of performances on the Allhypo
+Thyroid data set in Table~\ref{tab:proposed_unsup_comparison}. In order to get a
+good understanding of how well our method generalises, and whether it actually
+adds anything to a bare unsupervised methods, a statistical analysis of these
+differences is required.
+
+
+

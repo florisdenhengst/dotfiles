@@ -1,0 +1,23 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models, migrations
+import os
+
+def get_file(file_name):
+  f = open(os.path.join(os.path.dirname(__file__), file_name))
+  query = f.read()
+  return query
+  
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ("database", "0022_auto_20141222_1500"),
+    ]
+
+    operations = [
+        migrations.RunSQL("DROP VIEW IF EXISTS view_convertedemployeedates", get_file("0016_modify_view_dates.sql")),
+        
+        migrations.RunSQL(get_file("0023_modify_view_dates.sql"), 
+           "DROP MATERIALIZED VIEW IF EXISTS view_converteddates")
+    ]

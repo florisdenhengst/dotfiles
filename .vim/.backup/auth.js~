@@ -1,0 +1,226 @@
+/**
+ * On page load, rebuild auth state
+ */
+
+angular.module('kapstok').run(function($rootScope, $http, $state, $location) {
+
+  $rootScope.auth = {
+      appMap: {
+          "organisation": 0,
+          "workforce":    1,
+          "succession":   2,
+          "talent":       3,
+          "preference":   4,
+          "reward":       5,
+      },
+      getFriendlyName: function() {
+        if(this.firstName && this.lastName) {
+          return this.firstName + " " + this.lastName;
+        }
+        else if(this.firstName) {
+          return this.firstName;
+        }
+        else if(this.lastName) {
+          return this.lastName;
+        }
+        else {
+          return this.userName;
+        }
+      },
+      isAccessible: function(appName) {
+        return this.apps.indexOf(this.appMap[appName]) > -1;
+      },
+      stateIsInApp: function() {
+        for(var appName in this.appMap) {
+          if($state.current.name.indexOf(appName) == 0) {
+            return true;
+          }
+        }
+
+        return false;
+      },
+      redirectIfNotLoggedIn: function() {
+        if(!this.loginState) {
+          // show &nbsp; if 'simply' not logged in and no detailed
+          // message is available
+          this.statusMessage = '\u00A0';
+          this.next = $location.url();
+          $state.go('auth', {}, { reload: true });
+        }
+      },
+      redirectIfNotAllowed: function() {
+        // pages outside an app (e.g. auth) are always allowed
+        if(!this.stateIsInApp())
+          return;
+
+        var currentIndex = this.appMap[$state.current.name.split('.')[0]];
+
+        for(var i = 0; i < this.apps.length; i++) {
+          if(this.apps[i] == currentIndex) {
+            return;
+          }
+        }
+
+        // we are in an app and we are not allowed
+        $state.go('error402');
+      },
+      authChecked: false,
+      loginState: false,
+      userName: null,
+      firstName: null,
+      lastName: null,
+      apps: [],
+      statusMessage: null,
+  };
+
+  $rootScope.$on('$stateChangeSuccess', function() {
+    if($rootScope.auth.authChecked && !$state.includes('auth')) {
+      $rootScope.auth.redirectIfNotLoggedIn();
+      $rootScope.auth.redirectIfNotAllowed();
+    }
+  })
+
+  $http.get('/api/get_auth')
+    .success(function(data, status, headers, config) {
+      $rootScope.auth.loginState = true;
+      $rootScope.auth.userName = data.user.userName;
+      $rootScope.auth.firstName = data.user.firstName;
+      $rootScope.auth.lastName = data.user.lastName;
+      $rootScope.auth.apps = data.apps;
+      $rootScope.auth.statusMessage = "Login successful."
+      $rootScope.auth.authChecked = true;
+
+      $rootScope.auth.redirectIfNotLoggedIn();
+      $rootScope.auth.redirectIfNotAllowed();
+    })
+    .error(function() {
+      $rootScope.auth.authChecked = true;
+      $rootScope.auth.redirectIfNotLoggedIn();
+      $rootScope.auth.redirectIfNotAllowed();
+    });
+});
+
+/**
+ * Loads state of login page. If action == logout, then perform a logout request. If successful,
+ * set the client-side state to logged out and show an info message. If unsuccessful, keep client
+ * state logged in and show an error message.
+ */
+
+angular.module('kapstok').controller('AuthController', function(
+    $rootScope,
+    $scope,
+    $http,
+    $state,
+    $log) {
+
+  /**
+   * Performs a login request. If successful, set the client-side state to logged in and redirect to
+   * "next" URL. If unsuccessful, show an error message.
+   */
+
+  $scope.attemptLogin = function() {
+    var userName = $scope.userName;
+    var password = $scope.password;
+
+    $scope.auth.statusMessage = "Logging in...";
+
+    // We do a form-style POST request to allow django-ratelimit to extract the username
+    // and apply per-user rate limiting
+    $http({
+      method: 'POST',
+      url: '/api/login',
+      data: $.param({username: userName, password: password}),
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'}
+    }).success(function(data, status, headers, config) {
+      $scope.auth.loginState = true;
+      $scope.auth.userName = data.user.userName;
+      $scope.auth.firstName = data.user.firstName;
+      $scope.auth.lastName = data.user.lastName;
+      $scope.auth.apps = data.apps;
+      $scope.auth.statusMessage = "Login successful.";
+      if($scope.auth.next) {
+        var next = $scope.auth.next;
+        $scope.auth.next = null;
+        location.href = next;
+      } else {
+        $state.go("home");
+      }
+    }).error(function(data, status, headers, config) {
+      $scope.auth.loginState = false;
+      $scope.auth.userName = null;
+      $scope.auth.firstName = null;
+      $scope.auth.lastName = null;
+      $scope.auth.apps = [];
+      // Show different message when ratelimiter kicked in
+      if (status == 429) {
+        $scope.auth.statusMessage = "Too many login attempts. Please try again at a later time"
+      } else {
+        $scope.auth.statusMessage = "Couldn't login.";
+      }
+    });
+  };
+
+  /**
+   * Performs a logout request
+   */
+
+  $scope.attemptLogout = function() {
+    $log.log("auth.js: Attempt logout");
+    $scope.auth.statusMessage = "Logging out...";
+    $http.post('/api/logout')
+      .success(function(data, status, headers, config) {
+        $scope.auth.loginState = false;
+        $scope.auth.userName = null;
+        $scope.auth.firstName = null;
+        $scope.auth.lastName = null;
+        $scope.auth.apps = [];
+        $scope.auth.statusMessage = "Logout successful";
+        $state.go('auth');
+        $log.log("auth.js: Logout successful");
+      })
+      .error(function(data, status, headers, config) {
+        $scope.auth.statusMessage = "Couldn't logout";
+        $log.warn("auth.js: Couldn't logout")
+      });
+  }
+
+  /**
+   * Opens a new form to have user enter his/her e-mail adress
+   * in order to request a new password.
+   */
+
+  $scope.resetPassword = function() {
+    $('#request-new-password').css('display', 'inline')
+  }
+
+  function validateEmail(email) {
+      var re = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+      return re.test(email);
+  }
+
+
+  /**
+   * Request a new password
+   */
+
+  $scope.requestNewPassword = function() {
+    $log.log("auth.js: Request new password");
+    $scope.auth.statusMessage = "Requesting new password...";
+    if(!validateEmail($scope.email)){
+      $scope.auth.statusMessage = "Please enter a valid e-mail address!";
+      $('#email-box').css('border', '1px solid red');
+      return
+    }
+    $http.post('/api/forgot_password/', {'email': $scope.email})
+      .success(function(data, status, headers, config){
+        $scope.auth.statusMessage = "An e-mail has been sent to Crunchr requesting a new password. We will respond as soon as possible!"
+        $state.go('auth');
+        $log.log("auth.js: Requesting new password successful");
+        $('#request-new-password').css('display', 'none');
+      })
+      .error(function(data, status, headers, config) {
+        $scope.auth.statusMessage = "Something went wrong requesting a new password!";
+        $log.warn("auth.js: Couldn't request new password");
+      });
+  }
+});

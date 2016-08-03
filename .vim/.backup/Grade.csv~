@@ -1,0 +1,17 @@
+id;global_grade;local_grade;description;score;missing
+1;Associate Professional;;;;FALSE
+2;Associate Support Staff;;;;FALSE
+3;Senior Professional;;;;FALSE
+4;Manager II;;;;FALSE
+5;Manager I;;;;FALSE
+6;Professional;;;;FALSE
+7;Unknown;;;;TRUE
+8;Supervisor I;;;;FALSE
+9;Supervisor II;;;;FALSE
+10;Support Staff;;;;FALSE
+11;Senior Support Staff;;;;FALSE
+12;Advisor;;;;FALSE
+13;Senior Manager I;;;;FALSE
+14;Senior Advisor;;;;FALSE
+15;UG NONE;;;;FALSE
+16;Senior Manager I ;;;;FALSE

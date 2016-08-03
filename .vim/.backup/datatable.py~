@@ -1,0 +1,364 @@
+import copy
+from datetime import date, datetime, time
+
+class DataTable():
+  def __init__(self):
+    self.rows = []
+    self.cols = []
+    self.title = ""
+    self.p = {}
+  
+  @classmethod
+  def with_title(cls, title):
+    result = cls()
+    result.title = title
+    return result
+  
+  @classmethod
+  def from_data(cls, data):
+    result = cls()
+    result.cols.extend(data['cols'])
+    result.rows = copy.deepcopy(data['rows'])
+    result.title = data['title']
+    result.p = data['p']
+    return result
+  
+  @classmethod
+  def with_columns(cls, data):
+    result = cls()
+    result.cols.extend(data.cols)
+    return result
+
+  def add_properties(self, properties):
+    if not isinstance(properties, type({})):
+      raise TypeError("Properties cannot be added, argument is not a dictionary!")
+    
+    for property, value in properties.items():
+      self.p[property] = value
+  
+  def add_column(self, data_type, label="", id="", show=True):
+    if data_type == type({}):
+      raise TypeError("Cannot store dictionaries in DataTable cells!")
+    if not isinstance(data_type, type):
+      raise TypeError("%s is not a python type!" % data_type)
+    
+    # Add column definition
+    self.cols.append({
+        'type': data_type,
+        'label': label,
+        'id': id,
+        'show': show
+    })
+    
+    # Add empty column data to each exisiting row
+    for row in self.rows:
+      row.append({ 'v': None })
+    
+    return len(self.cols)
+
+  def add_row(self, values):
+    if len(values) != len(self.cols):
+      raise ValueError("Expected %d columns but length of values was %d" %
+          (len(self.cols), len(values)))
+    
+    data_objects = []
+    for index,value in enumerate(values):
+      # support cells in dictionary notation: e.g. { 'v': 42, 'f': "forty-two" }
+      if isinstance(value, type({})):
+        print('{}')
+        if not "v" in value:
+          raise TypeError("Missing v in value dictionary")
+        
+        if  not isinstance(value['v'], self.cols[index]['type']) and \
+            not isinstance(value['v'], type(None)):
+          raise TypeError("Could not add %s, expected type %s but got %s" %
+              (value['v'], self.cols[index]['type']))
+        
+        data_object = { 'v': value['v'] }
+        
+        if('f' in value):
+          data_object['f'] = str(value['f'])
+          
+        data_objects.append(data_object)
+      
+      # support cells in list notation: e.g. [42, "forty-two"]
+      elif isinstance(value, type([])):
+        print('[]')
+        # support list as cell value
+        if self.cols[index]['type'] == type([]):
+          data_objects.append({ 'v': value })
+          continue
+        
+        if len(value) == 0:
+          raise TypeError("Cell value must not be an empty array")
+        
+        if  not isinstance(value[0], self.cols[index]['type']) and \
+            not isinstance(value[0], type(None)):
+          raise TypeError("Could not add %s, expected type %s but got %s" %
+              (value[0], self.cols[index]['type']))
+        
+        data_object = { 'v': value[0] }
+        
+        if len(value) >= 2:
+          data_object['f'] = str(value[1])
+        
+        data_objects.append(data_object)
+      
+      # support cells in simple value notation
+      else:    
+        print('test')
+        if  not isinstance(value, self.cols[index]['type']) and \
+            not isinstance(value, type(None)):
+          raise TypeError("Could not add %s, expected type %s but got %s" %
+              (value, self.cols[index]['type'], type(value)))
+        data_objects.append({ 'v': value })
+    
+    self.rows.append({ 'c': data_objects})
+    return len(self.rows)
+
+  def set_cell(self, row_index, column_index, value):
+    if row_index < 0:
+      raise IndexError("Row index %d is smaller than 0" % row_index)
+    
+    if row_index >= len(self.rows):
+      raise IndexError("Row index %d is larger than number of rows (%d)" %
+          (row_index, len(self.rows)))
+
+    if column_index < 0:
+      raise IndexError("Column index %d is smaller than 0" % column_index)
+    
+    if column_index >= len(self.cols):
+      raise IndexError("Column index %d is larger than number of columns (%d)" %
+          (column_index, len(self.cols)))
+
+    if not (isinstance(value, self.cols[column_index]['type']) or \
+            isinstance(value, type(None))):
+      raise TypeError("Couldn't set value: expected type %s but got %s" %
+          (self.cols[column_index]['type'], type(value)))
+    
+    self.rows[row_index]['c'][column_index]['v'] = value
+
+  def get_value(self, row_index, column_index):
+    if row_index < 0:
+      raise IndexError("Row index %d is smaller than 0" % row_index)
+    
+    if row_index >= len(self.rows):
+      raise IndexError("Row index %d is larger than number of rows (%d)" %
+          (row_index, len(self.rows)))
+
+    if column_index < 0:
+      raise IndexError("Column index %d is smaller than 0" % column_index)
+    
+    if column_index >= len(self.cols):
+      raise IndexError("Column index %d is larger than number of columns (%d)" %
+          (column_index, len(self.cols)))
+
+    return self.rows[row_index]['c'][column_index]['v']
+
+  def get_number_of_rows(self):
+    return len(self.rows)
+
+  def get_number_of_columns(self):
+    return len(self.cols)
+
+  def get_number_of_visible_columns(self):
+    counter = 0
+    for col in self.cols:
+      if col['show']:
+        counter += 1
+
+    return counter
+
+  def show_column(self, column_index):
+    if column_index < 0:
+      raise IndexError("Column index %d smaller than 0" % column_index)
+    
+    if column_index >= len(self.cols):
+      raise IndexError("Column index %d larger than the number of columns (%d)" %
+          (column_index, len(self.cols)))
+    
+    self.cols[column_index]['show'] = True
+
+  def hide_column(self, column_index):
+    if column_index < 0:
+      raise IndexError("Column index %d smaller than 0" % column_index)
+    
+    if column_index >= len(self.cols):
+      raise IndexError("Column index %d larger than the number of columns (%d)" %
+          (column_index, len(self.cols)))
+    
+    self.cols[column_index]['show'] = False
+      
+  def is_column_visible(self, column_index):
+    if column_index < 0:
+      raise IndexError("Column index %d smaller than 0" % column_index)
+    
+    if column_index >= len(self.cols):
+      raise IndexError("Column index %d larger than the number of columns (%d)" %
+          (column_index, len(self.cols)))
+    
+    return self.cols[column_index]['show']
+
+  def get_column_label(self, column_index):
+    if column_index >= len(self.cols) or column_index < 0:
+      raise IndexError('''Column index cannot be larger than the number of columns ({}), or 
+          smaller than zero!'''.format(len(self.cols)))
+    return self.cols[column_index].label
+
+  def get_column_type(self, column_index): 
+    if column_index >= len(self.cols) or column_index < 0:
+      raise IndexError('''Column index cannot be larger than the number of columns ({}), or 
+          smaller than zero!'''.format(len(self.cols)))
+    return self.cols[column_index]['type']
+
+  def remove_row(self, row_index):
+    if row_index >= len(self.rows) or row_index < 0:
+      raise IndexError('''Row index cannot be larger than the number of rows ({}), or 
+          smaller than zero!'''.format(len(self.rows)))
+    self.rows.remove(row_index)
+
+  def remove_column(self, column_index):
+    if column_index >= len(self.cols) or column_index < 0:
+      raise IndexError('''Column index cannot be larger than the number of columns ({}), or 
+          smaller than zero!'''.format(len(self.cols)))
+
+    self.cols.remove(column_index)
+
+  def get_column_range(self, column_index):
+    if column_index >= len(self.cols) or column_index < 0:
+      raise IndexError('''Column index cannot be larger than the number of columns ({}), or 
+          smaller than zero!'''.format(len(self.cols)))
+    
+    maximum = minimum = 0;
+    if self.get_number_of_rows == 0:
+      maximum = minimum = nill
+    else:
+      maximum = self.get_value(0, column_index)
+      minimum = self.get_value(0, column_index)
+      for i in range(1,len(self.rows)):
+        value = self.get_value(i, column_index)
+        if value > maximum:
+          maximum = value
+        if value < minimum:
+          minimum = value 
+
+    return {'max': maximum, 'min': minimum}
+
+  def get_distinct_values(self, column_index):
+    if column_index >= len(self.cols) or column_index < 0:
+      raise IndexError('''Column index cannot be larger than the number of columns ({}), or 
+          smaller than zero!'''.format(len(self.cols)))
+    
+    result = []
+    for row in self.rows:
+      value = row['c'][column_index]['v']
+      if value not in result:
+        result.append(value)
+
+    return result
+
+  def get_column_values(self, column_index):
+    if column_index >= len(self.cols) or column_index < 0:
+      raise IndexError('''Column index cannot be larger than the number of columns ({}), or 
+          smaller than zero!'''.format(len(self.cols)))
+    result = []
+    for row in self.rows:
+      result.append(row['c'][column_index]['v'])
+
+    return result
+
+  def set_title(self, title):
+    self.title = title
+
+  def get_title(self):
+    return self.title
+
+  def get_row_values(self, row_index):
+    result = []
+
+    for i in range(self.get_number_of_columns()):
+      result.append(self.get_value(row_index, i))
+    
+    return result
+
+  def get_value_by_label(self, label, row_index):
+    if row_index >= len(self.rows) or row_index < 0:
+      raise IndexError('''Row index cannot be larger than the number of rows ({}), or 
+          smaller than zero!'''.format(len(self.rows)))
+
+    index = 0
+    for c in self.cols:
+      if c['label'] == label:
+        return self.rows[row_index]['c'][index]['v']
+      index += 1
+
+    raise KeyError('''The given label is not in the table!''')
+
+
+  
+  def get_row_index(self, column_index, value):
+    if column_index >= len(self.cols) or column_index < 0:
+      raise IndexError('''Column index cannot be larger than the number of columns ({}), or 
+          smaller than zero!'''.format(len(self.cols)))
+
+    for i in range(self.get_number_of_rows()):
+      if self.get_value(i, column_index) == value:
+        return i
+    return -1;
+
+  def get_column_index(self, label):
+    for i in range(len(self.cols)):
+      if self.cols[i]['label'] == label:
+        return i
+    return -1
+
+  def increment_cell(self, row_index, column_index, increment=1):
+    if row_index >= len(self.rows) or row_index < 0:
+      raise IndexError('''Row index cannot be larger than the number of rows ({}), or
+          smaller than zero!'''.format(len(self.rows)))
+                
+    if column_index >= len(self.cols) or column_index < 0:
+      raise IndexError('''Column index cannot be larger than the number of columns ({}), or 
+          smaller than zero!'''.format(len(self.cols)))
+    if not (isinstance(1.0, self.get_column_type(column_index)) or
+        isinstance(1, self.get_column_type(column_index))):
+      raise TypeError('''Cannot increment, as column data type is not int or float!''')
+    
+    self.rows[row_index]['c'][column_index]['v'] += increment 
+    
+    return increment
+  
+  def scale_columns(self, column_range, scalar):
+    for i in column_range:
+      for row in self.rows:
+        row['c'][i]['v'] *= scalar
+  
+  def reverse(self):
+    self.rows = self.rows[::-1]
+    return self
+
+  def to_JSON(self):
+    result = {}
+    result["cols"] = copy.deepcopy(self.cols)
+    result["rows"] = copy.deepcopy(self.rows)
+    for col in result["cols"]:
+      if col['type'] ==  type("string"):
+        col['type'] = "string"
+      elif col['type'] == type(True):
+        col['type'] = "boolean"
+      elif col['type'] == type(1) or col['type'] == type(1.0): 
+        col['type'] = "number"
+      elif col['type'] == type(date(1900,1,1)):
+        col['type'] = "date"
+      elif col['type'] == type(datetime(1900,1,1,1)):
+        col['type'] = "datetime"
+      elif col['type'] == type(time(1)):
+        col['type'] = "timeofday"
+      elif col['type'] == type([]) or col['type'] == type(()):
+        col['type'] = "array"
+      elif col['type'] == type({}):
+        col['type'] = "object"
+    result['title'] = self.title
+    result['p'] = self.p
+    
+    return result

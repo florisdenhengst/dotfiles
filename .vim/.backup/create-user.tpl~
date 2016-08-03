@@ -1,0 +1,4 @@
+{extends "edit-user.tpl"}
+{block "title"}
+  Create a new user
+{/block}

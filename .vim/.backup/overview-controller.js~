@@ -1,0 +1,111 @@
+angular.module('organisation').controller('OrganisationHeadcountOverviewController', function(
+    $scope,
+    DataTable,
+    FilterData) {
+
+  $scope.waterfallChartOptions = {
+    'bar': {
+      'groupWidth': 33
+    },
+    'barMargin': 22,
+    'margin': {
+      'left'  : 90,
+      'right' : 30,
+      'bottom': 90,
+      'top'   : 40
+    },
+    'minHeight'     : 500,
+    'xAxisPadding'  : 0.5,
+    'ticks'         : 4,
+    'tooltip'       : true,
+    'tooltipColumns': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    'labelX'        : "Year",
+    'labelY'        : "FTE"
+  };
+
+  $scope.filter = FilterData;
+  $scope.postParams = {};
+
+  // Returns a copy of the timeslice array from the filter contents,
+  // but excludes a specified timeslice
+  function filterTimeslices(excludedId) {
+    return FilterData.contents.timeslice.filter((timeslice) => {
+      return timeslice.id !== excludedId;
+    });
+  }
+
+  // Updates the bucket datatable below the waterfall chart.
+  // The bucketId parameter refers to the 'id' of the column in the bucketDataTable.
+  function updateBucketDataTable(bucketId){
+    let previousParams = {};
+    if($scope.bucketParams === undefined){
+      // set defaults on intialization
+      previousParams = {
+        page:             1,
+        orderBy:          "lastName",
+        descending:       false,
+        excludeChildren:  false,
+        rowsPerPage:      '10'
+      }
+    } else {
+      // there are previous params
+      previousParams = $scope.bucketParams
+    }
+    $scope.bucketParams = {
+        startTimeslice:  $scope.postParams.startTimeslice[0],
+        endTimeslice:    $scope.postParams.endtimeslice[0],
+        bucketId:        bucketId,
+        view:            $scope.postParams.view,
+        page:            previousParams.page,
+        orderBy:         previousParams.orderBy,
+        descending:      previousParams.descending,
+        excludeChildren: previousParams.excludeChildren,
+        rowsPerPage:     previousParams.rowsPerPage
+    };
+  }
+
+  // When the filter has been loaded, load timeslices into content variables for
+  // the start and end multi-select. The start timeslice will be set to the second most recent
+  // timeslice, the end timeslice will be set to the most recent timeslice
+  FilterData.asyncGetContents().then(() => {
+    let timesliceList = FilterData.contents.timeslice;
+
+    $scope.startTimesliceList = filterTimeslices(timesliceList[0].id);
+    $scope.endTimesliceList = filterTimeslices(timesliceList[1].id);
+  });
+
+  // Every time the currently select start timeslice is changed,
+  // exclude the start timeslice from the end multi-select and update the bucketDataTable.
+  $scope.$watch("postParams.startTimeslice", (timesliceId, oldTimesliceId) => {
+    if(timesliceId !== oldTimesliceId) {
+      $scope.endTimesliceList = filterTimeslices(timesliceId[0]);
+      // use the current bucketId
+      if($scope.bucketParams !== undefined){
+        updateBucketDataTable($scope.bucketParams.bucketId);
+      }
+    }
+  });
+
+  // Every time the currently select end timeslice is changed,
+  // exclude the end timeslice from the start multi-select and update the bucketDataTable.
+  $scope.$watch("postParams.endTimeslice", (timesliceId, oldTimesliceId) => {
+    if(timesliceId !== oldTimesliceId) {
+      $scope.startTimesliceList = filterTimeslices(timesliceId[0]);
+      // use the current bucketId
+      if($scope.bucketParams !== undefined){
+        updateBucketDataTable($scope.bucketParams.bucketId);
+      }
+    }
+  });
+
+  // Every time the currently selected bucket changes, update the bucket parameters
+  // so that fo-include will load the empoyees belonging to that bucket
+  $scope.$watch("currentSelection", (newValue, oldValue) => {
+    if(newValue !== oldValue) {
+      let bucketIndex = newValue[1];
+      let bucketDatatable = $scope.headcountData.dataTables[1];
+      let bucketId = bucketDatatable.getColumnId(bucketIndex);
+      updateBucketDataTable(bucketId)
+    }
+  }, true);
+});

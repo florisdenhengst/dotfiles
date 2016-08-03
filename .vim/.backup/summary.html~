@@ -1,0 +1,80 @@
+<fo-message>
+  Welcome to the summary of your workforce statistics. This is the first step towards workforce
+  data analytics. In this section, you will find all the information you need for workforce
+  reporting. You can easily access breakdowns of any number reported here for advanced analytics
+  on your organisation structure and workforce.
+</fo-message>
+
+<div class="row">
+  <div class="col-xs-12">
+    <h1>Summary</h1>  
+  </div>
+</div>
+
+
+<div class="row">
+  <div class="col-xs-12">
+    <div class="content-divider" />
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-xs-4 col-xs-offset-7">
+    <div class="col-xs-10 col-xs-offset-3">
+      <div class="col-xs-4 text-button-dimensions">
+        <div class="text-button" ng-class="{'clicked': directOnly === 1}" ng-click="directOnly = 1">
+          Direct
+        </div>
+      </div>
+      <div class="col-xs-4 text-button-dimensions">
+        <div class="text-button" ng-class="{'clicked': directOnly === 0}" ng-click="directOnly = 0">
+          Indirect
+        </div>    
+      </div>
+      <div class="col-xs-4 text-button-dimensions">
+        <div class="text-button" ng-class="{'clicked': directOnly == undefined}" ng-click="directOnly = undefined">
+          Both
+        </div>   
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-xs-offset-2 col-xs-8">
+    <fo-include data="/api/organisation/summary/statistics" fo-loading="!ready">
+
+      <div class="row">
+        <fo-statbox class="col-xs-12"
+            label="$parent.data.cols[0].label"
+            value="$parent.data.rows[0].c[0].f">
+        </fo-statbox>
+      </div>
+    
+      <div ng-if="!$first" ng-repeat="i in $parent.range($parent.data.cols.length / 2) track by $index">
+        <div class="row">
+          <fo-statbox class="col-xs-6"
+              label="$parent.$parent.$parent.data.cols[$index * 2 - 1].label"
+              value="$parent.$parent.$parent.data.rows[0].c[$index * 2 - 1].f">
+          </fo-statbox>
+          <fo-statbox class="col-xs-6"
+              label="$parent.$parent.$parent.data.cols[$index * 2].label"
+              value="$parent.$parent.$parent.data.rows[0].c[$index * 2].f">
+          </fo-statbox>
+        </div>
+      </div>
+    </fo-include>
+  </div>
+
+  <div class="col-xs-1 col-xs-push-1">
+    <div class="graph-options lower">
+      <ul>
+        <fo-learn-widget></fo-learn-widget>
+        <li><ng-include src="'/static/kapstok/logos/export.svg'"></ng-include>EXPORT</li>
+        <li><a href="#/organisation?page=powerreport">
+            <ng-include src="'/static/kapstok/logos/power report.svg'"></ng-include>POWER REPORT
+        </a></li>
+      </ul>
+    </div>
+  </div>
+</div>

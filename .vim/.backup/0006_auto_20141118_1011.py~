@@ -1,0 +1,153 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models, migrations
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('database', '0005_auto_20141114_1601'),
+    ]
+
+    operations = [
+        migrations.RenameField(
+            model_name='employee',
+            old_name='datasource',
+            new_name='data_source',
+        ),
+        migrations.RenameField(
+            model_name='employee',
+            old_name='dateinposition',
+            new_name='date_in_position',
+        ),
+        migrations.RenameField(
+            model_name='employee',
+            old_name='performancestatus',
+            new_name='performance_status',
+        ),
+        migrations.RenameField(
+            model_name='employee',
+            old_name='retentionrisk',
+            new_name='retention_risk',
+        ),
+        migrations.RenameField(
+            model_name='employee',
+            old_name='talentstatus',
+            new_name='talent_status',
+        ),
+        migrations.RemoveField(
+            model_name='exchangerate',
+            name='cur_from',
+        ),
+        migrations.RemoveField(
+            model_name='exchangerate',
+            name='cur_to',
+        ),
+        migrations.AddField(
+            model_name='exchangerate',
+            name='currency_from',
+            field=models.ForeignKey(to='database.Currency', null=True, related_name='currency_from'),
+            preserve_default=True,
+        ),
+        migrations.AddField(
+            model_name='exchangerate',
+            name='currency_to',
+            field=models.ForeignKey(to='database.Currency', null=True, related_name='currency_to'),
+            preserve_default=True,
+        ),
+        migrations.AlterField(
+            model_name='businessunithierarchy',
+            name='child',
+            field=models.ForeignKey(related_name='hierarchy_child', to='database.BusinessUnit'),
+            preserve_default=True,
+        ),
+        migrations.AlterField(
+            model_name='businessunithierarchy',
+            name='parent',
+            field=models.ForeignKey(related_name='hierarchy_parent', to='database.BusinessUnit'),
+            preserve_default=True,
+        ),
+        migrations.AlterField(
+            model_name='functionalareahierarchy',
+            name='child',
+            field=models.ForeignKey(related_name='hierarchy_child', to='database.FunctionalArea'),
+            preserve_default=True,
+        ),
+        migrations.AlterField(
+            model_name='functionalareahierarchy',
+            name='parent',
+            field=models.ForeignKey(to='database.FunctionalArea', null=True, related_name='hierarchy_parent'),
+            preserve_default=True,
+        ),
+        migrations.AlterField(
+            model_name='locationhierarchy',
+            name='child',
+            field=models.ForeignKey(related_name='hierarchy_child', to='database.Location'),
+            preserve_default=True,
+        ),
+        migrations.AlterField(
+            model_name='locationhierarchy',
+            name='parent',
+            field=models.ForeignKey(to='database.Location', null=True, related_name='hierarchy_parent'),
+            preserve_default=True,
+        ),
+        migrations.AlterField(
+            model_name='position',
+            name='dotted_line',
+            field=models.ForeignKey(db_constraint=False, to='database.Position', null=True, to_field='position_id', related_name='position_dotted_line'),
+            preserve_default=True,
+        ),
+        migrations.AlterModelTable(
+            name='businessunit',
+            table='business_unit',
+        ),
+        migrations.AlterModelTable(
+            name='businessunithierarchy',
+            table='business_unit_hierarchy',
+        ),
+        migrations.AlterModelTable(
+            name='datasource',
+            table='data_source',
+        ),
+        migrations.AlterModelTable(
+            name='exchangerate',
+            table='exchange_rate',
+        ),
+        migrations.AlterModelTable(
+            name='functionalarea',
+            table='functional_area',
+        ),
+        migrations.AlterModelTable(
+            name='functionalareahierarchy',
+            table='functional_area_hierarchy',
+        ),
+        migrations.AlterModelTable(
+            name='locationhierarchy',
+            table='location_hierarchy',
+        ),
+        migrations.AlterModelTable(
+            name='performancestatus',
+            table='performance_status',
+        ),
+        migrations.AlterModelTable(
+            name='rawposition',
+            table='raw_position',
+        ),
+        migrations.AlterModelTable(
+            name='retentionrisk',
+            table='retention_risk',
+        ),
+        migrations.AlterModelTable(
+            name='retentionriskreason',
+            table='retention_risk_reason',
+        ),
+        migrations.AlterModelTable(
+            name='successionterm',
+            table='succession_term',
+        ),
+        migrations.AlterModelTable(
+            name='talentstatus',
+            table='talent_status',
+        ),
+    ]

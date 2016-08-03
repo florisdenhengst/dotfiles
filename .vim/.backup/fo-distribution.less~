@@ -1,0 +1,128 @@
+.distribution-wrapper {
+  min-height: 250px;
+
+  .distribution-tree-header {
+    font-size: 13px;
+    padding-left: 0px;
+    padding-right: 0px;
+    height: 43px;
+    background-color: @crunchr-dark-grey;
+    color: @crunchr-blue;
+
+    .tree-left-header{
+      border-right: 1px solid #142126;
+      padding:12px;
+      float:left;
+      width: ~"calc(100% - 200px)";
+      height: 43px;
+      &:hover {
+        background-color: @highlight-grey;
+      }
+    }
+
+    .tree-right-header{
+      border-left: 1px solid #38465A;
+      border-right: 1px solid #142126;
+      padding:12px;
+      float:left;
+      width: 100px;
+      height: 43px;
+      &:hover {
+        background-color: @highlight-grey;
+      }
+    }
+
+    &:hover {
+      cursor: pointer;
+    }
+
+    .active {
+      background-color: #1F2B37;
+    }
+
+    img {
+      height: 10px;
+      float:right;
+      margin-top: 3px;
+
+      &.ordered {
+      transform: rotate(90deg);
+      }
+
+      &.reversed {
+        transform: rotate(270deg);
+      }
+    }
+  }
+
+  ul.distribution-tree {
+    list-style: none outside none;
+
+    li {
+      margin: 15px 0;
+
+      label:hover {
+        cursor: pointer;
+        color:@highlight-orange;
+        fill:@highlight-orange;
+      }
+    }
+  }
+
+  .distribution-row {
+    &:hover {
+      color:@organisation-green;
+    }
+
+    .left-col {
+      padding-top: 6px;
+      padding-bottom: 6px;
+      float: left;
+      width: ~"calc(100% - 200px)";
+      float: left;
+      border-bottom: 1px solid @crunchr-grey;
+
+      label {
+        margin-bottom: 0px;
+        font-size: 15px;
+        font-weight:300;
+        text-transform: uppercase;
+
+        img {
+          height: 10px;
+
+          &.opened {
+            transform: rotate(90deg);
+          }
+        }
+      }
+
+      span {
+        margin-bottom: 0px;
+        font-size: 15px;
+        font-weight:300;
+        text-transform: uppercase;
+      }
+    }
+
+    .right-col {
+      padding-top: 7px;
+      padding-bottom: 5px;
+      padding-right: 6px;
+      min-height: 34px;
+      float: left;
+      text-align:right;
+      width: 100px;
+      border-left: 1px solid @crunchr-dark-grey;
+      border-bottom: 1px solid @crunchr-grey;
+
+      span {
+        font-size: 15px;
+        font-weight:300;
+        text-transform: uppercase;
+        margin-bottom: 5px;
+        margin-top:0px;
+      }
+    }
+  }
+}

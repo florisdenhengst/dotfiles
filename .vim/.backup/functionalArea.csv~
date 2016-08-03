@@ -1,0 +1,368 @@
+id;name;parent
+1;Global;0
+2;Accounting and Finance;1
+3;Administration;1
+4;Communications and Marketing;1
+5;Compliance and Regulation;1
+6;Engineering and Technical;1
+7;Information and Communications Technology;1
+8;Information and Knowledge Management;1
+9;Intelligence;1
+10;Legal and Parliamentary;1
+11;Monitoring and Audit;1
+12;Organisation Leadership;1
+13;People;1
+14;Science and Health;1
+15;Service Delivery;1
+16;Strategic Policy, Reseach, Project and Programme;1
+17;Trades and Labour;1
+18;Budget, Costs and Financial Analysis;2
+19;General Finance and Travel;2
+20;Procurement and Contracting;2
+21;Professional Accounting;2
+22;Executive Support;3
+23;Facilities and Property;3
+24;General Administrative Support;3
+25;Campaigns and Marketing;4
+26;Graphic Design / Illustration;4
+27;Public Relations and Stakeholder Management;4
+28;Writing and Editing;4
+29;Compliance / Regulation;5
+30;Enforcement;5
+31;Inspection;5
+32;Investigation;5
+33;Maritime;5
+34;Education and Training;6
+35;Engineering Professionals;6
+36;Examiners;6
+37;Land and Asset Management;6
+38;Technician;6
+39;Business Change;7
+40;IT Business Management;7
+41;Service Delivery;7
+42;Service Support;7
+43;Solutions Development;7
+44;Solutions Implementation;7
+45;Librarians;8
+46;Records and Knowledge;8
+47;Collection and Analysis;9
+48;Goverance and Policy;9
+49;Production and Dissemination;9
+50;Judicial and Other Legal Professionals;10
+51;Lawyers and Legal Advisors;10
+52;Legal and Court Officer;10
+53;Legislation;10
+54;Ministerial / Cabinet and Parliamentary Liaison;10
+55;Audit;11
+56;Risk;11
+57;Board Member;12
+58;Chief Executive / Statutory Office Holder;12
+59;Management and Planning;12
+60;Human Resource Professional;13
+61;Occupational Health and Safety;13
+62;Organisational Design;13
+63;Health and Allied Health Professionals;14
+64;Natural and Physical Science Professional;14
+65;Welfare Support Workers;14
+66;Customer Advice and Support;15
+67;Gallery, Museum and Tour Guides / Tourist Information;15
+68;Hospitality;15
+69;Program Delivery;15
+70;Design;16
+71;Evaluation;16
+72;Numerical Analysis;16
+73;Programme;16
+74;Project;16
+75;Research;16
+76;Strategic Policy;16
+77;Horticulturalists / Gardeners and Labourers;17
+78;Trades;17
+79;Transport and Logistics;17
+80;Vehicle and Equipment Maintenance / Operation;17
+81;Budgets;18
+82;Costing;18
+83;Financial Anlaysis, Policy and Planning;18
+84;Accounts Receivable / Payable;19
+85;Debt Recovery;19
+86;General Finance;19
+87;Travel;19
+88;Contract;20
+89;Grants Management;20
+90;Pricing and Cost Analysis;20
+91;Procurement Policy;20
+92;Purchasing;20
+93;General Accounting;21
+94;Management Accounting;21
+95;Taxation Accounting;21
+96;Governance and Secretariat;22
+97;Personal / Executive Assistance and Support;22
+98;Reception;22
+99;Building Maintenance and Fit-Out;23
+100;Facilities Management;23
+101;Security;23
+102;Administrative Support;24
+103;Business Management;24
+104;Data Entry;24
+105;Mail;24
+106;Processing;24
+107;Campaign;25
+108;Market Research;25
+109;Marketing;25
+110;Graphic Design;26
+111;Illustration;26
+112;Change Management;27
+113;Community Liaison;27
+114;Conference and / or Event Organization;27
+115;Messaging;27
+116;Public Relations;27
+117;Relationship / Stakeholder Management;27
+118;Editing;28
+119;Journalism / Authoring / Writing;28
+120;Speechwriting;28
+121;Technical Writing;28
+122;Character;29
+123;Community Detention;29
+124;Compliance Assessment;29
+125;Compliance Case Management;29
+126;Compliance Field;29
+127;Detained Goods Management;29
+128;Detention Assessment;29
+129;Detention Operation;29
+130;Entry Officer;29
+131;Identity;29
+132;Status Resolution;29
+133;Trade Assessment;29
+134;Visa Processing;29
+135;Border Enforecement Operations;30
+136;Cargo Examination;30
+137;Debt Recovery Enforcement;30
+138;Dog Handling / Training;30
+139;Quarantine;30
+140;Removals;30
+141;Biosecurity;31
+142;Meat Inspection;31
+143;Primairy Products Inspection;31
+144;Taxation Inspection;31
+145;Water Inspection;31
+146;Weith and Measurement Inspection;31
+147;Investigation;32
+148;Movement Monitoring;32
+149;Trade Remedies Case Management;32
+150;Maritime Response;33
+151;Maritime Standards Specialist;33
+152;Education;34
+153;Specialist Training;34
+154;Training and Assessment;34
+155;Chemical / Materials Engineering;35
+156;Civil Engineering;35
+157;Electrical Engineering;35
+158;Electronics Engineering;35
+159;Engineering Management;35
+160;Industrial, Mechanical / Production Engineers;35
+161;Marine Engineering;35
+162;Other Engineering;35
+163;Forensic Document Examination;36
+164;Patents Examination;36
+165;Plant Breeders Rights Examination;36
+166;Trade Technician;36
+167;Trademark / Design Examination;36
+168;Asset Management (Land & Property);37
+169;Cartography and Surveying;37
+170;Urban and Regional Planning;37
+171;Valuation;37
+172;Architectural, Building and Surveying Technician;38
+173;CCTVm Radio and Satellite Technician;38
+174;Civil Engineering Draftsperson and Technician;38
+175;Electrical Engineering Draftsperson and Technician;38
+176;Electronics Engineering Draftsperson and Technician;38
+177;Mechanical Engineering Draftsperson and Technician;38
+178;Other Building and Engineering Draftsperson / Technicians;38
+179;Business Process Analysis / Design;39
+180;Program and Project Management;39
+181;Procurement and Vendor Relations;40
+182;Quality Assurance;40
+183;Strategic Leadership;40
+184;Databases and Data;41
+185;Information/ Knowledge Management;41
+186;Infrastructure and Facilities;41
+187;Networks and Telecommunications;41
+188;Security;41
+189;Service Management;41
+190;Systems Administration;41
+191;Helpdesk / Support;42
+192;Training and Development;42
+193;Development and Programming;43
+194;Systems Analysis and Design;43
+195;Web and Multimedia Content Development;43
+196;Systems Integration and Deployment;44
+197;Testing;44
+198;Librarians;45
+199;Library Assistance;45
+200;Archivist;46
+201;Curator;46
+202;Genealogy;46
+203;Information Management;46
+204;Knowledge Management;46
+205;Records Management;46
+206;Border Intelligence;47
+207;Cyber Intelligence;47
+208;Data Mining;47
+209;Entity Targeting;47
+210;Geospatial Intelligence;47
+211;Human Intelligence;47
+212;Imagery Intelligence;47
+213;Intelligence Analysis;47
+214;Other Covert;47
+215;Signals Intelligence;47
+216;Surveillance;47
+217;Cyber Security;48
+218;Government Infrastructure and Base Security Policy;48
+219;National Security Advise;48
+220;Personnel Security;48
+221;Counter Intelligence;49
+222;Intelligence Assessment;49
+223;Liaison;49
+224;Judge;50
+225;Legal Professional;50
+226;Magistrate;50
+227;Tribunal Member;50
+228;Lawyers;51
+229;Legal Advice;51
+230;Clerk of Court;52
+231;Court Officer;52
+232;Freedom of Information;52
+233;Legal Officer;52
+234;Legal Secretary;52
+235;Litigation Officer;52
+236;Advice;53
+237;Drafting;53
+238;Ministerial and Parliamentary Advice;54
+239;Ministerial and Parliamentary Support;54
+240;Audit Coordination;55
+241;External Audit (Financial);55
+242;External Audit (Performance);55
+243;Internal Audit (Financial);55
+244;Internal Audit (Performance);55
+245;Fraud Control and Corruption Prevention;56
+246;Issue Management;56
+247;Privacy Impect Assessment;56
+248;Risk Analysis;56
+249;Risk Management;56
+250;Member;57
+251;Chief Executive / Managing Director;58
+252;Chief Medical Advisor;59
+253;Corporate and Business Planning;59
+254;Corporate Service Management;59
+255;Generalist Management;59
+256;Operations Coordination;59
+257;Parks Management;59
+258;Station Management;59
+259;Business Partner;60
+260;Human Resource Advice;60
+261;Industrial Relations;60
+262;Learning and Development;60
+263;Payroll;60
+264;Recruitment / Redeployment;60
+265;Workforce Planning;60
+266;Workplace Relations;60
+267;Fitness for Duty / Return to Work Case Management;61
+268;Occupational Health and Safety Advice;61
+269;Occupational Health and Safety Inspection;61
+270;Organisation and Methods Analyst;62
+271;Organisational Psychology;62
+272;Rostering and Workload Management;62
+273;Workforce Strategy;62
+274;Dentist;63
+275;Dietician;63
+276;Generalist Medical Practitioner;63
+277;Health Promotion;63
+278;Job Capability Assessment;63
+279;Medical and Pharmaceutical Advice;63
+280;Medical Imaging;63
+281;Nurse;63
+282;Occupational and Environmental Health;63
+283;Occupational Therapy;63
+284;Optometry;63
+285;Pathology;63
+286;Pharmacy;63
+287;Physiotherapy;63
+288;Psychology;63
+289;Social Work;63
+290;Specialist Medical Practitioners;63
+291;Speech Professionals and Audiology;63
+292;Agriculture and Forestry Science;64
+293;Chemist, Food and Wine Science;64
+294;Conservator;64
+295;Environmental Science and Rangers;64
+296;Geology and Geophysics;64
+297;Hydrology;64
+298;Life Sciences;64
+299;Other Natural and Physical Science;64
+300;Veterinarians;64
+301;Counselling;65
+302;Disability Services;65
+303;Family Consultant;65
+304;Houseparent;65
+305;Indigeneous Health Workers;65
+306;Youth Worker;65
+307;Call, Contact or Smart Centre;66
+308;Client Partner / Case Manager;66
+309;Customer Liaison / Counter;66
+310;Customer Support;66
+311;Emergency Management;66
+312;Indigeneous Specialist Officers;66
+313;Objections and Complaints Resolution;66
+314;Recovery and Response;66
+315;Sales;66
+316;Technical and Procedural Quality Advice;66
+317;Gallery or Museum Guide;67
+318;Tour Guide;67
+319;Tourist Information Officer;67
+320;Chef / Cook;68
+321;Cleaner;68
+322;Hostel Management;68
+323;Kitchen Hand;68
+324;Program Advice and Support;69
+325;Program Management;69
+326;Co-design Planning;70
+327;Strategic Design;70
+328;Useability Design;70
+329;Evaluation;71
+330;Performance Reporting / Benefits Realisation;71
+331;Actuary;72
+332;Economist;72
+333;Mathematician;72
+334;Statician;72
+335;Statistical Officer;72
+336;Programme Management;73
+337;Programme Reporting;73
+338;Programme Support;73
+339;Project Management;74
+340;Project Reporting;74
+341;Project Support;74
+342;Data Analysis;75
+343;Research;75
+344;Survey Development;75
+345;International Delegations Management and Support;76
+346;International Stakeholder Agreements and Negotiations;76
+347;Policy Advice;76
+348;Policy Development;76
+349;Gardening;77
+350;Horticulture;77
+351;Labourers;77
+352;Carpentry;78
+353;Communications;78
+354;Electrician;78
+355;General Tradesperson;78
+356;Instrument Electrician;78
+357;Plumbing;78
+358;Air Traffic Control;79
+359;Driver;79
+360;Fleet Maintenance and Management;79
+361;Logistics;79
+362;Refuelling;79
+363;Mechanic;80
+364;Metal Fitter / Machinist;80
+365;Plant Inspection;80
+366;Plant Operation;80
+367;Print Machine Operation;80

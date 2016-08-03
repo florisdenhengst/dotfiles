@@ -1,0 +1,63 @@
+{extends "base.tpl"}
+
+{block "title"}
+Time slots
+<a class="btn btn-primary"
+  href="/management/timeslot/new">
+  <span class='glyphicon glyphicon-plus'></span>
+</a>
+{/block}
+
+
+{block "content"}
+  <div class="row header">
+    <div class="col-xs-2">
+      &nbsp;
+    </div>
+    <div class="col-xs-1">
+      ID
+    </div>
+    <div class="col-xs-3">
+      Start
+    </div>
+    <div class="col-xs-3">
+      End
+    </div>
+    <div class="col-xs-2">
+      Label
+    </div>
+    <div class="col-xs-1">
+      &nbsp;
+    </div>
+  </div>
+  {foreach $timeslots, index, timeslot}
+  <div class="row 
+              {if $index mod 2 == 1}odd{else}even{/if}
+              {if $timeslot.id == $highlight_id} bg-success init-fade-out{/if}">
+    <div class="col-xs-2">
+      <a class="btn btn-primary"
+        href="/management/timeslots/{$timeslot.id}">
+        <span class='glyphicon glyphicon-edit'></span>
+      </a>
+    </div>
+    <div class="col-xs-1">
+      {$timeslot.id}
+    </div>
+    <div class="col-xs-3">
+      {$timeslot.start_time}
+    </div>
+    <div class="col-xs-3">
+      {$timeslot.end_time}
+    </div>
+    <div class="col-xs-2">
+      {$timeslot.label}
+    </div>
+    <div class="col-xs-1">
+      <a class="btn btn-danger"
+        href="/management/timeslots/delete/{$timeslot.id}">
+        <span class='glyphicon glyphicon-remove'></span>
+      </a>
+    </div>
+  </div>
+  {/foreach}
+{/block}

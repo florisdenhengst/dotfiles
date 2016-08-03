@@ -1,0 +1,46 @@
+<?php
+class Group extends DataObject{
+  const JOIN_TO_USER = 'INNER JOIN user ON `group`.`owner` = `user`.`id` ';
+  public static $TABLE = 'group';
+  public $owner;
+  public $label;
+
+  public function __construct(){
+    parent::__construct("");
+  }
+
+  public static function fromId($id){
+    $group = new Group();
+    $group->id = $id;
+    return $group;
+  }
+
+  public static function fromData($label, $owner){
+    $group = new Group();
+    $group->owner = $owner;
+    $group->label = $label;
+    return $group;
+  }
+
+  /***
+   * Creates a Group.
+   */
+  public function create($dbh, $columns= "", $values = ""){
+    // all column names in DB
+    $columns = "owner, label";
+    // column matching variable names in Group object 
+    $values = ":owner, :label";
+    return parent::create($dbh, $columns, $values);
+  }
+
+  /***
+   * Update an existing group.
+   */
+  public function update($dbh, $columns="", $values="", $operator=""){
+    $columns = array("owner", "label");
+    $values = $columns;
+    return parent::update($dbh, $columns, $values);
+  }
+}
+
+

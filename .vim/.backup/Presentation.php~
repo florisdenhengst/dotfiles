@@ -1,0 +1,112 @@
+<?php
+class Presentation extends DataObject{
+  const JOIN_TO_USER = 'INNER JOIN `group` ON `presentation`.`group` = `group`.`id`' . Group::JOIN_TO_USER;
+  protected static $TABLE = 'presentation';
+  public $group;
+  public $url;
+  public $timeslot;
+  public $label;
+
+  public function __construct(){
+    parent::__construct("");
+  }
+
+  public static function fromId($id){
+    $pr = new Presentation();
+    $pr->id = $id;
+    return $pr;
+  }
+
+  public static function fromData($group, $url, $timeslot, $label){
+    $pr = new Presentation();
+    $pr->group = $group;
+    $pr->url = $url;
+    $pr->timeslot = $timeslot;
+    $pr->label = $label;
+    return $pr;
+  }
+
+  /***
+   * Creates a Presentation.
+   */
+  public function create($dbh, $columns= "", $values = ""){
+    // all column names in DB
+    $columns = "`group`, `url`, `timeslot`, `label`";
+    // column matching variable names in Presentation object 
+    $values = ":group, :url, :timeslot, :label";
+    return parent::create($dbh, $columns, $values);
+  }
+
+
+  /***
+   * Update an existing Presentation.
+   */
+  public function update($dbh, $columns="", $values="", $operator=""){
+    $columns = array("group", "url", "timeslot", "label");
+    $values = $columns;
+    return parent::update($dbh, $columns, $values);
+  }
+
+
+  /***
+   * Returns instances with label instead of ID's.
+   */
+  public static function get_all_auth_assoc($dbh, $user){
+    $preparation = sprintf(
+      'SELECT `%s`.*, 
+        `%s`.`label` AS `group_label`,
+        `%s`.`label` AS `timeslot_label`,
+        DATE_FORMAT(`%s`.`start_time`, "%%d-%%m %%H:%%i") AS start, 
+        DATE_FORMAT(`%s`.`end_time`, "%%d-%%m %%H:%%i") AS end
+      FROM `%s` 
+      %s
+      INNER JOIN `%s` ON `%s`.`%s` = `%s`.`id`
+      WHERE `user`.`id` = :user_id',
+      static::$TABLE,
+      Group::$TABLE,
+      TimeSlot::$TABLE,
+      TimeSlot::$TABLE,
+      TimeSlot::$TABLE,
+      static::$TABLE,
+      static::JOIN_TO_USER,
+      TimeSlot::$TABLE, static::$TABLE, TimeSlot::$TABLE, TimeSlot::$TABLE);
+    $statement = $dbh->prepare($preparation);
+    //run query
+    $statement->execute(array('user_id' => $user['id']));
+    $statement->setFetchMode(PDO::FETCH_ASSOC);
+    $result = array();
+    while($row = $statement->fetch()){
+      array_push($result, $row);
+    }
+    return $result;
+  }
+
+  /***
+   * Returns instances with label instead of ID's.
+   */
+  public static function get_all_assoc($dbh){
+    $qry = sprintf(
+      'SELECT `%s`.*, 
+        `%s`.`label` AS `group_label`,
+        `%s`.`label` AS `timeslot_label`,
+        DATE_FORMAT(`%s`.`start_time`, "%%d-%%m %%H:%%i") AS start, 
+        DATE_FORMAT(`%s`.`end_time`, "%%d-%%m %%H:%%i") AS end
+      FROM `%s` 
+      INNER JOIN `%s` ON `%s`.`%s` = `%s`.`id`
+      INNER JOIN `%s` ON `%s`.`%s` = `%s`.`id`',
+      static::$TABLE,
+      Group::$TABLE, TimeSlot::$TABLE, TimeSlot::$TABLE, TimeSlot::$TABLE,
+      static::$TABLE,
+      Group::$TABLE, static::$TABLE, Group::$TABLE, GROUP::$TABLE, 
+      TimeSlot::$TABLE, static::$TABLE, TimeSlot::$TABLE, TimeSlot::$TABLE);
+    $statement = $dbh->query($qry);
+    $statement->setFetchMode(PDO::FETCH_ASSOC);
+    $result = array();
+    while($row = $statement->fetch()){
+      array_push($result, $row);
+    }
+    return $result;
+  }
+}
+
+?>

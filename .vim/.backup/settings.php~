@@ -1,0 +1,20 @@
+<?php
+/***
+ * Some generic PHP project-settings
+ */
+
+//TODO: set to FALSE
+define('DEBUG', TRUE);
+
+// The root directory of the project
+define('PROJECT_ROOT', ''); 
+// The root directory for the Dwoo template engine
+define('DWOO_ROOT', PROJECT_ROOT . 'Dwoo/lib/');
+// The root directory for Dwoo templates
+define('TEMPLATE_ROOT', PROJECT_ROOT . '../html/');
+// Custom session name (not sure whether it works or not)
+define('MY_SESSION_NAME', 'SESSIE');
+
+// has to be of sizes 16, 24 or 32 
+define('SECRET_KEY', '0000changeme0000');
+?>

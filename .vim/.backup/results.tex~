@@ -1,0 +1,380 @@
+\chapter{Results}
+\label{ch:results}
+This chapter contains the results for the experiments described in the previous
+chapter. The results for the unsupervised and supervised components with optimal
+parameters are presented in detail. Next, the results of our proposed method for
+a varying number of hints by the expert are presented. A brief overview of our
+findings can be found first.
+
+\emph{Local Outlier Factor} (LOF) performs equally good or better than
+\emph{Local Correlation Integral} (LOCI) for all data sets under consideration
+and was therefore selected as the unsupervised component. For the supervised
+component, the \emph{C-Support Vector Classifier} (C-SVC) outperforms
+\emph{Semi-supervised anomaly detection} (SSAD) for all data sets under
+consideration.
+
+The proposed selection mechanism requires roughly 20\% and 50\% to reach maximum
+performance on the training and test data respectively, whereas the
+random selection mechanism requires all labels to achieve maximum performance.
+Performance on the training set, in which the labels for all instances can be
+queried, is better than on the test set, which is characterized by the absence
+of some data during training. Overall, incorporating user feedback only slightly
+increases performance when compared to a basic unsupervised approach, even when
+all labels are available. Expert feedback therefore remains valuable, even when
+a model was trained on an entire data set already.
+
+\section{Unsupervised component}
+\label{sec:results_unsup}
+The Precision-Recall (PR) curves from Figure~\ref{fig:unsupervised_results} show
+the results of LOF and LOCI using per-dataset optimal parameters (see
+Sections~\ref{subsec:unsupervised_param_selection} and
+\ref{subsec:optimal_params} for details).  LOF outperforms LOCI for the domain
+and Allhypo Thyroid data sets. For both data sets, the PR-curves for LOF
+dominate the LOCI curves almost completely: no matter what the preferred
+Precision-Recall trade-off is, LOF outperforms LOCI.  The AUCs for LOF vs LOCI
+are $0.369$ and $0.617$ vs $0.158$ and $0.390$, i.e. the AUCs for LOF are $1.5$
+and $2.3$ as much as the AUCs for LOCI for these data sets. The curve for the
+remaining Abalone data set resides at the lower regions of the graph.  The LOCI
+method performs only a little better on this data set with an AUC of $0.096$,
+compared to an AUC of $0.089$ for LOF, which is $1.07$ as much. For this data
+set, however, both methods outperform each other for different Precision-Recall
+trade-offs. Considering that the AUCs are almost equal on this data set,
+performance could generally be considered as equal. Because of time constraints,
+we have chosen LOF as the preferred unsupervised component in further analyses.
+The significance of these results is further discussed in
+Section~\ref{sec:note_generalisability}.
+
+Sudden drops in Precision that do not yield any additional Recall (such as for
+at for LOF on the domain data set at a recall of little of $0.4$) denote that
+the method is not capable of distinguishing amongst anomalies and non-anomalies
+for this part of its anomaly ranking: the rank by anomaly score matches the true
+rank of anomalies very poorly for these sections of the data set. The `price' in
+Precision that is to be paid for additionally retrieved anomalies is relatively
+high at these drops, which leads to long sequences of normal points being
+reported as `anomaly'. For example, the drop in performance for the LOCI method
+on the Allhypo Thyroid data set near the Recall of $~7.5$ would result in 
+roughly 20 additionally misclassified anomalies, whilst no additional correctly
+classified anomalies are gained.
+
+Consider the Precision values at a Recall of $1.0$ for all curves: at a Recall
+of $1.0$, all anomalies are correctly marked as such. For most method--data set
+combinations, Precision approaches $0.0$, meaning that almost all points have to be
+labelled as anomaly in order to achieve a Recall of $1.0$, the only exception
+being LOF on the Allhypo Thyroid data set.
+
+There is a large difference in PR-curves for both methods on the domain data
+set: judging from the sharp decline in Precision at lower Recall-regions for
+LOCI, it incorrectly assigns some of its highest anomaly scores to
+non-anomalies. This contrasts with the performance for LOF, which only steeply
+declines at a recall of $~0.4$. It is furthermore interesting that the Precision
+for LOCI is better for a higher Recall on this data set.
+
+\begin{figure}
+  \centering
+  \includegraphics[width=.6\textwidth]{results/unsupervised_pr_curves-crop.pdf}
+  \caption{Precision-Recall curves for the unsupervised LOF and LOCI methods on
+  all data sets under consideration.}
+  \label{fig:unsupervised_results}
+\end{figure}
+
+\begin{table}
+\centering
+\caption{F1 scores for LOF and LOCI on all data sets.}
+\label{tab:unsupervised_results}
+\begin{tabular}{l|c|c|c|c|c|c}
+                & \multicolumn{3}{c|}{LOF}             & \multicolumn{3}{c}{LOCI}           \\ 
+                & $max(F1)$ & $\mu(F1)$ & $\sigma(F1)$ & $max(F1)$ & $\mu(F1)$ & $\sigma(F1)$ \\ \hline
+Abalone         & 0.209   & 0.082      & 0.048         & \textbf{0.226}       & 0.067      & 0.051         \\ \hline
+Allhypo Thyroid & \textbf{0.637}   & 0.443      & 0.124         & 0.585       & 0.171      & 0.160         \\ \hline
+Domain          & \textbf{0.511}  & 0.093      & 0.081         & 0.255       & 0.144      & 0.050         \\ \hline
+\end{tabular}
+\end{table}
+
+
+\section{Supervised component}
+\label{sec:results_sup}
+The results using five-fold cross validation and per-dataset optimal parameters
+(see Sections~\ref{subsec:supervised_param_selection} and
+\ref{subsec:optimal_params} for details) for two supervised methods are listed
+in Table~\ref{tab:supervised_results}. The C-SVC method outperforms SSAD on all
+test data. Both of these methods are outperformed by methods with an
+unsupervised paradigm.
+
+Note that the comparison between supervised and unsupervised methods is not
+based on equally sized test sets: the unsupervised scores are based on
+performance on the entire set, whereas the supervised scores are an average of
+F1 scores on the five test folds. We assume that any effects of this difference
+in test set sizes are accounted for by averaging the F1 scores for the five
+folds.
+
+The unsupervised methods outperform the supervised methods on all data sets.
+This matches the rationale for SSAD, which is primarily based on an unsupervised
+method \cite{gornitz2013toward}. Interestingly, however, SSAD yields the lowest
+F1 scores in our experiments. In the original paper, SSAD outperforms
+traditional methods only when novel classes of anomalies are introduced, e.g.
+anomalies stemming from a different distribution. This could be an indication
+that in our scenario, the training and test samples stem from the same
+distribution, i.e. that there are sufficiently informative training examples
+available. Our experiments were not set up to reflect a situation of novel
+anomalies in the test set: we did not engineer our test set to contain anomalies
+from novel distributions as is done in the original paper. Although feasible,
+this explanation is not consistent with the results from C-SVC and the
+unsupervised methods. When we assume that the anomalies in the training set
+represent the anomalies in the test set well, we would expect C-SVC to be able
+to outperform the uninformed unsupervised methods, since the C-SVC method is
+theoretically able to differentiate between anomalies and outliers, whereas an
+unsupervised method is not.
+
+The inconsistency introduced by the unsupervised methods outperforming C-SVC
+under the assumption that the training data represents the test data well can
+have various reasons. We identify two independent causes of this inconsistency
+in this paragraph. Firstly, we optimized F1 score for the unsupervised methods
+as we can influence $\theta$ directly, but did not do so for SSAD and C-SVC as
+we depend on these methods to find the optimal separating hyperplane themselves.
+We therefore have to use $\gamma$ and $C$ to tweak performance, which are known
+to be hard to set and might influence each other indirectly. A comparison
+between unsupervised and supervised methods is not representative for actual
+performance in this regard. The $\mu(F1)$ and $\sigma(F1)$ scores indicate that
+the $max(F1)$ scores are not representative throughout the entire PR curve.
+However, the unsupervised methods (LOF especially) appear to be able to perform
+well for non-optimal parameters as well from the figures in
+Appendix~\ref{ch:unsup_param_selection}: the PR curves yielding the top-5 and
+top-1000 are not very different. Quantifying the effects of the parameters for
+these methods is left for future work.  Another possibility is that SSAD and
+C-SVC are not capable of capturing the complexity of the underlying relations
+well enough. This is possibly the case: both LOF and LOCI by their definition
+use information on the local density of points to construct anomaly scores.
+Local density is not explicitly encoded as input to the supervised methods and
+thus part of `being an anomaly' might not be captured well by only confining
+regions of the data domain.
+
+\begin{table}
+\centering
+\caption{F1 scores for all tested methods on all data sets on the test set
+(supervised methods) and training set (unupservised methods). The supervised
+methods were tested using five-fold cross validation.}
+\label{tab:supervised_results}
+\begin{tabular}{l|ll||ll}
+                & \multicolumn{2}{c||}{Supervised} &  \multicolumn{2}{c}{Unsupervised} \\ 
+                & SSAD  & C-SVC          & LOCI   & LOF    \\ \hline
+Abalone         & 0.0   & \textbf{0.038} & 0.226  & 0.209  \\ \hline
+Allhypo Thyroid & 0.019 & \textbf{0.136} & 0.585  & 0.637  \\ \hline
+Domain          & 0.124 & \textbf{0.489} & 0.255  & 0.511  \\ \hline
+\end{tabular}
+\end{table}
+
+
+\section{Learning Abilities}
+\label{sec:learning_abilities}
+From Section~\ref{sec:results_unsup} we have seen the maximal performance for an
+unsupervised method. In this section we examine how well our proposed method
+performs in comparison. We therefore examine F1 score, Precision and Recall for
+different numbers of labels on a training set, i.e. all data is available
+throughout the entire method. Furthermore, we are interested in the effects of
+using our query mechanism over a random query, which serves as a lower-bound on
+performance without our proposed method.  Because of time considerations, we
+only include results for a combination of the most promising supervised and
+unsupervised methods, e.g. LOF and C-SVC. Note that all data is available during
+query selection but not during training of C-SVC for final classification. Only
+data for which labels are available are used during this phase, as C-SVC is not
+capable of taking instances with missing labels into account.
+
+Judging from Table~\ref{tab:proposed_unsup_comparison}, only a slight F1 score
+increase over the unsupervised methods is achieved when using the available
+labels for the Allhypo Thyroid and domain data sets. The proposed method is
+incapable of outperforming the unsupervised methods for the Abalone data set.
+Further investigating performance differences by comparing Precision and Recall
+trade-offs in Figures~\ref{fig:unsupervised_results} and
+\ref{fig:learning_curve_details_single} in
+Table~\ref{tab:precision_at_max_recall_comparison}, our proposed method does
+show a number of beneficial characteristics. It achieves a Recall of 1.0 with
+reasonable Precision for the domain and Allhypo Thyroid data sets
+(Table~\ref{tab:precision_at_max_recall_comparison}). Especially for the domain
+data set, on which the unsupervised methods fail to achieve a practical
+Precision at a Recall $> 0.5$, the benefits of using the acquired labels are
+noteworthy: a Recall of $0.5$ is achieved at less than 20\% of labelled
+instances with a Precision $>0.4$ (Figures~\ref{fig:unsupervised_results} and
+\ref{fig:learning_curve_details_single}). Regarding performance on the training
+set, our method mainly outperforms the unsupervised methods whenever a high
+Recall is required and only when a sufficient amount of labels is available. The
+significance of these results is discussed in
+Section~\ref{sec:note_generalisability}.
+
+It is noteworthy that an F1 score of 1.0 is not achieved for any data set --
+even when all labels are available during training. This indicates that our
+classifier is unable to define a good separation between the classes in the
+training examples. For C-SVC, it means a separating hyperplane in which all
+instances lie at the correct side could not be computed. This situation is known
+as the `non separable case'. Assuming that our model can express sufficient
+complexity, non-separability indicates that out of multiple identical instances,
+some are reported as anomalies whereas others as non-anomalies. By using
+appropriate hyperparameters, F1 scores of 1.0 on the training set were obtained
+for all data sets, indicating that there are no identical instances that belong
+to different classes.
+
+\begin{table}
+\centering
+\caption{Comparison of maximum F1 scores on training data for the proposed
+method and for unsupervised methods. Bold denotes per-row maximum.}
+\label{tab:proposed_unsup_comparison}
+\begin{tabular}{l|cc}
+                & Proposed method    &  Unsupervised methods\\ \hline
+Abalone         & 0.056              &  \textbf{0.226}      \\ \hline
+Allhypo Thyroid & \textbf{0.681}     &  0.637               \\ \hline
+Domain          & \textbf{0.609}     &  0.511               \\ \hline
+\end{tabular}
+\end{table}
+
+\begin{table}
+\centering
+\caption{Comparison of Precision scores at maximum Recall on training data in
+proposed method and in unsupervised method. When maximum Recall is achieved for
+various `at \% labelled' and thus various corresponding Precision scores, the
+lowest `at \% labelled' is shown as further labelling would not uncover
+additional anomalies.  Note that the oscillations at the beginning of the graph
+have been omitted, as they include models that `cheat' by classifying
+everything as anomaly. Bold denotes per-row maximum Precision.}
+\label{tab:precision_at_max_recall_comparison}
+\begin{tabular}{l|ccc|ccc}
+                & \multicolumn{3}{c|}{Proposed method} & \multicolumn{2}{c}{Unsupervised} \\ 
+                & $max(Recall)$ & at Precision       & at \% labelled  & Precision      & Method  \\ \hline
+Abalone         & 0.775         & 0.026              & 69.3\%          & \textbf{0.031} & LOCI    \\ \hline %unsup precision = LOCI
+Allhypo Thyroid & 1.0           & \textbf{0.403}     & 78.2\%          & 0.184          & LOF     \\ \hline %unsup precision =  LOF
+Domain          & 1.0           & \textbf{0.367}     & 63.9\%          & 0.038          & LOF     \\ \hline %unsup precision = LOCI
+\end{tabular}
+\end{table}
+
+In a worst-case situation, the expert inspects instances in an arbitrary order,
+thus labelling them randomly. In order to gain insight in how our informed query
+mechanism affects performance, we compare the dashed and solid lines in
+Figure~\ref{fig:supervised_results_single} and we compare the maximum achieved
+F1 scores in Table~\ref{tab:learning_curves_single}. We clearly see the benefits
+from using an informed query mechanism over random querying. The learning curves
+for the proposed query mechanism dominate the random query mechanism for the
+domain and Allhypo Thyroid data sets. The proposed query mechanism yields higher
+maximum F1 scores and requires less labels to do so. The performance on the
+abalone data sets is comparable amongst the query mechanisms.
+
+\begin{figure*}
+  \centering
+  \begin{subfigure}[t]{.45\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{results/learning_curves_combined_intra_recall-crop.pdf}
+    \caption{Learning curve based on Recall.}
+    \label{fig:learning_curve_recall_single}
+  \end{subfigure}
+  ~
+  \begin{subfigure}[t]{.45\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{results/learning_curves_combined_intra_precision-crop.pdf}
+    \caption{Learning curve based on Precision.}
+  \end{subfigure}
+  \caption{Learning curves based on Precision and Recall on the training set.}
+  \label{fig:learning_curve_details_single}
+\end{figure*}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=.6\textwidth]{results/learning_curves_combined_intra-crop.pdf}
+  \caption{Learning curves for the proposed method on all data sets on the
+    training set. The `random selection mechanism' is included for comparison.
+  For the `random selection' results, an average of 25 runs is used to remove
+the effects of incidents.} \label{fig:supervised_results_single}
+\end{figure}
+
+\begin{table}
+\centering
+\caption{F1 scores for the proposed selection strategy and a random selection on
+all data sets on the training set. LOF and C-SVC were used as the unsupervised
+and supervised component.}
+\label{tab:learning_curves_single}
+\begin{tabular}{l|cc|cc}
+                & \multicolumn{2}{c|}{Proposed selection}              & \multicolumn{2}{c}{Random selection} \\ 
+                & $max(F1)$        & at \% labelled  &  $max(F1)$      & at \% labelled            \\ \hline
+Abalone         & \textbf{0.056}   & 88\%            &  0.052          & 90\%                      \\ \hline
+Allhypo Thyroid & \textbf{0.681}   & 41\%            &  0.579          & 100\%                     \\ \hline
+Domain          & \textbf{0.609}   & 13\%            &  0.557          & 100\%                     \\ \hline
+\end{tabular}
+\end{table}
+
+
+\section{Generalisability}
+Knowing how many labels we need to query in order to achieve a desired
+performance on training data, we do not yet know how well our proposed method
+will perform on test data. Recall that our model is intended to be used in a
+setting where multiple data uploads are possible and where it would be possible
+to apply a previously trained model on new data sets. We do this by looking at
+the generalisability of our proposed model, e.g. by investigating performance on
+a separate test data through five-fold cross validation. During training, not
+all data can be requested by our proposed query mechanism. The effects of this
+limitation in choice for labelling can be found in this section.
+
+The differences between the scenarios are clear when comparing
+Figure~\ref{fig:supervised_results_single} with
+Figure~\ref{fig:supervised_results_multiple} and
+Table~\ref{tab:learning_curves_single} with
+Table~\ref{tab:learning_curves_multiple}. All methods perform generally better
+on training data. The difference in performance on the Allhypo Thyroid data set
+is bigger than the difference for the domain data set.  Similarly to the results
+listed above, the performance on the Abalone dataset is very different from the
+other two data sets.
+
+Even though performance degrades when not all instances are known up front, the
+proposed selection mechanism still increases performance and requires less
+labelled instances to reach the optimal results (from 67\% up to 9\% of total
+number of instances).
+
+\begin{figure}
+  \centering
+  \includegraphics[width=.6\textwidth]{results/learning_curves_combined_inter-crop.pdf}
+  \caption{Learning curves for the proposed and a random selection mechanism on
+  test data. A `random selection mechanism' is included for comparison.  For the
+  `random selection' results, an average of 25 runs is used to remove the
+  effects of incidents.}
+  \label{fig:supervised_results_multiple}
+\end{figure}
+
+
+\begin{table}
+\centering
+\caption{F1 scores for LOF and LOCI on test data. LOF and C-SVC were used as the
+unsupervised and supervised component.}
+\label{tab:learning_curves_multiple}
+\begin{tabular}{l|c|c|c|c}
+                & \multicolumn{2}{c|}{Proposed selection}              & \multicolumn{2}{c}{Random selection} \\ 
+                & $max(F1)$        & at \% labelled  &  $max(F1)$      & at \% labelled            \\ \hline
+Abalone         & \textbf{0.052}   & 9\%             &  0.038          & 95\%                      \\ \hline
+Allhypo Thyroid & \textbf{0.164}   & 42\%            &  0.137          & 99\%                      \\ \hline
+Domain          & \textbf{0.491}   & 67\%            &  0.489          & 100\%                     \\ \hline
+\end{tabular}
+\end{table}
+
+The learning curves based on Recall and Precision from
+Figure~\ref{fig:learning_curve_details_multiple} contain the same oscillations
+as those in Figure~\ref{fig:learning_curve_details_single} in the beginning
+stage. The Recall reaches maxima of roughly $0.6$ for the abalone and domain
+and $0.2$ for the thyroid dataset. Precision at these points is nearing $0.0$
+(abalone), $0.6$ (domain) and $0.1$ (thyroid). Furthermore, we note that the
+Recall for the Allhypo Thyroid data set does not improve after having labelled
+little over $40\%$ of the data set. This might be caused by the lack of
+additionally found anomalies after this point and/or because of a lack of
+anomalies representative to those in the validation set during training.
+
+\begin{figure*}
+  \centering
+  \begin{subfigure}[t]{.45\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{results/learning_curves_combined_inter_recall-crop.pdf}
+    \caption{Learning curve based on Recall.}
+    \label{fig:learning_curve_recall_multiple}
+  \end{subfigure}
+  ~
+  \begin{subfigure}[t]{.45\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{results/learning_curves_combined_inter_precision-crop.pdf}
+    \caption{Learning curve based on Precision.}
+  \end{subfigure}
+  \caption{Learning curves based on Precision and Recall on test data.}
+  \label{fig:learning_curve_details_multiple}
+\end{figure*}
+

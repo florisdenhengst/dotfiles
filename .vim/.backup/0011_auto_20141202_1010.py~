@@ -1,0 +1,40 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models, migrations
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('database', '0010_view_longtermavailablesuccessors_view_midtermavailablesuccessors_view_shorttermavailablesuccessors'),
+    ]
+
+    operations = [
+        migrations.RemoveField(
+            model_name='employee',
+            name='permission_id',
+        ),
+        migrations.RemoveField(
+            model_name='position',
+            name='permission_id',
+        ),
+        migrations.AddField(
+            model_name='position',
+            name='chunk',
+            field=models.IntegerField(default=0),
+            preserve_default=True,
+        ),
+        migrations.AlterField(
+            model_name='chunk',
+            name='business_unit',
+            field=models.ForeignKey(to='database.BusinessUnit', db_column='businessunit_id'),
+            preserve_default=True,
+        ),
+        migrations.AlterField(
+            model_name='chunk',
+            name='functional_area',
+            field=models.ForeignKey(to='database.FunctionalArea', db_column='functionalarea_id'),
+            preserve_default=True,
+        ),
+    ]

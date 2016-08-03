@@ -1,0 +1,32 @@
+- Alleen Groups, TimeSlots & Presentations die toegankelijk zijn voor huidige
+  gebruiker tonen (medium werk)
+  V Verbergen van /users/ voor niet-superusers
+  - Verbergen van niet-geauthoriseerde edit-pagina's
+  - Tonen van alle entries voor superusers
+- Speciale omgang van 'admin' in bovenstaande. (kan veel worden - veel edge
+  cases - hoe gebruiker op te slaan?)
+- Kijk bij login of user 'active' is (weinig werk, wss 1 regel :P)
+- inladen via CSV
+- ?? Tonen van Client ID's ??
+- ?? Aanpassen van Client ID's ??
+  - moeten we de client id's ook kunnen willen aanpassen?
+- ?? Aparte login pagina ??
+  - willen we een aparte login pagina of is een 401 authentication required
+    gneoge?
+- ?? Toevoegen van 'active' voor Group/Client/Presentation ??
+  - in 'het idee.docx' staat iets over het actief zijn van Clients. Willen we
+    dit nog?
+- ?? Toevoegen van de 'current presentation' voor de clients. ?? 
+  - dan kan je snel zien welke presentatie er in te zien is. wel lastiger qua
+    authorizatie
+
+1. Server weer opzetten
+  - Nieuwe server
+  - https://149-210-142-173.colo.transip.net
+  - wordt nog aan domein gehangen
+  - Vhost aanmaken voor...
+    - eventcast.bmsec.nl
+  - ip: 149.210.142.173
+2. Login scherm
+- LoginScherm
+- User creation

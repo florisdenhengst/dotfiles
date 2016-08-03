@@ -1,0 +1,11 @@
+from database.models import *
+
+for ts in Timeslice.objects.all():
+    previous = Timeslice.objects.filter(capture_month__lt=ts.capture_month).order_by('-capture_month')
+    if previous.count() > 0:
+        previous = previous.first()
+    else:
+        previous = None
+    ts.previous = previous
+    ts.save()
+    

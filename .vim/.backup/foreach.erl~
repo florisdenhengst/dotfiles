@@ -1,0 +1,6 @@
+-module(myforeach).
+-export([myforeach/2]).
+
+myforeach(List1, List2) ->
+  lists:foreach(fun(List1) ->
+                    io.format("~p ~n", N))

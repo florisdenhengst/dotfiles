@@ -1,0 +1,38 @@
+<?php
+class requests extends controller{
+  protected _login_required = FALSE;
+
+  function __construct(){
+    parent::__construct($this->_login_required);
+    $this->_tpl = TEMPLATE_ROOT . 'test.tpl';
+  }
+
+  function GET($matches){
+    $errormsg = '';
+    if(count($matches) > 1){
+      $id = $matches[1];
+      // fetch the client and its presentation info etc.
+      $client = Client::get_full_assoc($this->_db, $id);
+      // try to stamp the client
+      Client::fromId($id)->stamp($this->_db);
+      if(!$client){
+        $errormsg = 'Client not present!';
+      } else {
+        if(strlen($client['url']) < 1){
+          $errormsg = sprintf("No url set for client id '%s'", $client['id']);
+        } else {
+          // all good in tha hood
+          header(sprintf('Location: %s', $client['url']));
+        }
+      }
+      // if everything went correctly, we have redicted. Show an error msg otherwise.
+      if(strlen($errormsg) < 1){
+        $errormsg = 'General error occured!';
+      }
+      parent::output($this->_tpl, array('errormsg' => $errormsg));
+    } else {
+      //TODO: set sensible error message
+      parent::output($this->_tpl, array());
+    }
+  }
+}

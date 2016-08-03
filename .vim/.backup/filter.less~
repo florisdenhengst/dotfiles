@@ -1,0 +1,237 @@
+/**
+ * Filter topbar
+ */
+
+fo-filter-bar {
+  display: none;
+  @close-size: 16px;
+  top: 0;
+  position: -webkit-sticky;
+  position: sticky;
+  z-index: @top;
+  box-shadow: 0 3px 6px (0.8 * @background-black);
+  background-color: @crunchr-grey;
+  min-height: 43px;
+  -webkit-transform: translateZ(0); // fix for flickering in chrome
+  
+  &.ready {
+    display: block;
+  }
+  
+  // Make our position:sticky polyfill behave
+  &, & + div[style] {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+  
+  .filter-buttons {
+    vertical-align: top;
+    display: inline-block;
+    width: @sidebar-width;
+    font-size: 13px;
+    
+    #filter-toggle {
+      display: inline-block;
+      height: 100%;
+      margin: 0 10px;
+      padding: 0px;
+      cursor: pointer;
+      font-weight: @font-weight-regular;
+      line-height: 43px;
+
+      svg {
+        display: inline;
+        width: 15px;
+        height: 15px;
+        vertical-align: middle;
+        margin-bottom: 2px;
+        margin-right: 5px;
+      }
+
+      &:hover svg rect {
+        fill:@highlight-orange;
+      }
+    }
+    
+    #filter-reset a {
+      color: @crunchr-blue;
+      text-transform: uppercase;
+      font-variant: small-caps;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 0;
+
+      &:hover {
+        color: @highlight-orange;
+      }
+    }
+  }
+  
+  .employees-in-selection {
+    vertical-align: top;
+    display: inline-block;
+    width: @sidebar-width;
+    line-height: 40px;
+
+    ng-transclude {
+      text-align: right;
+      margin-right: 10px;
+    }
+  }
+  
+  ul {
+    vertical-align: top;
+    display: inline-block;
+    width: calc(~"100% - 510px"); // can't use constants and prevent calculation at the same time
+    margin: 0;
+    margin-top: 4px;
+    padding: 0;
+    line-height: 27px;
+
+    li {
+      background-color: @crunchr-grey;
+      -moz-user-select: none;
+      user-select: none;
+      position: relative;
+      cursor: pointer;
+      display: inline-block;
+      margin: 3px;
+      padding: 0 10px;
+      border: 1px solid;
+      white-space: nowrap;
+      font-size: 12px;
+      .apply-app-color(border-color);
+      
+      &.ng-animate {
+        transition: none;
+      }
+      
+      &[data-filter-name] {
+        display: none;
+        transition: transform .6s ease, opacity .1s ease;
+      }
+
+      svg {
+        width: @close-size;
+        height: @close-size;
+        margin-right: -10px;
+        margin-bottom: -1px;
+
+        text {
+          fill: @crunchr-blue !important;
+          stroke: @crunchr-blue;
+        }
+      }
+
+      &.disabled, &.disabled:hover, &:disabled:active {
+        color: @text-color-grey;
+        cursor: default;
+        left: 0px;
+      }
+
+      &:hover  {
+        color: rgba(255, 255, 255, 0.75);
+
+        svg {
+          text {
+            fill: @highlight-orange !important;
+            stroke: @highlight-orange;
+          }
+        }
+      }
+
+      &:active {
+        left: 1px;
+      }
+    }
+  }
+}
+
+/**
+ * Filter sidebar
+ */
+
+#filter {
+  position: fixed;
+  transform: translateZ(0px);
+  height: 100%;
+  width: @sidebar-width;
+  top: 72px;
+  z-index: (@top + 1);
+  box-shadow: 5px 10px 10px (0.8 * @background-black);
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  margin-top: 0;
+  background-color: @crunchr-grey;
+  transition: @show-sidebar-transition;
+  left: 0;
+
+  .highlight{
+      .apply-app-color(color);
+  }
+
+  #filter-body {
+    padding: 0;
+    background-color: @crunchr-grey;
+
+    h3 {
+      text-align: left;
+      font-size: 14px;
+      text-transform: uppercase;
+      margin:5px 0px 10px 0px;
+    }
+
+    input[type="radio"] {
+      cursor: pointer;
+    }
+
+    label {
+      cursor: pointer;
+      font-weight: @font-weight-semibold;
+    }
+
+    .range-slider-container {
+      height: 110px;
+    }
+    
+    // switch buttons need fixed width in filter! (As if there were 3 buttons)
+    fo-switch {
+      &.two-items, &.three-items {
+        div {
+          // width is divided over 3 button, minus 1 pixel for fucking IE
+          width: calc(~"(100% - 2*@{margin-small} - 1px) / 3 " );
+        }
+      }
+    }
+
+    .box-container {
+      background-color: @crunchr-dark-grey;
+      min-height: 28px;
+      padding: 5px 5px 5px 5px;
+      padding-left: 15px;
+      white-space: nowrap;
+      font-size: 13px;
+      font-weight: normal;
+
+      span {
+        &.organisation {
+          color: @organisation-green;
+        }
+        &.talent {
+          color: @talent-orange;
+        }
+      }
+    }
+
+  }
+
+  &.ng-hide{
+    transform: translate(-@sidebar-width, 0px);
+  }
+
+  &.ng-hide-add {
+    transition: @hide-sidebar-transition
+  }
+}

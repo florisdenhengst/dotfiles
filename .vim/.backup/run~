@@ -1,0 +1,2 @@
+#!/bin/bash
+./manage.py collectstatic --link --noinput && ./manage.py compress && ./manage.py runserver

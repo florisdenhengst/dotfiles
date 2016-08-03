@@ -1,0 +1,66 @@
+TODO
+? visualisatie SVM in active learning (decision boundary / margin)
+- verwerken, interpreteren etc.
+- vergelijken van learning curves voor 'inter' en 'intra' met andere query
+  mechanismen:
+  ? LOCI
+  x random
+  - alleen C-SVC based
+  - alleen LOF-based
+  - kopieeren van resultaten in betekenisvolle plotjes
+
+
+NOPE
+x verder zoeken naar params voor usg/SSAD?
+
+LEZEN
+- https://www.quora.com/Machine-Learning/What-is-the-difference-between-inductive-and-transductive-learning
+- https://charlesmartin14.wordpress.com/2014/09/23/machine-learning-with-missing-labels-transductive-svms/
+
+
+DONE
+- LOF scores op berekenen in een 5-fold cross-validation setting voor
+  'Reusability'.
+  - Voor inter-timeslices
+  - op een of andere manier R aan python linken??
+- Parameters vastzetten & 'inner script' met juiste settings (LOF & unsup
+  component) draaien
+  - usg
+  - thyroid
+  - abalone
+- Grote runs van SSAD-cv op alle data
+  - scale -1 - 1?
+  - balance C?
+  - Cp, Cn, Cu?
+- Grote runs SSAD-cv met varierende gamma en kappa (C op 'balanced')
+- Bij welke template horen one-class SVM en SVDD?
+  One-class SVM:
+    Door het gebruik van kernels bij geen van beide. De scheiding met de
+    oorsprong maakt het een raar ding zonder kernel. Door een kernel te
+    gebruiken, veranderen de *boundaries* van de data. Het lijkt hierin op
+    kernelized spatial depth
+  SVDD:
+    Bij het weglaten van de kernel wordt er een 'enclosing ball' gevormd. Dit
+    betekent dat het 100% extreme value is. De kernel zorgt er voor dat er ook
+    andere waardes genomen kunnen worden EN dat de vorm kan veranderen.
+  -> Toch zijn dit wel extreme-value methodes. Het begrip 'boundary' is alleen
+    opgerekt door gebruik te maken van de kernel. In de kernel feature space,
+    echter, gaat het nog precies om extreme value detection.
+
+- MEEEEEEEER OC-SVM en SVDD:
+  - "Combination of two approaches for One-Class SVM"
+    http://www.design1a.de/projekte/vortrag.pdf
+  - LIBSVM SVDD
+    http://www.csie.ntu.edu.tw/~cjlin/libsvmtools/#libsvm_for_svdd_and_finding_the_smallest_sphere_containing_all_data
+  - SVDD introduction
+    https://www.projectrhea.org/rhea/index.php/One_class_svm
+  - Background by ene tjappie
+    https://rvlasveld.github.io/blog/2013/07/12/introduction-to-one-class-support-vector-machines/
+  -
+
+- Abalone & Thyroid / SVM-like
+  - scalen van Thyroid dataset
+  - genereren resultaten
+  - verwerken resultaten
++ verwerken van thyroid / LOCI resultaten (PR curve plots)
+

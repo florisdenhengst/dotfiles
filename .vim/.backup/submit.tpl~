@@ -1,0 +1,4 @@
+<label for="{$button_id}" class="col-sm-2 control-label"></label>
+<div class="col-sm-10 form-control-static">
+  <button id="{$button_id}" type="submit" class="btn btn-primary">Submit</button>
+</div>

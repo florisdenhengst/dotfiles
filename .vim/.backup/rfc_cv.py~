@@ -1,0 +1,129 @@
+import cvxopt as co
+from kernel import Kernel
+import numpy as np
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import pprint
+import sklearn as sk
+from sklearn import grid_search
+from svdd import SVDD
+from sklearn.utils.estimator_checks import check_estimator
+from sklearn.utils import check_array
+from sklearn.utils.validation import column_or_1d
+from sklearn.ensemble import RandomForestClassifier
+import sys
+import json
+import math
+from midpoint_normalize import MidPointNormalize
+
+K_TYPE = 'rbf'
+SKLEARN_CVTUPLE_MEAN = 1
+SKLEARN_CVTUPLE_STDEV = 2
+SKLEARN_CVTUPLE_PARAMS = 0
+N_BEST = 5
+
+if len(sys.argv) < 4:
+  print('Usage: python rfc_cv.py <k_folds> <n_jobs> <input_file> <target_file> <?save_to_dir>')
+
+co.solvers.options['show_progress'] = False
+k_folds = int(sys.argv[1])
+n_jobs = int(sys.argv[2])
+filename = sys.argv[3]
+classes_file = sys.argv[4]
+if len(sys.argv) == 6:
+  save_to_dir = sys.argv[5]
+else:
+  save_to_dir = None
+
+
+data = np.loadtxt(open(filename ,'rb'),
+                  delimiter=',')
+
+trues = np.loadtxt(open(classes_file, 'rb'), delimiter=',')[:,1]
+assert len(trues) == len(data[:,0])
+assert len(np.unique(trues)) == 2
+
+original_data = data
+ds_size = len(data[:,0])
+
+Dtrain = data
+
+c = float('inf')
+k_param = .3
+nums = 30
+n_features = len(data[0,:])
+param_grid = {
+    'criterion': ['gini',],
+    'n_estimators': [int(elem) for elem in np.logspace(
+                                                  start=1,
+                                                  stop=3.5,
+                                                  num=nums)],
+    'max_features': [int(elem) for elem in np.linspace(
+                                                  start=math.ceil(math.sqrt(n_features)),
+                                                  stop=n_features,
+                                                  num=nums)]
+    }
+
+def matthews_corrcoef(estimator, X, y_true):
+  predictions = estimator.predict(X)
+  score = sk.metrics.matthews_corrcoef(y_true, predictions)
+  return score
+
+def svc_f1(estimator, X, y_true):
+  predictions = estimator.predict(X)
+  f1 = sk.metrics.f1_score(y_true, predictions, pos_label=-1)
+  return f1
+
+def svc_auc_pr(estimator, X, y_true):
+  probas_pred = estimator.predict_proba(X)
+  probas_preds += probas_pred
+  (precision, recall, _) = sk.metrics.precision_recall_curve(y_true,
+          probas_pred, pos_label=-1)
+  auc = sk.metrics.auc(recall, precision)
+  return auc
+
+grid = grid_search.GridSearchCV(estimator=RandomForestClassifier(),
+                                param_grid=param_grid,
+                                cv=k_folds,
+                                refit=False,
+                                scoring=svc_f1,
+                                n_jobs=n_jobs,
+                                )
+
+fit = grid.fit(Dtrain, trues)
+scores = sorted(fit.grid_scores_, key=lambda score: score[SKLEARN_CVTUPLE_MEAN],
+        reverse=True)
+
+SCORE_MEAN = 1
+SCORE_PARAMS = 0
+SCORE_FOLDS = 2
+scores = [{'mean': score[SCORE_MEAN],
+           'params':score[SCORE_PARAMS],
+           'std': np.std(score[SCORE_FOLDS])} for score in scores]
+
+dump = json.dumps(scores, indent=2, sort_keys=True)
+print(dump)
+
+# make heatmap plot
+f1s = [x[SCORE_MEAN] for x in grid.grid_scores_]
+f1s = np.array(f1s).reshape(len(param_grid['n_estimators']), len(param_grid['max_features']))
+
+plt.figure(figsize=(8, 6))
+plt.imshow(f1s, interpolation='nearest', cmap=plt.cm.hot,
+        norm=MidPointNormalize(vmin=0.1, midpoint=np.average(f1s)))
+plt.tight_layout()
+plt.xlabel('max_features')
+plt.ylabel('n_estimators')
+plt.colorbar()
+xticks = ['{:.4f}'.format(x) for x in param_grid['max_features']]
+yticks = ['{:.4f}'.format(x) for x in param_grid['n_estimators']]
+plt.xticks(np.arange(len(param_grid['max_features'])), xticks , rotation=45)
+plt.yticks(np.arange(len(param_grid['n_estimators'])), yticks)
+plt.title(grid.scorer_.__name__)
+plt.tight_layout()
+
+if save_to_dir:
+  plt.savefig('{}/{}'.format(save_to_dir, 'f1_heatmap.pdf'), format='pdf')
+else:
+  plt.show()
+

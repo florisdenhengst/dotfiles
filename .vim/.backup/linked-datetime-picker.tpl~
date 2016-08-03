@@ -1,0 +1,35 @@
+{assign "$id-start" start_id} 
+{assign "$id-end" end_id}
+
+<div class="row">
+  {include(file='forms/datetime-picker.tpl',
+            input_id  = $start_id,
+            input_name= $start_name,
+            value     = $value_start,
+            label     = $start_label)
+  }
+</div>
+<div class="row">
+  {include(file='forms/datetime-picker.tpl',
+            input_id  = $end_id,
+            input_name= $end_name,
+            value     = $value_end,
+            label     = $end_label)
+  }
+</div>
+
+<script type="text/javascript">
+  $(function() {
+    var opts = {
+      format: 'DD-MM-YYYY H:00',
+    };
+    $("#{$start_id}").datetimepicker(opts);
+    $("#{$end_id}").datetimepicker(opts);
+    $("#{$start_id}").on("dp.change", function(e){
+     $("#{$end_id}").data("DateTimePicker").minDate(e.date);
+    });
+    $("#{$end_id}").on("dp.change", function(e){
+     $("#{$start_id}").data("DateTimePicker").maxDate(e.date);
+    });
+  });
+</script>

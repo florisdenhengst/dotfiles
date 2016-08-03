@@ -1,0 +1,167 @@
+import cvxopt as co
+from kernel import Kernel
+import numpy as np
+import matplotlib.pyplot as plt
+import pprint
+import sklearn as sk
+from joblib import Parallel, delayed
+from sklearn import grid_search
+from svdd import SVDD
+from sklearn.utils.estimator_checks import check_estimator
+from sklearn.utils import check_array
+from sklearn.utils.validation import column_or_1d, indexable
+from sklearn.cross_validation import check_cv
+from sklearn.base import clone
+from svdd_wrapper import SVDD_WRAPPER
+import sys
+import json
+from midpoint_normalize import MidPointNormalize
+from precision_recall_fitter import *
+
+K_TYPE = 'rbf'
+SKLEARN_CVTUPLE_MEAN = 1
+SKLEARN_CVTUPLE_STDEV = 2
+SKLEARN_CVTUPLE_PARAMS = 0
+TOP_N = 5
+
+if len(sys.argv) < 4:
+  print('Usage: python svdd_unsupervised.py <n_jobs> <input_file> <target_file> <txt_to_file> <?img_to_dir>')
+
+co.solvers.options['show_progress'] = False
+n_jobs = int(sys.argv[1])
+filename = sys.argv[2]
+classes_file = sys.argv[3]
+txt_to_file = sys.argv[4]
+if len(sys.argv) == 6:
+  save_to_dir = sys.argv[5]
+else:
+  save_to_dir = False
+
+data = np.loadtxt(open(filename ,'rb'),
+                  delimiter=',')
+
+trues = np.loadtxt(open(classes_file, 'rb'), delimiter=',')[:,1]
+assert len(trues) == len(data[:,0])
+assert len(np.unique(trues)) == 2
+assert data.max() <= 1.0
+
+original_data = data
+ds_size = len(data[:,0])
+
+Dtrain = data
+
+c = float('inf')
+k_param = .3
+nums = 10
+param_grid = {
+#    'k_param': [float(elem) for elem in list(np.linspace(start=25, stop=40, num=nums))],
+    'k_param': [float(elem) for elem in list(np.logspace(start=-4, stop=4, num=nums))],
+    'C': [float(elem) for elem in list(np.logspace(start=-3, stop=0, num=nums))],
+    }
+
+scorer = auc_pr
+estimator = SVDD_WRAPPER()
+verbose = False
+fit_parameters = {}
+
+grid = grid_search.ParameterGrid(param_grid)
+_scores = []
+(Dtrain, trues) = indexable(Dtrain, trues)
+
+def test(*args, **kwargs):
+	pass
+
+out = Parallel(
+		n_jobs=n_jobs
+		)(
+				delayed(my_fit_and_score)(
+				clone(estimator),
+				Dtrain,
+				trues,
+				scorer,
+				range(len(Dtrain)),
+				range(len(trues)),
+				verbose,
+				parameters,
+				fit_parameters,
+				return_parameters=True,
+				error_score=0.0 # default
+				)
+		for parameters in grid)
+dump = json.dumps(out, indent=2, sort_keys=True)
+with open(txt_to_file, 'w+') as f:
+	print(dump, file=f)
+
+exit()
+#LEGACYYYYYYYYYYYYYYY 2
+# dump to JSON
+SCORE_MEAN = 0
+SCORE_PARAMS = 3
+scores = [{'mean': score[SCORE_MEAN],
+           'params': score[SCORE_PARAMS]} for score in out]
+dump = json.dumps(scores, indent=2, sort_keys=True)
+
+# make heatmap plot
+scores = [x[SCORE_MEAN] for x in out]
+# reshape should be inverse of definition of param_grid definition
+scores = np.array(scores).reshape(len(param_grid['C']), len(param_grid['k_param']))
+
+plt.figure(figsize=(8, 6))
+plt.imshow(scores, interpolation='nearest', cmap=plt.cm.hot,
+        norm=MidPointNormalize(vmin=0.1, midpoint=np.average(scores)))
+plt.tight_layout()
+plt.xlabel('gamma')
+plt.ylabel('C')
+plt.colorbar()
+xticks = ['{:.4f}'.format(x) for x in param_grid['k_param']]
+yticks = ['{:.4f}'.format(x) for x in param_grid['C']]
+plt.xticks(np.arange(len(param_grid['k_param'])), xticks , rotation=45)
+plt.yticks(np.arange(len(param_grid['C'])), yticks)
+plt.title('AUC-PR')
+plt.tight_layout()
+
+if save_to_dir:
+  plt.savefig('{}/{}'.format(save_to_dir, 'f1_heatmap.pdf'), format='pdf')
+else:
+  plt.show()
+
+exit()
+
+# LEGACYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY
+aucs = []
+for params in grid_search.ParameterGrid(param_grid):
+  estimator = SVDD_WRAPPER(**params)
+  try:
+      fitted = estimator.fit(Dtrain)
+      scores = fitted.predict_proba(Dtrain)
+      (precision, recall, _) = sk.metrics.precision_recall_curve(trues, scores, pos_label=-1)
+      auc = sk.metrics.auc(recall, precision)
+  except:
+      auc = float('-inf')
+      precision = float(0)
+      recall = float(0)
+  aucs.append((params, auc, (precision, recall)))
+
+# sort aucs by auc
+aucs = sorted(aucs, key=lambda tup: tup[1], reverse=True)
+
+for (thisrange, auc, (precision, recall)) in aucs[0:TOP_N]:
+  label = 'G:{} C:{} AUC:{:0.4f}'.format(
+                                 thisrange['k_param'],
+                                 thisrange['C'],
+                                 auc)
+  plt.plot(recall, precision, label=label)
+  plt.legend(loc='upper right', prop={'size': 10})
+  plt.xlabel('Recall')
+  plt.ylabel('Precision')
+  plt.title('PR curves for SVDD with various settings of G and C')
+
+pprint.pprint(aucs)
+  
+# plot aur score
+if save_to_dir:
+  plt.savefig('{}/{}'.format(save_to_dir, 'output_unsup_svdd.pdf',format='pdf'))
+else:
+  plt.show()
+
+exit()

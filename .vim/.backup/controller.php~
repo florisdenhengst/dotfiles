@@ -1,0 +1,326 @@
+<?php
+class controller {
+  protected $_db; // the $db access object
+  protected $_dwoo; // the dwoo object
+  protected $_matches; // all url matches from the router
+  protected $_user; // the currently logged in user model
+  protected $_menuItems = array(); // composed of $_defaultMenuItems and (for su's) $_superuserMenuItems
+  protected $_defaultMenuItems = array(
+    array(
+      "url"   => "/management/clients",
+      "label" => "clients"
+    ),
+    array(
+      "url"   => "/management/groups",
+      "label" => "client groups"
+    ),
+    array(
+      "url"   => "/management/presentations",
+      "label" => "presentations"
+    ),
+    array(
+      "url"   => "/management/timeslots",
+      "label" => "timeslots"
+    ),
+  );
+  protected $_superuserMenuItems = array(
+    array(
+      "url"   => "/management/users",
+      "label" => "users"
+    )
+  );
+
+
+  /* A base class for all controllers. */
+  public function __construct($login_required = True, $superuser_required = False){
+    $this->_login_required = $login_required; // by default, a user should log in
+    $this->_superuser_required = $superuser_required; // by default, shouldn't have to be su
+    $this->_login_tpl = TEMPLATE_ROOT . 'login-form.tpl';
+    $this->_error_tpl = TEMPLATE_ROOT . 'error-page.tpl';
+    $this->_MISSING_CREDENTIALS_MSG = 'Both username and password required';
+    $this->_INCORRECT_CREDENTIALS_MSG = 'Combination of username and password is unknown';
+    $this->_LOGIN_FAILED_UNKNOWN = 'Login attempt failed for unknown reasons';
+    $this->_ANYONE_CAN_EDIT = FALSE;
+    global $connection;
+    global $connection_options;
+    global $dwoo;
+    try{
+      $this->_db = new PDO($connection, DB_USER, DB_PASSWORD, $connection_options);
+    }catch(PDOException $e){
+      //TODO: handle error better
+      echo $e->getMessage();
+    }
+
+    $this->_dwoo = $dwoo;
+    // start the session
+    $this->_start_secure_session();
+    if($this->_login_required){
+      $this->_process_login();
+      // continue
+    }
+  }
+
+  /***
+   * Generic handler for GET requests
+   */
+  function GET($id){
+    $this->_matches = $id;
+
+    if(count($id) > 2){
+      if($id[2] == "new"){
+        $this->create();
+      } else if($id[2] == 'delete'){
+       $this->delete($id[3]); 
+      } else {
+        // an id was provided. Show a form for editing this client.
+        $this->edit($id[2]);
+      }
+    } else {
+      // no id was provided. List all clients.
+      $this->all();
+    }
+  }
+
+  /***
+   * Generic function for creating any new instance
+   */
+  function create(){
+    if($this->_ANYONE_CAN_EDIT || $this->_user['is_superuser']){
+      $data = array();
+      $this->output($this->_create_tpl, $data);
+    }else{
+      $this->_response_not_authorized(
+        "Not authorized",
+        "You do not have authorization to perform this action");
+    }
+  }
+  
+  /***
+   * Wrapper function for outputting template file after adding some generic content
+   */
+  public function output($templateFile, $data){
+    // add nav info to the template
+    $menuData = $this->_getNavigationData();
+    $data = array_merge($data, $menuData);
+    $tpl = new TemplateWrapper($templateFile, $data);
+    echo $tpl->get($this->_dwoo);
+  }
+
+  /***
+   * Check if the user has provided login credentials.
+   */
+  protected function _process_login(){
+    if(!$this->logged_in() && $this->_login_attempt()){
+      $credentials = $this->_get_credentials();
+      if(!$credentials){
+        $this->response_login_required(array(
+          'errormessage' => $this->_MISSING_CREDENTIALS_MSG)
+        );
+      }
+      $result = $this->_attempt_login($credentials['username'],
+                                      $credentials['password']);
+      if(!$result){
+        $this->response_login_required(array(
+          'errormessage' => $this->_INCORRECT_CREDENTIALS_MSG)
+        );
+      }
+    }
+    $logged_in = $this->logged_in();
+    if($this->_login_required && !$logged_in){
+      $this->response_login_required(array());
+    } else if($logged_in){
+      $this->_user = $_SESSION['loginInfo']['user'];
+
+      if($this->_user['is_superuser']){
+        // add menu items only for superusers
+        $this->_menuItems = array_merge($this->_defaultMenuItems, $this->_superuserMenuItems);
+      } else {
+        $this->_menuItems = $this->_defaultMenuItems;
+      }
+    }
+  }
+
+  /***
+   * Function to return data on the state of the menu (mostly for building menu)
+   */
+  private function _getNavigationData(){
+    $user = $this->logged_in();
+    if($user){
+      $username = $user['username'];
+    } else {
+      $username = '';
+    }
+  
+    $currentState = $this->_getCurrentState($this->_matches[1]);
+    $navInfo = array(
+      'menu' => array(
+        'current' => $currentState['url'],
+        'items'   => $this->_menuItems),
+      'username'  => $username
+    );
+    return $navInfo;
+  }
+
+  /***
+   * Returns current state from an url (i.e. stripping off certain parameters).
+   */
+  private function _getCurrentState($currentUrl){
+    foreach($this->_menuItems as $item){
+      if(strpos($currentUrl, $item['url']) !== false){
+        return $item;
+      }
+    }
+  }
+
+  /***
+   * Starts a secure session
+   */
+  private function _start_secure_session(){
+    $httponly = true; // no JS cookie access
+    $secure = !DEBUG;
+    if(ini_set('session.use_only_cookies', 1) === FALSE){
+      // We only allow cookies for session management
+      throw new Exception("Something went wrong creating session!");
+    }
+
+    $cookieParams = session_get_cookie_params();
+    session_set_cookie_params(
+      $cookieParams['lifetime'],
+      $cookieParams['path'],
+      $cookieParams['domain'],
+      $secure,
+      $httponly
+    );
+    session_name(MY_SESSION_NAME);
+    session_start();
+    session_regenerate_id(true);
+  }
+
+  /***
+   * Checks whether a current user is logged in.
+   */
+  public function logged_in(){
+    if(isset(
+      $_SESSION['loginInfo'],
+      $_SESSION['loginInfo']['loggedIn'],
+      $_SESSION['loginInfo']['user'],
+      $_SESSION['loginInfo']['user']['username']) &&
+      $_SESSION['loginInfo']['loggedIn']){
+      // TODO: do some checks for userbrowser 
+        return $_SESSION['loginInfo']['user'];
+    } 
+    // $_SESSION vars not set
+    return FALSE;
+  }
+
+  /***
+   * Checks login for an assoc. array $user
+   */
+  private function _validate_password($username, $password){
+    $user = User::get_assoc($this->_db, $username, 'username');
+    // $password = hash(HASHING_METHOD, $password . $salt);
+    $inputPassword = User::safe_b64encode(User::hash($password, $user['salt']));
+
+    // (optional) brute force check
+    
+    // check whether db_password matches $password
+    if($inputPassword === $user['password']){
+      return $user;
+    }
+    return FALSE;
+  }
+
+  /***
+   * Returns True if a login attempt has been made in the request.
+   * See attempt_login and _get_credentials for how this is handled.
+   */
+  private function _login_attempt(){
+    return (in_array('login-username', array_keys($_POST))
+           || in_array('login-password', array_keys($_POST)));
+  }
+
+  /***
+   * Returns 'username' and 'password' variables.
+   */
+  private function _get_credentials(){
+    if (in_array('login-username', array_keys($_POST)) &&
+      in_array('login-password', array_keys($_POST))){
+      return array(
+        'username' => $_POST['login-username'],
+        'password' => $_POST['login-password']
+      );
+    }
+    return FALSE;
+  }
+
+  /***
+   * Logs a user in
+   */
+  private function _attempt_login($username, $password){
+    $user = $this->_validate_password($username, $password);
+    if(!$user){
+      return FALSE;
+    }
+    // login succeeded. Save user to the session
+
+    // store login-info in session
+    // XSS protection:
+    $user['username'] = preg_replace("/[^a-zA-Z0-9_\-@]+/", "", $user['username']);
+    // store loginInfo
+    $_SESSION['loginInfo'] = array('loggedIn' => TRUE);
+    // store the model
+    $_SESSION['loginInfo']['user'] = $user;
+    
+    /* TODO: wat doet dit en waarom moet het?
+      $user_browser = $_SERVER['HTTP_USER_AGENT'];
+    $_SESSION['logininfo']['loginString'] = hash('sha512', 
+      $usr['id'], $pw, $user_browser);*/
+    header('Location: /');
+    die();
+    return TRUE;
+  }
+
+  /***
+   * Returns a 401 login required.
+   */
+  public function response_login_required($data){
+    if(!in_array('errormessage', array_keys($data))){
+      $data['errormessage'] = '';
+    }
+    $tpl = new TemplateWrapper($this->_login_tpl, $data);
+    echo $tpl->get($this->_dwoo);
+    exit();
+#    header('WWW-Authenticate: Basic realm="Control center requires login');
+#    header('HTTP/1.0 401 Unauthorized');
+#    exit();
+  }
+
+  /***
+   * Returns a 400 bad request.
+   */
+  public function response_bad_request($msg="This request was malformed."){
+    header("HTTP/1.0 400 Bad Request");
+    die($msg);
+  }
+
+  /***
+   * Method for showing errors
+   */
+  public function _response_not_authorized(
+    $summary= "You are not authorised to go here",
+    $body = ''
+  ){
+    if($body == ''){
+      $body= 'You are not authorized to visit this page or perform this action';
+    }
+    $tpl = new TemplateWrapper($this->_error_tpl,
+                               array(
+                                 'summary' => $summary,
+                                 'body' => $body
+                               )
+                             );
+    echo $tpl->get($this->_dwoo);
+    exit();
+  }
+}
+?>

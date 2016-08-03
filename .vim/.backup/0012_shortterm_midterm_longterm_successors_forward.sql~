@@ -1,0 +1,50 @@
+DROP VIEW IF EXISTS view_shorttermsuccessors;
+CREATE OR REPLACE VIEW view_shorttermsuccessors AS
+  SELECT id as position, positiontitle.base as title,
+  COALESCE(listed.count, 0) AS listed_successors
+  FROM position 
+  LEFT OUTER JOIN positiontitle ON position.title_id = positiontitle.id
+  LEFT OUTER JOIN(
+    SELECT COUNT(*), position_id
+    FROM succession
+    LEFT OUTER JOIN successionterm
+      ON succession.term_id = successionterm.id
+    WHERE successionterm.majorterm = 1
+    GROUP BY position_id
+    ORDER BY position_id
+  ) listed
+ON listed.position_id = position.id;
+
+DROP VIEW IF EXISTS view_midtermsuccessors;
+CREATE OR REPLACE VIEW view_midtermsuccessors AS 
+SELECT id as position, positiontitle.base as title,
+COALESCE(listed.count, 0) AS listed_successors
+FROM position
+LEFT OUTER JOIN positiontitle ON position.title_id = positiontitle.id
+LEFT OUTER JOIN(
+  SELECT COUNT(*), position_id
+  FROM succession
+  LEFT OUTER JOIN successionterm
+  ON succession.term_id = successionterm.id
+  WHERE successionterm.majorterm = 2
+  GROUP BY position_id
+  ORDER BY position_id
+  ) listed
+ON listed.position_id = position.id;
+
+DROP VIEW IF EXISTS view_longtermsuccessors;
+CREATE OR REPLACE VIEW view_longtermsuccessors AS
+SELECT id as position, positiontitle.base as title,
+COALESCE(listed.count, 0) AS listed_successors
+FROM position
+LEFT OUTER JOIN positiontitle ON position.title_id = positiontitle.id
+LEFT OUTER JOIN(
+  SELECT COUNT(*), position_id
+  FROM succession
+  LEFT OUTER JOIN successionterm
+  ON succession.term_id = successionterm.id
+  WHERE successionterm.majorterm = 3
+  GROUP BY position_id
+  ORDER BY position_id
+  ) listed
+ON listed.position_id = position.id;

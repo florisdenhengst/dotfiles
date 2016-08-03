@@ -1,0 +1,13 @@
+{% verbatim %}
+<div ng-switch="selectedSubPage">
+  <!--POSITIONS-->
+  <div ng-switch-default>
+    <div ng-include src="'/successionplanning/subapp/positions/'"></div>
+  </div>
+  
+  <!--CANDIDATES-->
+  <div ng-switch-when="individuals">
+    <div ng-include src="'/successionplanning/subapp/candidates/'"></div>
+  </div>
+</div>
+{% endverbatim %}

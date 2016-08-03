@@ -1,0 +1,133 @@
+{% verbatim %}
+<div id="filter">
+  <div id="filter-body">
+    <div>
+      <h3>LOCATION</h3>
+      <multi-select
+          input-model="locationsMultiSelectList"
+          output-model="locationsOutput"
+          button-label="name"
+          item-label="name"
+          tick-property="selected"
+          helper-elements="filter"
+          max-labels="0"
+          default-label="<img class='none-selected-label' src='/static/kapstok/logos/arrowRight.png'>"
+          group-property="multiSelectGroup">
+      </multi-select>
+    </div>
+    
+    <div>
+      <h3>FUNCTIONAL AREA</h3>
+      <multi-select
+          input-model="functionalAreasMultiSelectList"
+          output-model="functionalAreasOutput"
+          button-label="name"
+          item-label="name"
+          tick-property="selected"
+          helper-elements="filter"
+          max-labels="0"
+          default-label="<img class='none-selected-label' src='/static/kapstok/logos/arrowRight.png'>"
+          group-property="multiSelectGroup">
+      </multi-select>
+    </div>
+    
+    <div>
+      <h3>BUSINESS UNIT</h3>
+      <multi-select
+          input-model="businessUnitsMultiSelectList"
+          button-label="name"
+          item-label="name"
+          tick-property="selected"
+          helper-elements="filter"
+          max-labels="0"
+          default-label="<img class='none-selected-label' src='/static/kapstok/logos/arrowRight.png'>"
+          group-property="multiSelectGroup">
+      </multi-select>
+    </div>
+    
+    <div>
+      <h3>JOB TITLE</h3>
+      <multi-select
+          input-model="positionTitles"
+          button-label="title"
+          item-label="title"
+          tick-property="selected"
+          helper-elements="filter"
+          default-label="<img class='none-selected-label' src='/static/kapstok/logos/arrowRight.png'>"
+          max-labels="0">
+      </multi-select>
+    </div>
+    
+    <hr>
+    
+    <div>
+      <h3>GENDER</h3>
+      <div class="row">
+        <div class="col-lg-4">
+          <label class="gender-button" ng-class="{ selected: filter.selections.genders.female }">
+            <input ng-model="filter.selections.genders.female" type="checkbox">
+            <div ng-include="'/static/kapstok/logos/filter female.svg'"></div>
+          </label>
+        </div>
+        <div class="col-lg-4">
+          <label class="gender-button" ng-class="{ selected: filter.selections.genders.male }">
+            <input ng-model="filter.selections.genders.male" type="checkbox">
+            <div ng-include="'/static/kapstok/logos/filter male.svg'"></div>
+          </label>
+        </div>
+        <div class="col-lg-4">
+          <label class="gender-button" ng-class="{ selected: filter.selections.genders.unknown }">
+            <input ng-model="filter.selections.genders.unknown" type="checkbox">
+            <div ng-include="'/static/kapstok/logos/filter question.svg'"></div>
+          </label>
+        </div>
+      </div>
+    </div>
+    
+    <div>
+      <h3>AGE</h3>
+      <fo-range-slider ng-model="filter.selections.age" domain="filter.contents.age">
+        <div class="range-low"></div>
+        <div class="range-high"></div>
+      </fo-range-slider>
+    </div>
+    
+    <hr>
+    
+    <div>
+      <h3>TALENT STATUS</h3>
+      <label><input type="checkbox"> Normal</label><br>
+      <label><input type="checkbox"> Talented</label><br>
+      <label><input type="checkbox"> TopTalent</label>
+    </div>
+    
+    <div>
+      <h3>PERFORMANCE STATUS</h3>
+      <label><input type="checkbox"> Underperforms</label><br>
+      <label><input type="checkbox"> Solid</label><br>
+      <label><input type="checkbox"> Over-achiever</label>
+    </div>
+    
+    <hr>
+    
+    <div>
+      <h3>GRADE</h3>
+      <multi-select
+          input-model="[]"
+          button-label="title"
+          item-label="title"
+          tick-property="selected"
+          helper-elements="filter"
+          default-label="<img class='none-selected-label' src='/static/kapstok/logos/arrowRight.png'>"
+          max-labels="0">
+      </multi-select>
+    </div>
+    
+    <div>
+      <h3>PEOPLE MANAGER</h3>
+      <label><input ng-model="filter.selections.managers" type="radio"> No</label>
+      <label><input ng-model="filter.selections.managers" type="radio"> Yes</label>
+    </div>
+  </div>
+</div>
+{% endverbatim %}

@@ -1,0 +1,45 @@
+@article{phua2010comprehensive,
+  title={A comprehensive survey of data mining-based fraud detection research},
+  author={Phua, Clifton and Lee, Vincent and Smith, Kate and Gayler, Ross},
+  journal={arXiv preprint arXiv:1009.6119},
+  year={2010}
+}
+
+@inproceedings{portnoy2001intrusion,
+  title={Intrusion detection with unlabeled data using clustering},
+  author={Portnoy, Leonid and Eskin, Eleazar and Stolfo, Sal},
+  booktitle={In Proceedings of ACM CSS Workshop on Data Mining Applied to Security (DMSA-2001},
+  year={2001},
+  organization={Citeseer}
+}
+
+@article{prastawa2004brain,
+  title={A brain tumor segmentation framework based on outlier detection},
+  author={Prastawa, Marcel and Bullitt, Elizabeth and Ho, Sean and Gerig, Guido},
+  journal={Medical image analysis},
+  volume={8},
+  number={3},
+  pages={275--283},
+  year={2004},
+  publisher={Elsevier}
+}
+
+@inproceedings{pelleg2004active,
+  title={Active learning for anomaly and rare-category detection},
+  author={Pelleg, Dan and Moore, Andrew W},
+  booktitle={Advances in Neural Information Processing Systems},
+  pages={1073--1080},
+  year={2004}
+}
+
+@inproceedings{breunig2000lof,
+  title={LOF: identifying density-based local outliers},
+  author={Breunig, Markus M and Kriegel, Hans-Peter and Ng, Raymond T and Sander, J{\"o}rg},
+  booktitle={ACM Sigmod Record},
+  volume={29},
+  number={2},
+  pages={93--104},
+  year={2000},
+  organization={ACM}
+}
+

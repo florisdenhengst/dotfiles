@@ -1,0 +1,35 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models, migrations
+import os
+
+def get_file(file_name):
+  f = open(os.path.join(os.path.dirname(__file__), file_name))
+  query = f.read()
+  return query
+  
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('database', '0005_view_longtermsuccessors_view_midtermsuccessors_view_shorttermsuccessors'),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='ConvertedEmployeeDates',
+            fields=[
+                ('id', models.OneToOneField(serialize=False, primary_key=True, to='database.Employee')),
+                ('age', models.IntegerField()),
+                ('years_of_service', models.IntegerField()),
+                ('years_in_position', models.IntegerField()),
+            ],
+            options={
+                'db_table': 'view_convertedemployeedates',
+                'managed': False,
+            },
+            bases=(models.Model,),
+        ),
+        
+        migrations.RunSQL(get_file("0006_create_view_dates.sql"), "DROP VIEW view_convertedemployeedates")
+    ]

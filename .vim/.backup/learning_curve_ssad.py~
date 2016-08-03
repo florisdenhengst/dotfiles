@@ -1,0 +1,83 @@
+import cvxopt as co
+from kernel import Kernel
+import numpy as np
+import matplotlib.pyplot as plt
+import pprint
+import sklearn as sk
+from sklearn import grid_search
+from svdd import SVDD
+from sklearn.utils.estimator_checks import check_estimator
+from sklearn.utils import check_array
+from sklearn.utils.validation import column_or_1d
+import sys
+from ssad_wrapper import *
+from midpoint_normalize import *
+import json
+import os
+
+K_TYPE = 'rbf'
+USAGE = '''Usage: python learning_curve_ssad.py <inner/inter>
+  <data_file>
+  <unsup_scores_file>
+  <classes_file>
+  <json_output>
+  <?img_to_dir>
+  <?n_jobs>
+  <?n_folds>
+  '''
+def assign_optional_arg(index, argname):
+  try:
+    globals()[argname] = sys.argv[index]
+  except IndexError:
+    print('No arg {} provided.'.format(argname))
+
+if len(sys.argv) < 4:
+  print()
+
+try:
+  inner = sys.argv[1] == 'inner'
+  if not inner and sys.argv[1] != 'inter':
+    raise IndexError()
+  data_file = sys.argv[2]
+  unsup_scores_file = sys.argv[3]
+  classes_file = sys.argv[4]
+  output_file = sys.argv[5]
+except IndexError:
+  print(USAGE)
+  exit(1)
+
+# validate json output
+with open(output_file, 'w+') as f:
+  print('output file validated')
+
+for i, arg in enumerate(['img_to_dir', 'n_jobs', 'n_folds']):
+  assign_optional_arg(i+6, arg)
+
+# read input file 
+data = np.loadtxt(open(data_file,'rb'), delimiter=',')
+
+# read classes file
+trues = np.loadtxt(open(classes_file, 'rb'), delimiter=',')[:,1]
+
+# read unsupervised file
+unsup_scores = np.loadtxt(open(unsup_scores_file, 'rb'), delimiter=',')[:,1]
+
+# validate scores and classes etc.
+assert len(trues) == len(data[:,0]) == len(unsup_scores)
+assert len(np.unique(trues)) == 2
+
+# set optimal parameters
+# TODO
+
+# 
+hints_range = range(len(trues))
+
+
+for i, n_hints in enumerate(hints_range):
+  # build a model, based on known information
+
+  # query in alternating fashion.
+  if i % 2 == 0:
+      # t
+
+

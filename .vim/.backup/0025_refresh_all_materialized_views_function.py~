@@ -1,0 +1,23 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models, migrations
+import os
+
+def get_file(file_name):
+  f = open(os.path.join(os.path.dirname(__file__), file_name))
+  query = f.read()
+  return query
+  
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ("database", "0024_auto_20141223_1438"),
+    ]
+
+    operations = [
+        migrations.RunSQL(
+          sql=get_file("0025_refresh_all_materialized_views_function_forward.sql"),
+          reverse_sql=get_file("0025_refresh_all_materialized_views_function_forward.sql")
+        )
+    ]

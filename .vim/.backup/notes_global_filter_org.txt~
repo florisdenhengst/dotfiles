@@ -1,0 +1,26 @@
+- Location (Position)
+- Func. area (Position)
+- BU (Position)
+- Job Title (Position)
+
+- Gender (Person)
+- Age (Person)
+
+
+- TalentStatus (Employee)
+
+
+
+- PerformanceStatus (Job) 
+
+
+- Grade (Employee & Position)
+  (how to define)
+
+
+- People Manager (PositionHierarchy.direct_span > 0  -> what to do if no org app?)
+
+
+
+in ORG
+

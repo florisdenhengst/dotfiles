@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# These settings are for the migration testing database
+# Name of the django database preset in sitesettings.py
+MIGRATION_TEST_DB_PRESET=migration_test
+# Actual name of the database
+MIGRATION_TEST_DB=crunchr_migration_test
+
+echo "========== EXECUTING PRE-COMMIT CHECKS =========="
+
+branch=$(git branch | sed -n -e 's/^\* \(.*\)/\1/p')
+if [ $branch = "master" ] && git diff --name-only --cached | grep -E "^database/models*.py$"; then
+  echo "Model changes detected. Attempting to make migrations..."
+  # Make the migrations which may lead to untracked files in database/migrations
+  ./manage.py makemigrations
+  untracked_migrations=`git ls-files --others database/migrations | grep -v __pycache`
+  if [ -n "$untracked_migrations" ]; then                  
+    echo "There are untracked migrations:"
+    echo $untracked_migrations
+    echo "Please add these to your commit!"
+    echo "================================================="
+    exit 1
+  else                                                     
+    echo "No untracked migrations found."                                            
+  fi   
+fi
+
+echo "============= TESTING MIGRATIONS ================"
+echo "Running migration test on \"$MIGRATION_TEST_DB\" database..."
+echo "make sure \"$MIGRATION_TEST_DB\" is configured in sitesettings.py!"
+echo "For more info, check: https://bitbucket.org/foini/web-framework/wiki/Git%20hooks"
+echo ""     
+python3 ./manage.py migrate --database $MIGRATION_TEST_DB_PRESET
+MIGRATIONS_SUCCESSFUL=$?
+echo "Clearing \"$MIGRATION_TEST_DB\""
+dropdb $MIGRATION_TEST_DB
+createdb $MIGRATION_TEST_DB
+if [ $MIGRATIONS_SUCCESSFUL -ne 0 ]; then
+  echo "Aborting commit. Migrations failed!"
+  exit 1    
+fi
+echo "================================================="

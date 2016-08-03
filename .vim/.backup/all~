@@ -1,0 +1,10 @@
+#!/bin/bash
+
+FILES=input/*.prom
+
+for f in $FILES
+do
+  echo "$f"
+  bin/ndfs $f seq 1
+  echo "\n"
+done

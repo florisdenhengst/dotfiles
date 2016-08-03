@@ -1,0 +1,105 @@
+from database.models import * 
+from django.db import connection
+import time
+
+N_POSITIONS = Position.objects.all().count()
+N_POSITIONS = 50 
+
+user = User.objects.get(pk=1)
+
+
+def current_query_time(queries):
+  query_time = 0
+  n_queries = 0
+  for query in connection.queries:
+    query_time = query_time + float(query['time'])
+    n_queries = n_queries + 1
+  return (query_time, n_queries)
+
+
+def get_authorization_filter(model, chunk_ids, operator):
+  if(issubclass(model, Protected)):
+    path_to_chunk = model.get_path_to_chunk()
+    lookup = "%s__%s" % (path_to_chunk, operator)
+    auth_filter = {}
+    auth_filter[lookup] = chunk_ids
+    return auth_filter
+  else:
+    raise NotImplementedError()
+
+
+def authorized(qs, user, operator):
+  model = qs.model
+  if(issubclass(model, Protected)):
+    chunks = Role.get_chunk_ids_for_user(user)
+    auth_filter = get_authorization_filter(model, chunks, operator)
+    return qs.filter(**auth_filter)
+
+
+def anny(qs, user):
+  return authorized(qs, user, 'id__any')
+
+
+def inna(qs, user):
+  return authorized(qs, user, 'in')
+
+def usahs(qs, user):
+  return qs.filter(chunk__in=ChunkUser.objects.get(user=user).chunks.all())
+
+
+start_time = time.time()
+init_query_time = current_query_time(connection.queries)[0]
+for i in range(0,N_POSITIONS):
+  pos = anny(Position.objects, user)
+  pos = list(pos)
+
+any_total_time = time.time() - start_time
+total_any_query_time = current_query_time(connection.queries)[0]
+example_query_any = connection.queries[-1]
+
+start_time = time.time()
+for i in range(0,N_POSITIONS):
+  pos = inna(Position.objects, user)
+  pos = list(pos)
+
+in_total_time = time.time() - start_time
+total_in_query_time = current_query_time(connection.queries)[0]
+example_query_in = connection.queries[-1]
+
+start_time = time.time()
+for i in range(0,N_POSITIONS):
+  pos = list(Position.objects.all())
+
+all_total_time = time.time() - start_time
+total_all_query_time = current_query_time(connection.queries)[0]
+example_query_all = connection.queries[-1]
+
+start_time = time.time()
+for i in range(0,N_POSITIONS):
+  pos = list(usahs(Position.objects, user))
+
+sub_total_time = time.time() - start_time
+total_sub_query_time = current_query_time(connection.queries)[0]
+example_query_sub = connection.queries[-1]
+
+
+
+any_query_time = total_any_query_time - init_query_time
+in_query_time = total_in_query_time - total_any_query_time
+all_query_time = total_all_query_time - total_in_query_time
+sub_query_time = total_sub_query_time - total_all_query_time
+
+print('')
+print('Time spent doing %d times authorized-query using `any`: %f out of %f' % (N_POSITIONS, any_query_time,  any_total_time, ))
+#print('Example query: %s' % example_query_any)
+print('')
+print('Time spent doing %d times authorized-query using `in`: %f out of %f' % (N_POSITIONS, in_query_time,in_total_time,))
+#print('Example query: %s' % example_query_in)
+print('')
+print('Time spent doing %d times authorized-query using `all`: %f out of %f' % (N_POSITIONS,all_query_time,all_total_time,))
+#print('Example query: %s' % example_query_all)
+print('')
+print('Time spent doing %d times authorized-query using `subquery`: %f out of %f' % (N_POSITIONS,sub_query_time,sub_total_time,))
+print('Example query: %s' % example_query_sub)
+print('')
+

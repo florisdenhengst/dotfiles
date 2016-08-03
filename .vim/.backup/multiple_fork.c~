@@ -1,0 +1,144 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <errno.h>
+#include <string.h>
+#include <signal.h>
+
+/* het verwachtte aantal command line args*/
+#define EXPCTD_ARGS 2
+/* max lengte van een rabbit type (young, adult, old) */
+#define MAX_RABBIT_TYPE_LEN 6 //young + 1
+/* max lengte van een identification text */
+#define MAX_IDENTIFICATION_TEXT_LEN 5 // lion/bear/wolf + 1
+
+/* teller om aantal bij te houden (afhankelijk van aantal expedities) */
+volatile sig_atomic_t expected_signals = 0;
+
+/* in een bericht zit... */
+typedef struct message {
+  char rabbit_type[MAX_RABBIT_TYPE_LEN];
+  char identification_text[MAX_IDENTIFICATION_TEXT_LEN];
+} message_t; // een message heeft nu type message_t
+
+/* signal handler -- wordt uitgevoerd als signal voor 'expedition has arrived' binnenkomt */
+void signal_expedition_arrived_handler(int sig, siginfo_t *info, void *extra){
+  printf("expeditie %d is aangekomen\n", info->si_pid);
+  /* elk kind stuurt precies 1 expdtn_arrvd_signal signal. Alle signals komen aan. */
+  expected_signals--;
+}
+
+/* uitgevoerd door expedition processes */
+void expedition(int expdtn_arrvd_signal){
+  printf("expeditie %d is gestart\n", getpid());
+  /* stuur signal naar parent */
+  kill(getppid(), expdtn_arrvd_signal);
+  //printf("Ik heb wel kill() uitgevoerd maar ik leef nog hoor ;)");
+
+  /* TODO: de expedition moet hier een op een identification_text wachten en die lokaal opslaan */
+
+  // ....
+
+  /* TODO: de expedition moet hier een for-loop resultaten sturen TOT de eindtijd bereikt is */
+
+  /* dit proces is klaar en mag successvol afsluiten */
+  exit(0);
+}
+
+/* controleer command line argumenten (exit als verkeerd) */
+void parse_args(int argc, char *argv[], int* n_exps, int* obs_time){
+  if(argc != EXPCTD_ARGS + 1){ /* programma naam zelf komt ook mee */
+    /* verkeerd aantal argumenten */
+    printf("Provide 'number of expeditions' and 'observation time' arguments\n");
+    exit(EXIT_FAILURE); // we gaan niet draaien maar stoppen het programma
+  }
+
+  /* converteer van char[] naar integer met atoi en sla op in n_exps en obs_time*/
+  *n_exps = atoi(argv[1]);
+  *obs_time = atoi(argv[2]);
+  printf("Collecting observations using:\n  n_exps:     %d\n  obs_time: %d\n", 
+      *n_exps, *obs_time);
+}
+
+int main(int argc, char *argv[]){
+  /* de signal die gestuurd moet worden als een expiditie aangekomen is */
+  int expdtn_arrvd_signal = SIGRTMIN + 1; // Alle signals moeten SIGRTMIN + 1, SIGRTMIN + 2, SIGRTMIN + 3 etc. worden
+
+  int n_expeditions,            // het aantal expedities
+      observation_time,         // de observation time (TODO: moet geen int zijn?)
+      started_expeditions,         // het aantal processes dat al gestart is
+      running_expeditions,         // het aantal processes dat op dit moment nog loopt
+      done_status;              // de status van een kind die klaar is
+
+  pid_t process_id,             // process_id als resultaat van fork()
+        done_pid;               // process_id van een kind die klaar is
+
+
+  /* struct om opties voor signal handling voor 'expedition arrived' in te zetten */
+  struct sigaction signal_arrived_options;
+  sigset_t block_mask;
+  sigfillset(&block_mask);
+
+
+  /* we willen dat signal_expedition_arrived_handler wordt uitgevoerd */
+  signal_arrived_options.sa_sigaction = signal_expedition_arrived_handler; 
+  /* hier komt in welke signals we willen ondervangen */
+  signal_arrived_options.sa_mask = block_mask;
+  /* als signal_expedition_arrived_handler al wordt uitgevoerd op het
+   * moment dat er een nieuwe signal binnenkomt, moet elk volgend signal in een lijst
+   * gezet worden */
+  signal_arrived_options.sa_flags = SA_SIGINFO; //SA_SIGINFO;
+  /* bij een expdtn_arrvd_signal-signal moet alles zoals in signal_arrived_options beschreven staat
+   * worden uitgevoerd*/
+  sigaction (expdtn_arrvd_signal, &signal_arrived_options, NULL);
+
+  /* controleer de command line arguments en sla de waardes op */
+  parse_args(argc, argv, &n_expeditions, &observation_time);
+  /* we weten hoeveel expedities we gaan maken, dus hoevel signals we nog verwachten */
+  expected_signals = n_expeditions;
+  
+  /* we gaan de process_ids van de kinderen opslaan in een array om berichten te kunnen sturen */
+  pid_t expeditions[n_expeditions];
+
+  /* maak kinderen */
+  running_expeditions = 0; // we beginnen met 0 kinderen!
+  for(started_expeditions = 0; started_expeditions < n_expeditions; started_expeditions++){
+    process_id = fork();
+    if(process_id == -1){
+      /* fork failed */
+      perror("Fork failed!");
+    } else if(process_id == 0){
+      /* expedition process */
+      expedition(expdtn_arrvd_signal);
+    } else{
+      /* parent process */
+      running_expeditions ++;
+    }
+  }
+  // de expedition processes moeten op het eind een exit() doen, dan komt alleen de parent hier
+  while(expected_signals > 0){
+    printf("parent wacht op tot %d expedities zijn aangekomen\n", expected_signals); // TODO: mag weg
+    sleep(1);                                                        // TODO: mag weg of op een lager getal
+  }
+  printf("alle expedities hebben zich gemeld!\n");
+  
+  /* roep (een random) de 3e expeditie terug */
+  kill(expeditions[2], SIGTERM);
+
+  /* TODO: de parent moet hier gaan kijken naar een lijstje met pipes oid */
+
+  
+  /* wacht tot kinderen klaar zijn -- als we dit niet doen kan de parent al stoppen voor
+   * de kinderen */
+  while(running_expeditions > 0){
+    /* wacht tot een kind klaar is */
+    done_pid = wait(&done_status);
+    printf("expedition met id %d gestopt met status %d\n", (int) done_pid, done_status);
+    running_expeditions --;
+  }
+  printf("====================parent gaat sluiten===============\n");
+
+  //TODO: dit is alleen nodig voor automatisch runnen (anders kan de server het wss niet aan en lijkt je programma te crashen. 
+  sleep(1);
+}

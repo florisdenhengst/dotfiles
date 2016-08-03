@@ -1,0 +1,18 @@
+ALTER VIEW shorttermsuccessors
+RENAME TO view_shorttermsuccessors;
+
+ALTER VIEW midtermsuccessors
+RENAME TO view_midtermsuccessors;
+
+ALTER VIEW longtermsuccessors
+RENAME TO view_longtermsuccessors;
+
+ALTER VIEW shorttermavailablesuccessors
+RENAME TO view_shorttermavailablesuccessors;
+
+ALTER VIEW midtermavailablesuccessors
+RENAME TO view_midtermavailablesuccessors;
+
+ALTER VIEW longtermavailablesuccessors
+RENAME TO view_longtermavailablesuccessors;
+

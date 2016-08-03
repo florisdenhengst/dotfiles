@@ -1,0 +1,60 @@
+<fo-message>
+  This section provides organisation effectiveness insights. If cost control or operating
+  expenditure is a priority at your organisation, the analytics in this section form the basis for
+  any decision making. The overview includes the reporting layers and the positions and individuals
+  per layer. These include reporting structures and form an interactive organisation chart. The
+  reporting layers show the number of reporting levels within your organisation, and the span of
+  control indicates how many employees report into one manager at different levels throughout the
+  organisation. Finally, the organisation health report is the Crunch data science on all data,
+  showing where red flags or best practices exist within your organisation.
+</fo-message>
+
+<div class="row">
+  <div class="col-lg-12">
+    <h1 id="top">Overview</h1>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-12">
+    <div class="content-divider" />
+  </div>
+</div>
+
+<div class="row" />
+
+<div ui-view>
+
+  <!-- Search box -->
+  <div class="row overflowable">
+    <div class="col-xs-12">
+      <div class="search-box-container">
+        <fo-search-box callback="setSelectedPosition(id, layer)"></fo-search-box>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overview table of structure -->
+  <div class="row structure-table" ng-hide="st.overview.activeLayer">
+    <div class="col-xs-4 col-xs-offset-4">
+      <fo-include data="/api/organisation/structure/overview/"
+        template="static/kapstok/html/widgets/fo-layer-list.html"></fo-include>
+    </div>
+
+    <!-- Learn bar -->
+    <div class="col-xs-1 col-xs-offset-3">
+      <div class="graph-options lower">
+        <ul>
+          <fo-learn-widget></fo-learn-widget>
+          <!--
+          <li><ng-include src="'/static/kapstok/logos/export.svg'"></ng-include>EXPORT</li>
+          <li><a href="#/organisation?page=powerreport">
+              <ng-include src="'/static/kapstok/logos/power report.svg'"></ng-include>POWER REPORT
+          </a></li>
+          -->
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</div>

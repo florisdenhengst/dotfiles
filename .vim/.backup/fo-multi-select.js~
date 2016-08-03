@@ -1,0 +1,839 @@
+/**
+ * Wrap everything inside a self-executing function to prevent creating globals
+ */
+
+(function() {
+
+/**
+ * Load the kapstok module, to add our directives
+ */
+
+var kapstok = angular.module('kapstok');
+
+/**
+ * Multi-select directive
+ *
+ * Usage:
+ *
+ * <fo-multi-select [parameters]></fo-multi-select>
+ *
+ * Parameters: TODO: Add description and default values
+ * 	- name
+ * 	- label
+ * 	- value
+ * 	- ng-model
+ * 	- num-selected-items
+ * 	- single-mode
+ * 	- expandable
+ * 	- overlay-checkbox
+ * 	- show-search-box
+ * 	- selectionEmptyIfAllSelected
+ */
+
+kapstok.directive('foMultiSelect', function($http, $timeout, $compile, $log) {
+  var childScope;
+
+  /**
+  * DIRECTIVE
+  */
+  return {
+      restrict: 'E',
+      replace: true,
+      scope: {
+        label: '=?',
+        value: '=',               // Input
+        selection: '=ngModel',    // Output
+        numSelectedItems: '=?',
+        inputDataReady: '='
+      },
+      controller: function($scope, $attrs) {
+
+        // Important! Create child scope
+        $scope.childScope = $scope.$new();
+      },
+      link: function($scope, $element, $attrs) {
+
+        /**
+         * FUNCTIONS
+         */
+
+        // Retrieve list of selected IDs in the whole tree (recursive function)
+        function getSelectedIDs(node) {
+          var IDs = [];
+
+          if(node === undefined)
+             return [];
+
+          if(node.children && node.children.length > 0) {
+            for(var i = 0; i < node.children.length; i++) {
+              IDs = IDs.concat(getSelectedIDs(node.children[i]));
+            }
+
+            if(node.isSelected) {
+              IDs.push(node.id);
+            }
+          } else {
+            if(node.isSelected) {
+              return [node.id];
+            } else {
+              return [];
+            }
+          }
+
+          return IDs;
+        }
+
+        // Update selection
+        function updateSelection() {
+          var selection = [];
+          $scope.selectionChanged = true; // User changed selection in this multi select
+
+          // Add ID's of selected nodes (calls recursive function)
+          for(var i = 0 ; i < $scope.childScope.contents.length; i++) {
+            selection = selection.concat(getSelectedIDs($scope.childScope.contents[i]));
+          }
+
+          if($scope.childScope.selectionEmptyIfAllSelected) {
+            // All elements selected is the same as an empty selection
+            if(selection.length ==  $scope.childScope.totalNumItems || selection.length == 0)
+            {
+              // Only update $scope.childScope.selection if something has changed
+              if($scope.childScope.selection.length > 0) {
+                $scope.childScope.selection = [];
+                $scope.selection = [];
+              }
+            } else {
+              $scope.childScope.selection = selection;
+              $scope.selection = selection;
+            }
+          } else {
+            $scope.childScope.selection = selection;
+            $scope.selection = selection;
+          }
+
+          // Update number of selected items
+          $scope.numSelectedItems = $scope.childScope.selection.length;
+
+          updateLabel();
+        }
+
+        // Update selection from data
+        function updateSelectionFromData() {
+          if(!$scope.childScope.nodeLookupMap)
+            return;
+
+          $scope.childScope.selection = $scope.selection;
+          $scope.numSelectedItems = $scope.childScope.selection.length;
+
+          // Clear selection
+          for(var nodeID in $scope.childScope.nodeLookupMap) {
+            var node = $scope.childScope.nodeLookupMap[nodeID];
+            node.isSelected = false;
+          }
+
+          // Check checkboxes according to new selection
+          for(var i = 0; i < $scope.childScope.selection.length; i++) {
+            var nodeID = $scope.childScope.selection[i];
+            var node = getNodeByID(nodeID);
+
+            node.isSelected = true;
+          }
+
+          if($scope.childScope.singleMode)
+            $scope.childScope.selectedElement = getNodeByID($scope.selection);
+
+          updateLabel();
+        }
+
+        // Update label
+        function updateLabel() {var oldLabel = $scope.label;
+          if($scope.childScope.singleMode) {
+            // If no label was set by the user, show the number of selected elements
+            $scope.label = $scope.childScope.selectedElement.name || $scope.childScope.initialLabel;
+          } else {
+            // If a label was set by the user, show the label when no selection has been made
+            // Otherwise, show the first selected items plus the number of selected items
+            // Example: 'Amsterdam, London, Ber... (3)'
+            if($scope.numSelectedItems > 0) {
+              $scope.label = "";
+
+              // Create abbreviated label string
+              var TARGET_LENGTH = 50;
+
+              for(var i = 0; i < $scope.selection.length; i++) {
+                var nodeIndex = $scope.selection[i];
+                var node = getNodeByID(nodeIndex);
+
+                $scope.label += node.name;
+
+                // Stop when label string is long enough
+                if($scope.label.length > TARGET_LENGTH)
+                  break;
+
+                // Don't add comma at the end of the label
+                if(i != $scope.selection.length - 1)
+                  $scope.label += ", ";
+              }
+            } else {
+              $scope.label = $scope.childScope.initialLabel;
+            }
+          }
+        }
+
+        // Reset selection
+        $scope.resetSelection = function() {
+          for(var i = 0; i < $scope.childScope.contents.length; i++) {
+            $scope.childScope.toggleDescendantSelection($scope.childScope.contents[i], 1, false);
+
+          }
+
+          updateSelection();
+        };
+
+        // Search tree for nodes whose name contains the keyword
+        function searchTree(node, keyword) {
+          var childContainsKeyword = false;
+          var leafNodeMatches = 0;
+
+          if(node.children && node.children.length > 0) {
+            for(var i = 0 ; i < node.children.length; i++) {
+              var result = searchTree(node.children[i], keyword);
+
+              if(result > 0) {
+                childContainsKeyword = true;
+                leafNodeMatches++;
+              }
+            }
+
+            if(childContainsKeyword) {
+               $scope.childScope.setCollapser(node, false);
+            } else {
+              $scope.childScope.setCollapser(node, true);
+            }
+          }
+
+          if(node.name.toLowerCase().indexOf(keyword) != -1 || childContainsKeyword) {
+            node.matchesSearchFilter = true;
+            leafNodeMatches = 1;
+          }
+          else {
+            node.matchesSearchFilter = false;
+          }
+
+          return leafNodeMatches;
+        }
+
+        // Reset tree, so that everything will be shown
+        function resetTree(node, level) {
+          node.matchesSearchFilter = true;
+
+          if(node.children && node.children.length > 0) {
+            for(var i = 0 ; i < node.children.length; i++) {
+              resetTree(node.children[i], level + 1);
+            }
+
+            $scope.childScope.setCollapser(node, level > 0);
+          }
+        }
+
+        // Construct lookup map to speed up node by ID search
+        function constructNodeIDMap(node, parentNode, level) {
+          var id = node.id;
+
+          if(node.children && node.children.length > 0) {
+            id = -id;  // Negate to make the ID of head office distinct from a parent node
+            node.id = id;
+          }
+
+          $scope.childScope.nodeLookupMap[id] = node;
+          node.parent = parentNode;
+
+          // Uncollapse first node by default
+          node.isCollapsed = (level == 0) ? false : true;
+
+          // First and second node are visible by default
+          node.isVisible = (level <= 1 ? true : false);
+
+          // If there is a default selection for this node, set selected to true
+          // if ($scope.childScope.selection.indexOf(id) != -1) {
+          //   node.isSelected = true;
+          //   $scope.childScope.selectedElement = node;
+          // } else {
+          //   node.isSelected = false;
+          // }
+
+          node.matchesSearchFilter = true;
+
+          if(node.children && node.children.length > 0) {
+            for(var i = 0; i < node.children.length; i++) {
+              constructNodeIDMap(node.children[i], node, level + 1);
+            }
+          } else {
+            $scope.childScope.totalNumItems++;
+          }
+        }
+
+        // Return the node in the data structure which has a specified ID
+        function getNodeByID(id) {
+          return $scope.childScope.nodeLookupMap[id];
+        }
+
+        // Create child template recursively
+        function createChildTemplate(node, level) {
+          var id = node.id;
+
+          if(node.children && node.children.length > 0)
+            id = -id;
+
+          label = node.name || '';
+          var template = "<ul ng-if='isNodeVisible(" + id + ")' ng-class='{collapsed: isNodeCollapsed(" + id + ")}'><li class='multi-select-item'><div>" +
+                "<ng-include class='expander' src='\"/static/kapstok/img/arrowDown.svg\"'" +
+                "ng-class='getCollapsedClass(" + id + ")' ng-click='toggleCollapser(" + id + ", $event)'></ng-include>" +
+                "<label ng-class='getCheckboxClass(" + id + ")' ng-click='toggleCheckbox(" + id + ")'>" +
+                " " + label +
+                "</label></div>";
+
+          if(node.children) {
+            for(var i = 0; i < node.children.length; i++) {
+              template += createChildTemplate(node.children[i], level + 1);
+            }
+          }
+
+          template += "</li></ul>";
+
+          return template;
+        };
+
+        /**
+         * Scope functions
+         */
+
+        // Attach scope methods to child scope. This has to be done every time the contents
+        // of the multi select widgets changes (because the child scope is recreated)
+        function attachChildScopeMethods() {
+          $scope.isOpened = false;
+
+          // Toggle multi select
+          $scope.childScope.toggleMultiSelect = function() {
+            $scope.isOpened = !$scope.isOpened;
+            $scope.childScope.arrowClass = $scope.childScope.arrowClass == "collapsed" ? "" : "collapsed";
+            $scope.childScope.checkboxLayerClass = $scope.childScope.checkboxLayerClass == "show" ? "" : "show";
+          };
+
+          // Close multi select
+          $scope.childScope.closeMultiSelect = function() {
+            $scope.isOpened = false;
+            $scope.childScope.arrowClass = "collapsed";
+            $scope.childScope.checkboxLayerClass = "";
+          };
+
+          // Toggle collapser node
+          $scope.childScope.toggleCollapser = function(id, $event) {
+            var node = getNodeByID(id);
+            $scope.childScope.setCollapser(node, !node.isCollapsed);
+          };
+
+          // Expand or collapse node
+          $scope.childScope.setCollapser = function(node, isCollapsed) {
+            if(node.children) {
+              node.isCollapsed = isCollapsed;
+              node.collapserClass = isCollapsed ? "collapsed" : "";
+
+              toggleDescendantVisibility(node, 0, !isCollapsed);
+            }
+          };
+
+          // Toggle visibility of descendants of a node
+          function toggleDescendantVisibility(node, level, isVisible) {
+            if(level > 0)
+              node.isVisible = isVisible;
+
+            if(node.children && node.isCollapsed == !isVisible) {
+              for(var i = 0; i < node.children.length; i++) {
+                toggleDescendantVisibility(node.children[i], level + 1, isVisible);
+              }
+            }
+          }
+
+          // Toggle checkbox
+          $scope.childScope.toggleCheckbox = function(id) {
+            var node = getNodeByID(id);
+
+            if($scope.childScope.singleMode) {
+              // Set node on selected
+              node.isSelected = true;
+
+              // Uncheck previously selected element if single mode is enabled
+              // if the element was a different element
+              if($scope.childScope.selectedElement != undefined && $scope.childScope.selectedElement != node)
+                $scope.childScope.selectedElement.isSelected = false;
+
+              // Store selected element if an element is selected
+              if(node.isSelected)
+                $scope.childScope.selectedElement = node;
+              else
+                $scope.childScope.selectedElement = undefined;
+
+              //$scope.numSelectedItems = node.isSelected ? 1 : 0;
+
+              // If close-on-click is enabled, close multiselect after changing the selection
+              if($scope.childScope.closeOnClick) {
+                $scope.childScope.toggleMultiSelect();
+              }
+            } else {
+              // Toggle node
+              node.isSelected = !node.isSelected;
+
+              // Uncheck ancestor checboxes if a node is unchecked
+              if(!node.isSelected)
+                $scope.childScope.uncheckAncestorCheckboxes(node);
+
+              // Recursively toggle decendants
+              if(node.children && node.children.length > 0) {
+                $scope.childScope.toggleDescendantSelection(node, 0, node.isSelected);
+              } else {
+                //$scope.numSelectedItems += node.isSelected ? 1 : -1;
+              }
+            }
+
+            updateSelection();
+          };
+
+          // Toggle checkboxes of descendants of a node
+          $scope.childScope.toggleDescendantSelection = function(node, level, isSelected) {
+            if(node.children && node.children.length > 0) {
+              for(var i = 0; i < node.children.length; i++) {
+                $scope.childScope.toggleDescendantSelection(node.children[i], level + 1, isSelected);
+              }
+            } else {
+              // if(level > 0) {
+              //   // Increment or decrement count one by when element is toggled
+              //   // but only when it's a leaf node
+              //   if(isSelected && !node.isSelected)
+              //     $scope.numSelectedItems++;
+              //   else if(!isSelected && node.isSelected)
+              //     $scope.numSelectedItems--;
+              // }
+            }
+
+            node.isSelected = isSelected;
+          };
+
+          // Uncheck checkboxes of ancestors of a node
+          $scope.childScope.uncheckAncestorCheckboxes = function(node) {
+            node.isSelected = false;
+
+            if(node.parent) {
+              $scope.childScope.uncheckAncestorCheckboxes(node.parent);
+            }
+          };
+
+          // Returns whether a node is visible or not
+          $scope.childScope.isNodeVisible = function(id) {
+            var node = getNodeByID(id);
+            return node.isVisible && node.matchesSearchFilter;
+          };
+
+          // Returns whether a node is collapsed or not
+          $scope.childScope.isNodeCollapsed = function(id) {
+            var node = getNodeByID(id);
+            return node.isCollapsed;
+          };
+
+          // Returns whether a node is collapsed or not
+          $scope.childScope.getCollapsedClass = function(id) {
+            var node = getNodeByID(id);
+
+            // Do not show collapser if no hierarchical data
+            if(!$scope.childScope.hasHierarchy) {
+              return "no-expander";
+            }
+
+            if(node.children && node.children.length > 0)
+              return node.isCollapsed ? "collapsed" : "";
+            else
+              return "placeholder";
+          };
+
+          // Returns whether a node is checked or not
+          $scope.childScope.getCheckboxClass = function(id) {
+            var node = getNodeByID(id);
+            return node.isSelected ? "selected" : "";
+          };
+        }
+
+        function performSearch(newValue) {
+          var keyword = newValue.toLowerCase();
+          var checkboxContainer = $scope.newElement.find(".checkbox-container");
+          $scope.childScope.currentPage = 1;
+
+          if(keyword.length === 0) {
+            // Reset page visibilities
+            $scope.childScope.pageVisibilities[0] = true;
+
+            $timeout(function() {
+              for(var i = 1; i < $scope.childScope.pageVisibilities.length; i++) {
+                  $scope.childScope.pageVisibilities[i] = $scope.childScope.hasHierarchy;
+              }
+            });
+
+            $timeout(function() {
+              // Reset node data
+              for(var i = 0; i < $scope.childScope.contents.length; i++) {
+                resetTree($scope.childScope.contents[i], 0);
+              }
+
+              $scope.childScope.isSearching = false;
+            });
+
+            $scope.childScope.numSearchResults = $scope.childScope.totalNumItems;
+          } else {
+            $scope.childScope.numSearchResults = 0;
+
+            $timeout(function() {
+              for(var i = 1; i < $scope.childScope.pageVisibilities.length; i++) {
+                  $scope.childScope.pageVisibilities[i] = $scope.childScope.hasHierarchy;
+              }
+            });
+
+            $timeout(function() {
+              for(var i = 0; i < $scope.childScope.contents.length; i++) {
+                $scope.childScope.numSearchResults += searchTree($scope.childScope.contents[i], keyword);
+              }
+
+              // Make the correct number of pages visible so that enough results are shown
+              var numMatches = 0;
+              var nodeIndex = 0;
+
+              while(numMatches < NUM_ITEMS_PER_PAGE &&
+                  nodeIndex < $scope.childScope.contents.length) {
+                if($scope.childScope.contents[nodeIndex].matchesSearchFilter)
+                  numMatches++;
+
+                nodeIndex++;
+              }
+
+              var numPagesVisible = Math.floor(nodeIndex / NUM_ITEMS_PER_PAGE);
+
+              for(var i = 0; i < $scope.childScope.pageVisibilities.length; i++) {
+                if(i <= numPagesVisible) {
+                  $scope.childScope.pageVisibilities[i] = true;
+                } else {
+                  $scope.childScope.pageVisibilities[i] = $scope.childScope.hasHierarchy;
+                }
+              }
+
+              $scope.childScope.isSearching = false;
+            });
+          }
+
+          $timeout(function() {
+            checkboxContainer.scrollTop(0);
+          });
+        }
+
+        // Convert string to boolean
+        function strToBool(string) {
+          return string === "true";
+        }
+
+        /**
+         * Main code
+         */
+
+        var MAX_ITEMS_IN_EXPANDABLE = 5;
+        var NUM_ITEMS_PER_PAGE = 25;
+
+        // Load multi select data from tree data structure stored in $scope.contents
+        $scope.loadMultiSelect = function(firstTime) {
+          $timeout(function() {
+            $scope.dataLoaded = false;
+
+            if(!firstTime) {
+              $scope.childScope.$destroy();
+              angular.element($scope.newElement).remove();
+              $scope.childScope = $scope.$new();
+            }
+
+            attachChildScopeMethods();
+
+            $scope.childScope.nodeLookupMap = {};
+            $scope.childScope.isSearching   = false;
+
+            // Default values optional attributes (directive attributes)
+            $scope.childScope.singleMode             = ($attrs.singleMode == undefined) ? false : strToBool($attrs.singleMode);
+            $scope.childScope.showSearchBox          = ($attrs.showSearchBox == undefined) ? true : strToBool($attrs.showSearchBox);
+            $scope.childScope.closeOnClick           = ($attrs.closeOnClick == undefined) ? false : strToBool($attrs.closeOnClick);
+            $scope.childScope.selectionEmptyIfAllSelected = ($attrs.selectionEmptyIfAllSelected == undefined) ? false : strToBool($attrs.selectionEmptyIfAllSelected);
+
+            // If the user assigns a constant string to the label attribute
+            // it will be shown as the multi-select label when no items are selected
+            if($attrs.label !== undefined && $attrs.label[0] == "'")
+              $scope.childScope.initialLabel = $scope.label;
+            else
+              $scope.childScope.initialLabel = "";
+
+            // Selected items variables
+            $scope.numSelectedItems              = 0;
+            $scope.childScope.totalNumItems      = 0;
+
+            // In single-mode, set selection to first element if no initial selection is provided
+            if($scope.childScope.singleMode) {
+              if($scope.value.length > 0 && (!$scope.selection ||
+                  $scope.selection.length === 0)) {
+                $scope.selection = [$scope.value[0].id];
+                $scope.childScope.selectedElement = getNodeByID($scope.selection);
+              }
+              else
+                $scope.childScope.selectedElement = undefined;
+            }
+
+            // CSS class variables
+            $scope.childScope.arrowClass         = "collapsed";
+            $scope.childScope.checkboxLayerClass = "";
+            $scope.childScope.checkboxClass      = "";
+            $scope.childScope.collapserClass     = "collapsed";
+
+            // First make a deep copy, so that the original data will not be affected
+            $scope.childScope.contents = angular.copy($scope.value);
+
+            // Set hierarchy boolean
+            if($scope.childScope.contents[0].children !== undefined)
+              $scope.childScope.hasHierarchy = true;
+            else
+              $scope.childScope.hasHierarchy = false;
+
+            var childrenTemplate = "";
+
+            // Temporary fix for too many elements in a multi-select:
+            // If the number of elements is too high, don't process it
+            if($scope.childScope.contents.length > 4000) {
+              childrenTemplate = "<p>Too many elements</p>";
+            }
+            else {
+              // Construct node ID lookup map and create child template
+              var numPages = Math.ceil($scope.childScope.contents.length / NUM_ITEMS_PER_PAGE);
+
+              $scope.childScope.currentPage = 1;
+              $scope.childScope.pageVisibilities = [true];  // First page is visible
+
+              // Other pages are not visible at first (except for hierarchical data)
+              for(var i = 1; i < numPages; i++) {
+                $scope.childScope.pageVisibilities.push($scope.childScope.hasHierarchy);
+              }
+
+              childrenTemplate += "<div ng-if='pageVisibilities[0]'>";
+
+              for(var i = 0; i < $scope.childScope.contents.length; i++) {
+                if(i % NUM_ITEMS_PER_PAGE == 0 && i > 0) {
+                  var page = i / NUM_ITEMS_PER_PAGE;
+                  childrenTemplate += "</div><div ng-if='pageVisibilities[" + page + "]'>";
+                }
+
+                childrenTemplate += createChildTemplate($scope.childScope.contents[i], 0);
+                constructNodeIDMap($scope.childScope.contents[i], null, 0);
+              }
+
+              childrenTemplate += "</div>";
+
+              updateSelectionFromData();
+            }
+
+            $scope.childScope.numSearchResults = $scope.childScope.totalNumItems;
+
+
+            // Use attribute 'expandable' set by user, otherwise set it automatically
+            // depending on the number of items in the contents of a multi-select
+            if($attrs.expandable == "true") {
+              $scope.childScope.expandable = true;
+            }
+            else if($attrs.expandable == "false" ||
+                ($scope.childScope.totalNumItems <= MAX_ITEMS_IN_EXPANDABLE &&
+                $scope.childScope.contents[0].children === undefined)) {
+              $scope.childScope.expandable = false;
+              $scope.childScope.toggleMultiSelect();
+            } else {
+              $scope.childScope.expandable = true;
+            }
+
+            var divIdHTML = "";
+            var overlayClass = "";
+
+            if($attrs.name !== undefined && $attrs.overlayCheckbox == "true") {
+              divIdHTML = "id='multiselect-" + $attrs.name + "'";
+              overlayClass = "overlay";
+            }
+
+            // Create template and replace content of directive tag
+            var template = "<span class='multi-select' " + divIdHTML + "'>" +
+              "<button \
+                  type='button' \
+                  class='button' \
+                  ng-class='checkboxLayerClass' \
+                  ng-show='expandable' \
+                  ng-click='toggleMultiSelect()'> \
+                <ng-include \
+                    class='expander multi-select-expander' \
+                    ng-class='arrowClass' \
+                    src='\"/static/kapstok/img/arrowDown.svg\"'> \
+                </ng-include> \
+                <span class='selected-label'>{{label}}</span> \
+                <span class='num-selected-items' ng-show='numSelectedItems > 0 && !singleMode'> \
+                  ({{numSelectedItems}}) \
+                </span> \
+              </button>" +
+              "<div class='checkbox-layer " + overlayClass + "' ng-class='checkboxLayerClass'> \
+                <input \
+                    ng-show='showSearchBox && expandable' \
+                    ng-model='search' \
+                    type='text' \
+                    class='search-box' \
+                    placeholder='Search...'> \
+                <div \
+                    ng-show='numSearchResults > 0 && totalNumItems > 1 && !isSearching' \
+                    class='checkbox-container " + overlayClass + " {{checkboxLayerClass}}'>" +
+                  childrenTemplate +
+                "</div> \
+                <div class='checkbox-container no-matches' ng-show='isSearching && search.length == 0'>Updating...</div> \
+                <div class='checkbox-container no-matches' ng-show='isSearching && search.length > 0'>Searching...</div> \
+                <div class='checkbox-container no-matches' ng-show='!isSearching && numSearchResults == 0'>No matches</div> \
+                <div class='checkbox-container no-matches' ng-show='totalNumItems <= 1'>No data available</div> \
+              </div> \
+            </span>";
+
+            $scope.newElement = $compile(template)($scope.childScope);
+            $element.append($scope.newElement);
+
+            // Add this scope to parent's scope. In this case, the parent is
+            // the directive (such as the filter directive) that contains
+            // this fo-multi-select directive
+            if($attrs.name != undefined) {
+              if($scope.$parent.children === undefined)
+                $scope.$parent.children = {};
+
+              $scope.$parent.children[$attrs.name] = $scope;
+            }
+
+            // Load new pages of items when user scrolls
+            var checkboxContainer = $scope.newElement.find(".checkbox-container");
+
+            checkboxContainer.scroll(function() {
+              // Do not support infinite scroll if  data is hierarchical
+              if($scope.childScope.hasHierarchy)
+                return;
+
+              if(checkboxContainer[0].scrollHeight - checkboxContainer.scrollTop() <=
+                checkboxContainer.outerHeight() + 50) {
+                  $timeout(function() {
+                    // Keep opening pages until enough items are displayed
+                    var numItems = 0;
+
+                    do {
+                      $scope.childScope.pageVisibilities[$scope.childScope.currentPage] = true;
+                      $scope.childScope.currentPage++;
+
+                      var firstItemIndex = $scope.childScope.currentPage * NUM_ITEMS_PER_PAGE;
+
+                      for(var i = 0; i < NUM_ITEMS_PER_PAGE; i++) {
+                        var index = firstItemIndex + i;
+
+                        if(index >= $scope.childScope.totalNumItems)
+                          break;
+
+                        if($scope.childScope.contents[index].matchesSearchFilter)
+                          numItems++;
+                      }
+
+                    } while(numItems < NUM_ITEMS_PER_PAGE &&
+                        $scope.childScope.currentPage < $scope.childScope.pageVisibilities.length);
+                  });
+              }
+            });
+
+            var TIMEOUT = 250;   // Timeout in milliseconds
+            var timeoutHandle = undefined;
+
+            // Set watch on search field, in order to be able to update the visibility of elements
+            $scope.childScope.$watch("search", function(newValue, oldValue) {
+
+              if(!$scope.dataLoaded || newValue === undefined)
+                return;
+
+              $scope.childScope.isSearching = true;
+
+              // Set (or reset) timer that will start the search when it times out
+              if(timeoutHandle)
+                  clearTimeout(timeoutHandle);
+
+              timeoutHandle = setTimeout(function() {
+                  performSearch(newValue);
+                  timeoutHandle = undefined;
+              }, TIMEOUT);
+            });
+
+            // Update label so that it matches the selection (only the first time
+            // because it will be updated by updateSelectionFromData() after the first time)
+            if(firstTime)
+              updateLabel();
+
+            $scope.dataLoaded = true;
+          });
+        };
+
+        /**
+         * Main code
+         */
+
+        // If the overlay checkbox option is enabled, close checkbox when a click
+        // outside of the element is registered
+        var clickFunction = function(event) {
+          var divID = "#multiselect-" + $attrs.name;
+
+          if(!$(event.target).closest(divID).length) {
+            $scope.$apply(function() {
+              if($scope.childScope.closeMultiSelect !== undefined) {
+                $scope.childScope.closeMultiSelect();
+              } else {
+                // Remove listener when multi select is reloaded or destroyed (when changing states)
+                $(document).off("click", clickFunction);
+              }
+            });
+          }
+        };
+
+        if($attrs.overlayCheckbox == "true") {
+          $(document).on("click", clickFunction);
+        }
+
+        // Wait for input data to be loaded
+        $scope.$watch("inputDataReady", function(newValue) {
+          if(newValue === true) {
+            $scope.loadMultiSelect(true);
+          }
+        });
+
+        $scope.$watch("value", function(newValue, oldValue) {
+          if(newValue != oldValue && oldValue !== undefined && $scope.inputDataReady) {
+            $scope.loadMultiSelect(false);
+          }
+        });
+
+        $scope.$watch("selection", function(newValue, oldValue) {
+          if(newValue !== undefined && oldValue !== undefined) {
+            if(!$scope.selectionChanged) {
+              updateSelectionFromData();
+            }
+            else {
+              $scope.selectionChanged = false;
+            }
+          }
+        }, true);
+      }
+  };
+});
+
+/**
+ * Close and execute the wrapper function
+ */
+
+})();

@@ -1,0 +1,69 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models, migrations, transaction, connection
+from database.models import *
+
+def move_position_titles(apps, schema_editor):
+  for model in ['Position', 'MultiPosition']:
+    Position = apps.get_model('database', model)
+    PositionTitle = apps.get_model('database', model + 'Title')
+    print(Position)
+    print(Position._meta.get_field('title'))
+    cursor = connection.cursor()
+    qry = "SELECT column_name FROM information_schema.columns " +\
+          "WHERE table_name='position'"
+    cursor.execute(qry)
+    result = cursor.fetchone()
+    print(result)
+    
+    for pos in Position.objects.all():
+      pt, created = PositionTitle.objects.get_or_create(base=pos.title)
+      if created:
+        pt.save()
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('database', '0016_indices_converddates_mat_views'),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='MultiPositionTitle',
+            fields=[
+                ('id', models.AutoField(serialize=False, auto_created=True, primary_key=True, verbose_name='ID')),
+                ('base', models.CharField(max_length=200)),
+            ],
+            options={
+                'db_table': 'multipositiontitle',
+            },
+            bases=(models.Model,),
+        ),
+        migrations.CreateModel(
+            name='PositionTitle',
+            fields=[
+                ('id', models.AutoField(serialize=False, auto_created=True, primary_key=True, verbose_name='ID')),
+                ('base', models.CharField(max_length=200, unique=True)),
+            ],
+            options={
+                'db_table': 'positiontitle',
+            },
+            bases=(models.Model,),
+        ),
+        # New models have been created in DB. Move data to new models. 
+        migrations.RunPython(move_position_titles),
+        migrations.AddField(
+            model_name='multiposition',
+            name='title_tmp',
+            field=models.ForeignKey(to='database.MultiPositionTitle', null=True),
+            preserve_default=True,
+        ),
+        migrations.AddField(
+            model_name='position',
+            name='title_tmp',
+            field=models.ForeignKey(to='database.PositionTitle', null=True),
+            preserve_default=True,
+        ),
+    ]

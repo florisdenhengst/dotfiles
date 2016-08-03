@@ -1,0 +1,56 @@
+DROP VIEW IF EXISTS view_shorttermbench;
+CREATE OR REPLACE VIEW view_shorttermbench AS
+SELECT id as employee,
+COALESCE(successors.count, 0) AS sucs
+FROM employee
+LEFT OUTER JOIN(
+  SELECT COUNT(*), employee_id 
+  FROM succession
+  INNER JOIN successionterm
+  ON succession.term_id = successionterm.id
+  WHERE successionterm.major_term = 1 
+  GROUP BY employee_id
+  ORDER BY employee_id) successors
+ON employee.id = successors.employee_id;
+
+DROP VIEW IF EXISTS view_midtermbench;
+CREATE OR REPLACE VIEW view_midtermbench AS
+SELECT id as employee,
+COALESCE(successors.count, 0) AS sucs
+FROM employee
+LEFT OUTER JOIN(
+  SELECT COUNT(*), employee_id 
+  FROM succession
+  INNER JOIN successionterm
+  ON succession.term_id = successionterm.id
+  WHERE successionterm.major_term = 2 
+  GROUP BY employee_id
+  ORDER BY employee_id) successors
+ON employee.id = successors.employee_id;
+
+DROP VIEW IF EXISTS view_longtermbench;
+CREATE OR REPLACE VIEW view_longtermbench AS
+SELECT id as employee,
+COALESCE(successors.count, 0) AS sucs
+FROM employee
+LEFT OUTER JOIN(
+  SELECT COUNT(*), employee_id 
+  FROM succession
+  INNER JOIN successionterm
+  ON succession.term_id = successionterm.id
+  WHERE successionterm.major_term = 3 
+  GROUP BY employee_id
+  ORDER BY employee_id) successors
+ON employee.id = successors.employee_id;
+
+DROP VIEW IF EXISTS view_totalbench;
+CREATE OR REPLACE VIEW view_totalbench AS
+SELECT id as employee,
+COALESCE(successors.count, 0) AS sucs
+FROM employee
+LEFT OUTER JOIN(
+  SELECT COUNT(*), employee_id 
+  FROM succession
+  GROUP BY employee_id
+  ORDER BY employee_id) successors
+ON employee.id = successors.employee_id;

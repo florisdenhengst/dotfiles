@@ -1,0 +1,2 @@
+/* All constant heights, widths, etc. */
+@sidebar-width: 255px;

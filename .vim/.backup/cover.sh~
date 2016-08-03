@@ -1,0 +1,22 @@
+#!/bin/bash
+# SHELL SCRIPT FOR AUTOMATICALLY CREATING COVERAGE REPORT
+# FOR PROJECT
+
+#!/bin/bash
+ 
+# clean up previous results:
+#rm ./htmlcov/*
+#rm .coverage
+ 
+# Exclude all migrations:
+PARMS=--omit='*migrations*'
+ 
+# run the tests and collect coverage, only for our applications
+coverage run --branch --source="." manage.py -v 2 --noinput
+ 
+# generate plaintext and HTML report
+#echo "----------------------------"
+#echo "Coverage results:"
+#coverage report $PARMS
+coverage html $PARMS
+echo "HTML report generated in htmlcov/index.html"

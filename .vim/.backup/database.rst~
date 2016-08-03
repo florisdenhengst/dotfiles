@@ -1,0 +1,62 @@
+database package
+================
+
+Subpackages
+-----------
+
+.. toctree::
+
+    database.management
+
+Submodules
+----------
+
+database.admin module
+---------------------
+
+.. automodule:: database.admin
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+database.datatable module
+-------------------------
+
+.. automodule:: database.datatable
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+database.models module
+----------------------
+
+.. automodule:: database.models
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+database.tests module
+--------------------
+
+.. automodule:: database.tests
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+database.views module
+---------------------
+
+.. automodule:: database.views
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+Module contents
+---------------
+
+.. automodule:: database
+    :members:
+    :undoc-members:
+    :show-inheritance:

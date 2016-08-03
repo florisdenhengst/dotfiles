@@ -1,0 +1,9 @@
+Host crunchr
+ HostName bitbucket.org
+ IdentityFile ~/.ssh/crunchmachine_id_rsa
+Host personal
+ HostName bitbucket.org
+ IdentityFile ~/.ssh/id_rsa
+Host ssh-vu
+ HostName ssh.data.vu.nl
+ IdentityFile ~/.ssh/id_rsa

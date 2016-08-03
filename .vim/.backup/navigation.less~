@@ -1,0 +1,178 @@
+@sub-menu-gray: #BDBEC1;
+@menu-item-height:43px;
+
+#global-nav {
+  background-color: #14212C;
+  height: @menu-item-height;
+  width: 100%;
+  transition-property: height, margin, padding;
+  overflow: hidden;
+  display: block;
+
+  .wheel-wrapper{
+    position: relative; // IE11 fix
+    max-height: 100%;   // IE11 fix
+
+    .wheel{
+      width:30px;
+      height:36px;
+      position:absolute;
+    }
+  }
+  
+  svg {
+    width: 30px;
+    margin-top: 6px;
+  }
+  
+  img {
+    height: 40px;
+  }
+  
+  ul {
+    display: table;
+    margin: 0 auto;
+    list-style: none outside none;
+    border-spacing: 10px 0;
+    
+    li {
+      background-color: @organisation-green;
+      display: table-cell;
+      height: @menu-item-height;
+      vertical-align: middle;
+      
+      a {
+        color: inherit;
+        display: block;
+        text-decoration: none;
+        padding: 5px 20px;
+      }
+    }
+  }
+}
+
+.log-out {
+  padding-top: 7px;
+  margin-right:40px;
+  font-size: 11px;
+  min-width: 255px;
+  clear:both;
+  float: right;
+  
+  #profile-logo{
+    max-width:20px;
+    margin-bottom: 5px;
+    * {
+      max-width:inherit;
+    }
+  }
+  
+  * {
+    text-align: right;
+  }
+  
+  .row {
+    max-height: 16px;
+    line-height: 6px;
+    margin-bottom:5px;
+    
+    * {
+      max-height: inherit;
+      line-height: inherit;
+      vertical-align: middle;
+      padding-bottom: 2px;
+    }
+    
+    .col-xs-12 a {
+      text-decoration: none;
+      text-transform: uppercase;
+      color: #61D9FD;
+      font-weight: @weight-bolder;
+      font-size: 10px;
+    }
+    
+    .col-xs-12 a:hover {
+      color:@highlight-orange;
+    }
+  }
+}
+.menu {
+  width: 100%;
+  min-height: 72px;
+  background-color: #2B3543;
+  border-top: 1px solid #2B3543;
+  transition: @default-transition;
+  
+  
+  .app-logo {
+    margin-left: 12px;
+    margin-top: 8px;
+    max-width: 255px;
+    cursor: pointer;
+    float: left;
+    
+    img {
+      height: 55px;
+    }
+  }
+  
+  .subheaders {
+    margin-top: 29px;
+    
+    ul {
+      background-color: #2B3543;
+    }
+  }
+
+  .menu-row{
+    &.main-menu{
+      min-height:@menu-item-height;
+
+      ul{
+        min-height:@menu-item-height;
+      }
+    }
+  }
+}
+
+
+.menu-row ul {
+  display: block;
+  line-height: @menu-item-height;
+  background-color: #262F3B;
+  border-bottom: 1px solid #14212C;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+  text-transform: uppercase;
+  font-size: 13px;
+  li {
+    display: inline-block;
+    margin: 0 15px;
+  }
+}
+
+.sub-menu {
+  a, a:hover, a:active, a:visited, a:focus {
+    color: @sub-menu-gray;
+  }
+}
+
+.apps-button {
+  cursor: pointer;
+  margin-top: 6px;
+  font-size: 11px;
+  &:hover {
+    svg rect {
+      fill: @highlight-orange;
+    }
+  }
+}
+
+.access-apps{
+  max-width: 14px;
+  padding-left: 10px;
+}
+.access-apps *{
+  max-width: inherit;
+}

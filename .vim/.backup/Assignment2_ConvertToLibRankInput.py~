@@ -1,0 +1,135 @@
+#General imports
+import warnings
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore",category=DeprecationWarning)
+import numpy as np
+import csv as csv
+import scipy as sp
+from sklearn.datasets import load_svmlight_file
+from sklearn import preprocessing
+import random as random
+
+#location of data files
+root = "~/Documents/kylie/datamining/"
+loc_trainset = root + "output_train.csv"
+loc_testset = root + "output_test.csv"
+
+#will be created
+#loc_output = "D:/Documenten/VU/DM/Assignment2/data/data_newest/training_output7_small.csv"
+loc_output = root + "training_output7_balanced.csv"
+
+#list of features of which the average is calculated
+list_avg=['prop_location_score1','prop_log_historical_price','prop_location_score2','prop_starrating','price_usd','prop_review_score']
+
+
+##def read_input(loc_trainset):
+##    X_train = csv.DictReader(open(loc_trainset, 'r'))
+##    return X_train
+###batches based on
+##batch_feature = 'srch_id'
+##
+##def make_fieldnames(list_avg, loc_trainset):
+##    new_fields =[]
+##    for e in list_avg:
+##        new_fields += [str(e+"_diff")]
+##    old_fields = csv.DictReader(open(loc_trainset)).fieldnames
+##    fieldnames = old_fields + new_fields
+##    return fieldnames
+##
+##
+###splits the input per searchID and sends to process_batch
+def read_input(loc_data):
+    csv_file_object = csv.reader(open(loc_data, 'rb'))
+    header = csv_file_object.next()
+    
+    X_train = csv.DictReader(open(loc_trainset))
+    old_fields = X_train.fieldnames
+    i = 0
+    j = 0
+    X2 = []
+    for hotel in csv_file_object:
+        i += 1
+        if i == 100000:
+            print str(i*j) + " samples processed."
+            i =0
+            j +=1
+
+        X2.append(hotel)
+    X2 = np.array(X2)
+            
+    return X2, old_fields
+##
+##def process_batch(data, old_fields, list_avg, batch_feature):
+##    sid = data[0][batch_feature]
+##    avg=[]
+##    for feature in list_avg:
+##        avg += [(feature, calc_avg(data, feature))]
+##    add_avg_features(data,avg, old_fields)   
+##
+##    
+##def calc_avg(data,fieldname):
+##    avg = 0
+##    i=0
+##    for hotel in data:
+##        if hotel[fieldname] != 'NULL' and hotel[fieldname] != '':
+##            avg += float(hotel[fieldname])
+##        i += 1
+##    avg /= i
+##    return avg
+##
+##
+##def add_avg_features(data, avg, old_fields):
+##    new_fields =[]
+##    for feature in avg:
+##        new_fields += [str(feature[0]+"_diff")]
+##        for hotel in data:
+##            if hotel[feature[0]] != 'NULL' and hotel[feature[0]] != '':
+##                diff = float(hotel[feature[0]])-feature[1]
+##            else:
+##                diff = -feature[1]
+##            hotel[feature[0]+"_diff"] = diff
+##    fieldnames = old_fields + new_fields
+##    write_output2(data, loc_reduced)
+    
+
+#Write output  
+def write_header(loc_data, loc_output):
+    csv_file_object = csv.reader(open(loc_data, 'rb')) 
+    header = str(csv_file_object.next()).replace("[","").replace("]","").replace("'","").replace(" ","") #ja I know, supermooie code enzo.
+    with open(loc_output, "wb") as outfile:
+        outfile.write(header)
+        outfile.write('\n')
+  
+def write_output(data, loc_output, fieldnames):
+    #output = csv.DictWriter(open(loc_output, 'wb'), fieldnames, lineterminator='\n')
+    #output.writeheader()   
+    with open(loc_output, "wb") as outfile:
+        for i in range(0,len(data)):
+            outfile.write(str(data[i][len(data[i])-1]) + " qid:" + str(data[i][0]+ " "))
+            for j in range(1,len(data[i])-1):
+                outfile.write(str(j) + ":"+ str(data[i][j]) + " ")
+            outfile.write("\n")
+
+
+##
+##def write_output2(data, loc_output):
+##    output = csv.DictWriter(open(loc_output, 'ab'), fieldnames, lineterminator='\n')
+##    output.writerows(data)
+##
+##def write_header2(loc_output):
+##    output = csv.DictWriter(open(loc_output, 'w'), fieldnames, lineterminator='\n')
+##    output.writeheader()
+
+##def convert_format(data):
+##    with open(loc_output, "ab") as outfile:
+##        for line in csv.DictReader(open(loc_trainset)):
+##            
+
+
+X_train, fieldnames = read_input(loc_trainset)
+##write_header(loc_trainset, loc_output)
+write_output(X_train, loc_output, fieldnames)
+##fieldnames = make_fieldnames(list_avg, loc_trainset)
+##write_header2(loc_reduced)    
+##X_train = read_input(loc_trainset, list_avg, batch_feature)
+print "Done."

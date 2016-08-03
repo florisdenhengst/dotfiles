@@ -1,0 +1,27 @@
+# * coding: utf8 *
+from __future__ import unicode_literals
+import os
+
+from django.db import models, migrations, connection
+
+def get_file(file_name):
+  f = open(os.path.join(os.path.dirname(__file__), file_name))
+  query = f.read()
+  f.close()
+  return query
+
+class Migration(migrations.Migration):
+
+  dependencies = [
+      ('database', '0011_auto_20150119_1119'),
+  ]
+
+  operations = [
+      migrations.RunSQL(
+        sql=get_file("0012_shortterm_midterm_longterm_successors_forward.sql"),
+        reverse_sql="DROP VIEW IF EXISTS view_shorttermsuccessors;"+
+                    "DROP VIEW IF EXISTS view_midtermsuccessors;"+
+                    "DROP VIEW IF EXISTS view_longtermsuccessors;"+
+                    get_file("0002_shortterm_midterm_longterm_successors_forward.sql"),
+        )
+  ]

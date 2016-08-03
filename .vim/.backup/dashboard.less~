@@ -1,0 +1,137 @@
+html {
+	position: relative;
+	min-height: 100%;
+}
+
+body {
+	background-color: @colorDarkBlue;
+	color: @colorText;
+	font-family: @fontFamily1;
+	font-size: @fontSize3;
+	.antialiasText();
+	margin-bottom: @footerHeight;
+}
+
+.header {
+	background-color: @colorDarkGray;
+}
+
+#intro {
+	text-align: center;
+	margin: @margin3 0;
+	opacity: 0;
+
+	h1 {
+		margin-top: 0;
+	}
+
+	p {
+		font-size: @fontSize4;
+		margin-bottom: 0;
+	}
+}
+
+#menu {
+	text-align: center;
+	display: none;
+
+	@media (max-width: @screen-sm-max) {
+		display: block;
+		margin-bottom: @margin1;
+	}
+
+	.button {
+		margin: 0 @margin05 @margin0;
+	}
+}
+
+.logo {
+	width: 284px;
+	height: 60px;
+	background-size: 100% 100%;
+	background-repeat: no-repeat;
+	background-position: center;
+
+	&.crunchr {
+		margin: 7px @margin1;
+	}
+
+	&.organisation {
+		background-image: url(../logos/crunchrOrganisation.png);
+	}
+
+	&.preference {
+		background-image: url(../logos/crunchrPreference.png);
+	}
+
+	&.reward {
+		background-image: url(../logos/crunchrReward.png);
+	}
+
+	&.succession {
+		background-image: url(../logos/crunchrSuccession.png);
+	}
+
+	&.talent {
+		background-image: url(../logos/crunchrTalent.png);
+	}
+
+	&.workforce {
+		background-image: url(../logos/crunchrWorkforce.png);
+	}
+
+  img{
+    max-width: 100%;
+    max-height: 100%;
+  }
+}
+
+input.button,
+a.button {
+	color: @colorLink;
+	display: inline-block;
+	padding: @margin05 @margin1;
+	border: 1px solid @colorLink;
+	border-radius: @margin2 / 2;
+	text-transform: uppercase;
+	font-weight: @fontWeightBold;
+	font-size: @fontSize2;
+
+	@media (max-width: @screen-xs-max) {
+		margin-top: @margin1;
+		font-size: @fontSize1;
+		padding: @margin05 @margin0;
+	}
+
+	.transition();
+
+	&:hover, &.selected {
+		color: @colorLinkHover;
+		border-color: @colorLinkHover;
+		text-decoration: none;
+	}
+  &.disabled{
+    color: @disabledColor;
+    background-color: @disabledColor;
+    border-color: @disabledColor;
+    pointer-events: none;
+  }
+}
+
+input.button{
+  background-color: transparent;
+}
+
+#state-indicator {
+	position: absolute;
+	top: 0;
+	right: -100%;
+
+	&:before {
+		content: 'max';
+
+		@media (max-width: @screen-xs-max) {
+			content: 'min';
+		}
+	}
+}

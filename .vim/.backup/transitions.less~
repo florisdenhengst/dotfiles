@@ -1,0 +1,4 @@
+/* Default transition */
+@default-transition:  all .2s cubic-bezier(0.35, 0, 0.35, 1);
+@transform-transition:  transform .2s cubic-bezier(0.35, 0, 0.35, 1);
+@margin-transition: margin-left margin-right .2s;

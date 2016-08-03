@@ -1,0 +1,99 @@
+from django.db import models
+
+class EnumTable:
+  """
+  Specifies all operations that are supported for generic enumeration tables.
+  It relies on the actual Model of the enumtable to override _lazy_init() and to provide
+  more specific methods that deal with the peculiarities of that enumeration
+  """
+
+  # Dictionary containing all enum-table information
+  _enums = {}
+
+  @classmethod
+  def _lazy_init(cls):
+    if not issubclass(cls, models.Model):
+      raise TypeError(str(cls)+" is not a django Model")
+    if not cls.__name__  in EnumTable._enums:
+      EnumTable._enums[cls.__name__] = {member.id: member for member in cls.objects.all()}
+
+  @staticmethod
+  def _get_enum(cls):
+    return EnumTable._enums[cls.__name__]
+
+  @classmethod
+  def members(cls):
+    """
+    Returns a dictionary of members. Each member is an (ID, model) pair.
+    """
+    cls._lazy_init() 
+    return {member_id: member for member_id, member in EnumTable._get_enum(cls).items()} 
+
+  @classmethod
+  def ids(cls):
+    """
+    Returns all ID's of this enumeration
+    """
+    cls._lazy_init() 
+    return {entry_id for entry_id, entry_data in EnumTable._get_enum(cls).items()} 
+
+
+class UnorderedEnumModel(models.Model, EnumTable):
+  """
+  A very simple generic enumeration model without ordering.
+
+  We must separate this into a single class (instead of merging with EnumTable) because
+  Django does not support multi-level single-table inheritance of models. In other words
+  if we have a class hierarchy of A<-B<-C, the fields defined in A will not show up in C.
+  """
+  # Each enumeration has these fields
+  original_name  = models.CharField(max_length=ENUM_ORIGINAL_NAME_LENGTH, db_column="originalname")
+  description   = models.CharField(max_length=ENUM_DESCRIPTION_LENGTH, blank=True, default="")
+
+  def __str__(self):
+    return '%s - %s' % (str(self.pk), self.original_name)
+
+  class Meta:
+    app_label= 'database'
+    abstract = True
+
+
+class OrderedEnumModel(models.Model, EnumTable):
+  """
+  Supports all enum models that have a score. Adds methods to filter by score.
+  """
+  # Each enumeration has these fields
+  original_name  = models.CharField(max_length=ENUM_ORIGINAL_NAME_LENGTH, db_column="originalname")
+  description   = models.CharField(max_length=ENUM_DESCRIPTION_LENGTH, blank=True, default="")
+  score = models.IntegerField()
+
+  @classmethod
+  def members_with(cls, min_score=0, max_score=1000):
+    """
+    Returns all members with a score in the given range. By default it
+    returns all members, but specific ranges can be specified using
+    min_score and max_score. The min value is included but the max value is
+    not.  
+    """
+    cls._lazy_init() 
+    return {member_id: member for member_id, member in EnumTable._get_enum(cls).items()
+        if member.score >= min_score and member.score < max_score}
+
+  @classmethod
+  def ids_with(min_score=0, max_score=1000):
+    """
+    Returns all id's of all members with a score in the given range. By
+    default it returns all id's, but specific ranges can be specified using
+    min_score and max_score. The min value is included but the max value is
+    not.  
+    """
+    cls._lazy_init() 
+    return {member_id for member_id, member in EnumTable._get_enum(cls).items()
+        if member.score >= min_score and member.score < max_score}
+
+  def __str__(self):
+    return "%s - %s (%d)" % (str(self.pk), self.original_name, self.score)
+
+  class Meta:
+    app_label= 'database'
+    abstract = True

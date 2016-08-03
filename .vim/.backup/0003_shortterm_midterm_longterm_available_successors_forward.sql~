@@ -1,0 +1,71 @@
+CREATE OR REPLACE VIEW view_shorttermavailablesuccessors AS             
+SELECT position.id, positiontitle.base 
+COALESCE(effectives.sum, 0) AS effective
+FROM position
+LEFT OUTER JOIN positiontitle ON position.title_id = positiontitle.id
+LEFT OUTER JOIN(
+  SELECT SUM(fractions.fraction), fractions.position_id FROM(
+    SELECT * FROM succession
+    INNER JOIN
+      (SELECT (1.0 / COUNT(*)) AS fraction, employee_id, successionterm.description
+      FROM succession
+      INNER JOIN successionterm 
+      ON successionterm.id = succession.term_id
+      WHERE successionterm.majorterm = 1 
+      GROUP BY employee_id, successionterm.description) available_successors
+      ON available_successors.employee_id = succession.employee_id
+      INNER JOIN successionterm
+      ON successionterm.id = succession.term_id
+      WHERE successionterm.majorterm = 1 
+      ORDER BY position_id
+      ) fractions
+    GROUP BY fractions.position_id
+)effectives ON effectives.position_id = position.id;
+
+CREATE OR REPLACE VIEW view_midtermavailablesuccessors AS             
+SELECT position.id, positiontitle.base 
+COALESCE(effectives.sum, 0) AS effective
+FROM position
+LEFT OUTER JOIN positiontitle ON position.title_id = positiontitle.id
+LEFT OUTER JOIN(
+  SELECT SUM(fractions.fraction), fractions.position_id FROM(
+    SELECT * FROM succession
+    INNER JOIN
+      (SELECT (1.0 / COUNT(*)) AS fraction, employee_id, successionterm.description
+      FROM succession
+      INNER JOIN successionterm 
+      ON successionterm.id = succession.term_id
+      WHERE successionterm.majorterm = 2
+      GROUP BY employee_id, successionterm.description) available_successors
+      ON available_successors.employee_id = succession.employee_id
+      INNER JOIN successionterm
+      ON successionterm.id = succession.term_id
+      WHERE successionterm.majorterm = 2
+      ORDER BY position_id
+      ) fractions
+    GROUP BY fractions.position_id
+)effectives ON effectives.position_id = position.id;
+
+CREATE OR REPLACE VIEW view_longtermavailablesuccessors AS             
+SELECT position.id, positiontitle.base 
+COALESCE(effectives.sum, 0) AS effective
+FROM position
+LEFT OUTER JOIN positiontitle ON position.title_id = positiontitle.id
+LEFT OUTER JOIN(
+  SELECT SUM(fractions.fraction), fractions.position_id FROM(
+    SELECT * FROM succession
+    INNER JOIN
+      (SELECT (1.0 / COUNT(*)) AS fraction, employee_id, successionterm.description
+      FROM succession
+      INNER JOIN successionterm 
+      ON successionterm.id = succession.term_id
+      WHERE successionterm.majorterm = 3
+      GROUP BY employee_id, successionterm.description) available_successors
+      ON available_successors.employee_id = succession.employee_id
+      INNER JOIN successionterm
+      ON successionterm.id = succession.term_id
+      WHERE successionterm.majorterm = 3
+      ORDER BY position_id
+      ) fractions
+    GROUP BY fractions.position_id
+)effectives ON effectives.position_id = position.id;

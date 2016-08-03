@@ -1,0 +1,250 @@
+\chapter{Introduction}
+% Why is it interesting and important?  -> Motivation
+%
+% Why is it hard?  ->  shortly discuss previous work (should go first)
+%
+% Why hasn't it been solved before (in relation to other work) -> shortly
+% discuss previous work (should go first)
+%
+% What is the problem?  -> Problem statement
+%
+% Key components of approach and results (TODO) -> near end
+%
+% Key contributions (TODO -- bullet point) -> very end
+
+Data-driven decision making is becoming more and more important to
+organisations. Business functions which have traditionally been tackled from
+qualitative and ideology-based perspectives, such as customer care and human
+resource management (HR), have recently started taking an interest in
+data-driven approaches.
+
+% introduction of Crunchr
+%   - enabling self service hr analytics
+% TODO: more scientific intro
+%   - data science is upcoming
+%   - more and more data is present, how to deal with it
+%   - outlier analysis is important in working with data (citation)
+%     but can be time consuming
+
+\markabove{c}{TODO:Begin van motivatie vanuit wetenschappelijk perspectief}
+Focus Orange is a company that provides data-driven analytics to HR departments
+on topics such as succession planning, talent management and working conditions
+preferences. By combining domain knowledge with quantitative methods and an
+automated approach, they gap the bridge between traditional HR and upcoming
+technologies.
+
+\section{Motivation}
+\label{sec:motivation}
+% Motivation
+% - introducing data quality
+% - Note on plan of automated uploads -- validation should be outfitted with a
+%   human 'gut feeling'.
+% - currently data is validated by hand 
+%   - time consuming, requires a lot of back-and-forth, communication, error prone
+Recently, Focus Orange has launched `Crunchr': an online HR analytics platform
+that brings self-service to the HR analytics domain.  It has been observed in
+practice that a key element in the successful adoption of this platform is the
+quality of the data that it is based on. Faulty data can harm the analyses in
+the platform and generally can make results unreliable. It is therefore desired
+that data that enters the platform contains little errors. This requirement of
+high quality data, however, is not easily met by most organisations for which
+Crunchr might be of interest.
+
+It is therefore vital that all data is validated before it enters Crunchr. This
+is currently achieved by the combined effort of a domain expert and a data
+scientist: the data scientist's goal is to find possible errors and report these
+to the domain expert, who then provides the correct values where appropriate.
+Besides some intuition and rules-of-thumb, the data scientist's main tool in
+finding these values efficiently and quickly is outlier analysis (also known as
+extreme value analysis).
+
+This manual approach is time consuming, error prone and goes against the
+self-service principle of the platform. It requires back-and-forth communication
+between the domain expert and data scientist, both of whom might struggle with
+understanding each others point of view and jargon. Furthermore, important
+insights about a specific organisation might get lost over time: the
+continuation of knowledge about which unlikely values are erroneous fully
+depends on the data scientist.
+
+% Why is it hard
+% - Note on data quality and the lack of strictly structured systems.
+% - Even within strictly structured data systems, errors are bound to be
+%   present.
+% - It's hard to say what an error is, domain knowledge should be present.
+% - Even more so: Organisations might have a strongly varying structure
+%   (workforce composition is different as a result varying degrees of
+%   internationalization, targetted markets and/or the data might have different
+%   subjects)
+Since organisations use different data management systems, there is no upfront
+knowledge on which errors might be present. If such upfront knowledge were
+easily available, the errors would not exist in the first place. Because we
+cannot know up front which errors are present, each data set has to be audited
+separately.
+
+Furthermore, the definition of what should be viewed as a (possible) error
+differs per organisation. For example: the degree of internationalization,
+organisation size and workforce composition could all contribute to what is seen
+as an `abnormal' salary for an organisation. An evidently erroneous situation
+for an organisation could be perfectly normal for another. This makes the
+formulation of a single predefined method (e.g. a set of rules) for
+finding abnormalities for multiple data set sources infeasible. Another, more
+data-dependant method is therefore desired.
+
+% TODO: illustrative example (plaatje)
+% definitions of outliers:
+% - Hawkins (1980) 'an observation that deviates so much from other observations as to arouse
+%   suspicion that it was generated by a different mechanism
+% - Barnet and Lews (1994) 'an outlying observation, or outlier, is one that
+%   appears to deviate markedly from other members of the sample in which it
+%   occurs'
+% - Johnson (1992) 'as an observation in a data set which appears to be
+%   inconsistent with the remainder of that set of data'
+Although various definitions of the concept `outlier' exist, they all convey a
+suspicion about an entry being unlikely when compared to the remainder of the
+available entries -- and thus possibly erroneous
+\cite{hawkins1980identification} \cite{barnett1994outliers}
+\cite{johnson1992applied}. Not all unlikely entries, however, are of special
+interest. The distinction between `interesting' and `not interesting' is by
+definition subjective: it depends on assumptions about the way the data was
+created (the \emph{generating process} of the data), which features are more
+important than others and possibly even future usage of the data.
+
+% TODO: describe from scientific perspective
+
+We assume that these interesting and not interesting outliers can be separated
+somehow: although subjective, this distinction cannot be completely arbitrary. If
+this were the case, a human would not be able to make a proper distinction
+either.
+\markabove{c}{dit is wat er vaak gebeurd, zo blijkt uit navraag}
+We also assume the data should contain enough information to make this
+distinction: a human would not require external sources.
+
+Interesting outliers are known as \emph{anomalies} or \emph{strong outliers},
+other outliers are usually called \emph{noise} or \emph{weak outliers}
+\cite{aggarwal2013outlier}.  Since this research is aimed at finding errors for
+a data validation process, the terms \emph{anomaly} for interesting outliers
+and \emph{noise} for all other outliers seems most appropriate and will be used
+from here on out. Non-outliers are called \emph{normal} entries.
+
+\section{Relation to other work}
+\label{sec:related_work}
+% Different models of 
+% Why hasn't it been solved before (in relation to other work)
+% - Literature is either unsupervised or fully-supervised, semi-supervised 
+%   - Unsupervised: 
+%     - Does not take 'arbitrary' interesting vs. not interesting into account
+%   - Supervised:
+%     - mainly addresses the issue of 'class imbalance' (i.e. flagging no outliers 
+%       at all will yield `acceptable` classification rate. Solved through weighing,
+%       re-sampling and boosting.
+%     - borrow from some of its useage, but getting all the labels is too costly,
+%       and not necessary (our use case is more outlier-discovery oriented).
+%   - Semi-supervised all make some assumptions:
+%     - (Pelleg & Moore) assumes 'mixture model' AND 'gaussian distribution' 
+%       (i.e. independent variables).
+%     - 'positive and unlabeled case' (which we don't have)
+%     - 'novel class detection' assumes provided data is 100% clean
+%     - 'rare class detection' assumes some of both are present.
+The various usages of outlier detection has lead to a wide variety of definitions
+of the term `outlier'. Assumptions on knowledge of generating process,
+dimensionality, shape and locality of patterns have lead to different
+\emph{models} for outlier detection: the probabilistic model are backed by
+statistical theory but require knowledge on the generating processes of the data
+(underlying distribution, number of subpopulations, etc.), the extreme value is
+aimed at identifying outliers in the outskirts of the data only, the subspace
+model requires global correlations in the data, proximity based methods are
+suitable for clustered data. Selecting the right model is key in the successful
+selection of an outlier detection method.
+
+From a Machine Learning perspective, methods can be categorized by the
+availability of labels: Unsupervised outlier detection methods, such as those
+described in \cite{escalante2005comparison}, \cite{tax2004support},
+\cite{amer2013enhancing} and \cite{breunig2000lof} aid in finding outliers in a
+data set (discovery of outliers) and are generally optimized for certain uses
+cases: (a lack of) knowledge on the underlying distribution, a specific data set
+size or data dimensionality, a focus on numerical or categorical data and
+runtime requirements all play a role in selecting an appropriate method for a
+use case.  Unsupervised methods cannot make a distinction between noise and
+anomalies, as this distinction is by definition subjective.
+
+Supervised methods can make this distinction between anomalies and noise. These
+methods solve a specific variant of the binary classification problem, in which
+a large imbalance between the available examples is present. Supervised methods
+require examples from both classes in a part of the data (the \emph{training
+set}) from which the difference between anomalies and non-anomalies is learned.
+
+Semi-supervised methods are rather rare in the anomaly detection domain.  Most
+of them are designed to work on a data set in which only examples from one of
+both classes (anomaly, non-anomaly) are present, whereas in the current setting
+examples from both classes are present. After a training phase, they are able to
+detect points that are unlike the previously seen data, which is often referred
+to as \emph{novelty detection} \cite{hodge2004survey}.  Active learning
+approaches, in which points are selected for labelling by a human, can be found
+in \cite{zhu2011outlier} \cite{pelleg2004active}. The goal here is to select as
+little points for labelling while still maintaining good performance. These
+methods can be applied when unaided labelling of points is expensive, however,
+their approach does not fit our use case.
+
+\section{Problem Statement}
+\label{sec:problem_statement}
+% - since this is the most data present, we'll go for numeric data only (and
+%   dummy variables).
+% - should start with 100% unlabeled data.
+% - both outliers, noise and normal data present.
+% - method should cover for a wide range of organisations, so should be capable
+%   of finding any `arbitrary' class of interesting outliers
+% - should be possible so have some model that can be 'saved' between data uploads.
+% - interested in required 'number of samples' and 'size of samples'?
+
+% Research question
+The goal of this research is to develop a method to efficiently separate
+anomalies from noise and normal entries in a data set.
+% Sub research question
+This goal is split up into two sub goals:
+\begin{enumerate}
+  \item efficiently detect outliers without \emph{a priori} knowledge
+  \item separating noise from anomalies among outliers
+\end{enumerate}
+
+% TODO: should we already make a note on somewhat clustered data?
+We aim for a method that can handle the absence of class labels initially,
+operates on data sets where normal points and noise as well as anomalies may be
+present and is robust to unknown underlying distributions.
+
+In order to limit the scope of this research, we consider only numerical
+(continuous and interval) data. The rationale for this is threefold: most
+features in our use case are numerical; categorical features can be converted
+into numerical features relatively easy using `dummy variables', and finally:
+errors in other kinds of data can be detected relatively easy in other ways
+\cite{vanhooland_programminghistorian_2014}.
+
+%TODO: update reference
+An in-depth analysis of these and related requirements for our method can be
+found in Chapter~\ref{ch:contributions}.
+
+% - interested in precision vs. recall
+% - which `entry to ask about'  (i.e. sample selection?)
+% ? difference between data sets? why? 
+% TODO: assumption that the annotator is always right? ORACLE??????
+% TODO: should this even be here?
+\section{Key components and preview of approach \& results OR Key Contributions}
+We'll first have a look into outlier analysis in general and then treat
+supervised, unsupervised and semi-supervised machine learning approaches for
+outlier and anomaly detection. Some literature on active learning is treated as
+well.
+
+\markabove{c}{informeel vanaf hier}
+% TODO: finalize once work is done
+% - we have compared the following methods.
+% - approach (SVM and LOF).
+Next, we'll describe the new method, which is is basically LOF combined with an
+SVM. We'll have a look at different selection methods and their justification.
+
+% - annotated data sets are present in the method
+% - ground truth is always available for training phase (annotated by expert or
+%   from literature)
+We proceed by describing the experimental setup and give an analysis of results.
+
+Finally, conclusion reflection etc.
+\markbelow{c}{informeel tot hier}
+

@@ -1,0 +1,259 @@
+from django.db import models
+
+from database.models.core import *
+
+# Describes a partition of the data that is protected by access privileges.
+# Each role grants access to a set of chunks
+class Chunk(models.Model):
+  business_unit = models.ForeignKey(BusinessUnit, null=False, db_column='businessunit_id')
+  functional_area = models.ForeignKey(FunctionalArea, null=False, db_column='functionalarea_id')
+  location = models.ForeignKey(Location, null=False)
+
+  @staticmethod
+  def generate_chunks(): 
+    """Regenerates the contents of the chunk table. It first drops all rows. Then all 
+    positions and employees are iterated to identify and create all chunks. Finally,
+    we will make sure that all Positions will reference the newly created chunks
+    """    
+    #TODO: update - should also include MultiPositions
+#    chunk_set = [
+#        (pos["business_unit"], pos["functional_area"], pos["location"]) 
+#        for pos 
+#        in Position.objects.values("business_unit", "functional_area", "location").distinct()
+#    ]
+    chunks_query = """
+      SELECT DISTINCT location_id, businessunit_id, functionalarea_id FROM position
+      UNION
+      SELECT DISTINCT location_id, businessunit_id, functionalarea_id FROM multiposition"""
+    cursor = connection.cursor()
+    cursor.execute(chunks_query)
+    chunk_set = cursor.fetchall()
+
+
+    new_chunks = [
+        Chunk(location_id=chunk[0], business_unit_id=chunk[1], functional_area_id=chunk[2]) 
+        for chunk
+        in chunk_set
+    ]
+
+    Chunk.objects.bulk_create(new_chunks)
+    
+    # Populate Position.chunk_id
+    new_chunks = Chunk.objects.all()
+    Chunk._update_chunk_ids(new_chunks)
+          
+  @transaction.atomic      
+  def _update_chunk_ids(new_chunks):
+    for i, chunk in enumerate(new_chunks):
+      Job.objects.filter(
+          position__business_unit=chunk.business_unit, 
+          position__functional_area=chunk.functional_area, 
+          position__location=chunk.location
+      ).update(chunk = chunk)
+      MultiPosition.objects.filter(
+          business_unit=chunk.business_unit, 
+          functional_area=chunk.functional_area, 
+          location=chunk.location
+      ).update(chunk = chunk)
+
+  def __str__(self):
+     return ' '.join([self.business_unit.name, ' - ', self.functional_area.name, ' - ', self.location.name]) 
+
+  class Meta:
+    app_label= 'database'
+    db_table= 'chunk'
+
+
+class Role(models.Model):
+  """The role has a one-to-one mapping with a Django auth group. It has a name, description
+  as well as multiple rules. Roles without rules do not provide access to any data.
+  The chunks the role gives access to are stored in the chunks many-to-many relation and should be 
+  regenerated when any of the rules of the role changes."""
+  name = models.CharField(max_length=50)
+  description = models.CharField(max_length=500)
+  group = models.OneToOneField(Group)
+  chunks = models.ManyToManyField(Chunk, related_name='roles', null=True)
+
+  def create_business_unit_rule(self, allowed_business_units):
+    """Creates a rule for this role that checks whether the data is part of
+    specific business units. Note that the hierarchy is not respected (i.e
+    when A is the parent of B, including A does not imply that B will pass
+    the rule."""
+    value_set_json = json.dumps([bu.id for bu in allowed_business_units])
+    rule = Rule(field = Rule.BUSINESS_UNIT_FIELD, role = self, value_set = value_set_json)
+    rule.save()
+
+  def create_functional_area_rule(self, allowed_functional_areas):
+    """ Creates a rule for this role that grants access based on the functional
+    area. Note that the hierarchy is not respected (i.e when A is the
+    parent of B, including A does not imply that B will pass the rule."""
+    value_set_json = json.dumps([fa.id for fa in allowed_functional_areas])
+    rule = Rule(field = Rule.FUNCTIONAL_AREA_FIELD, role = self, value_set = value_set_json)
+    rule.save()
+
+  def create_location_rule(self, allowed_locations):
+    """Creates a rule for this role that allows access based on location. Note
+    that the hierarchy is not respected (i.e when A is the parent of B,
+    including A does not imply that B will pass the rule."""
+    value_set_json = json.dumps([loc.id for loc in allowed_locations])
+    rule = Rule(field = Rule.LOCATION_FIELD, role = self, value_set = value_set_json)
+    rule.save()
+
+  @staticmethod
+  def update_all():
+    """Updates chunks for all roles. We should call this after regenerating the chunks."""
+    for role in Role.objects.all():
+      role.update()
+
+  def update(self):
+    """Updates the chunks to which this role grants access. This is done by evaluating all
+    the rules on the total chunk set, which leaves us with the accessible ones. """
+    self.chunks.clear()
+    allowed_for_role = Chunk.objects.all()
+    for rule in self.rules.all():
+      allowed_for_role = rule.evaluate(allowed_for_role)
+    self.chunks.add(*allowed_for_role)
+
+  def get_chunk_ids(self):
+    """Returns a set containing the ID's of all chunks we have access to."""
+    return {chunk.id for chunk in self.chunks.all()}
+
+  @staticmethod
+  def for_user(user):
+    """Get the set of roles of a user."""
+    return {group.role for group in user.groups.all() if hasattr(group, 'role')}
+
+  @staticmethod
+  def get_chunk_ids_for_user(user):
+    """Gets all chunk ids for a user. This will inspect all the roles of the user and create
+    the union of all chunk id's accessible to these roles."""
+    if(hasattr(user, 'chunk_ids') and user.chunk_ids is not None):
+      return user.chunk_ids
+    chunks_for_roles = [role.get_chunk_ids() for role in Role.for_user(user)]
+    return set().union(*chunks_for_roles)
+
+  def __str__(self):
+    return self.name
+
+  class Meta:
+    app_label= 'database'
+    db_table= 'role'
+
+class Rule(models.Model):
+  """A rule specifies a condition that must be true for data to become visible to the user.
+  When a role has multiple rules, all rules must be true (AND) before data is shown.
+  A rule is always applied to a specific field, which is one of the fields in RULE_FIELD.
+ 
+  The valueset will contain a set of IDs into a table specific to the field. For example
+  field=location will result in the IDs pointing into the location table."""
+  BUSINESS_UNIT_FIELD = 1
+  FUNCTIONAL_AREA_FIELD = 2
+  LOCATION_FIELD = 3
+  RULE_FIELD = (
+    (BUSINESS_UNIT_FIELD,    'businessunit'),
+    (FUNCTIONAL_AREA_FIELD,  'functionalarea'),
+    (LOCATION_FIELD,         'location'),
+  )
+  field = models.IntegerField(choices=RULE_FIELD)
+  # This is a JSON field because the set of 'allowed' values can be described in different
+  # ways depending on 'field'. For example, we can have a set of ID's (for location, business unit)
+  # Alternatively, we can have a min/max filter if we want to filter salary or grade
+  # Since we will always pre-process the rules, the DB does not need to query this field, which
+  # is why we can use JSON instead of a datatype the DB understands
+  value_set = models.TextField()
+  role = models.ForeignKey(Role, related_name='rules')
+
+  @staticmethod
+  def get_field_enum_id(rule_field):
+    """
+    Returns the enum value for a given rule_field String.
+    Example: 
+    get_enum_id('businessunit') returns 1
+    """
+    return [value for key, value in enumerate(Rule.RULE_FIELD) 
+             if value[1] == rule_field][0][0]
+
+  def format_value_set(self):
+    """
+    Returns formatted value_set.
+    """
+    if(self.field == Rule.BUSINESS_UNIT_FIELD):
+      return self._format_business_unit_set()
+    if(self.field == Rule.FUNCTIONAL_AREA_FIELD):
+      return self._format_function_area_set()
+    if(self.field == Rule.LOCATION_FIELD):
+      return self._format_location_set()
+
+  def _format_business_unit_set(self):
+    """
+    Returns formatted values set if field is set to 'businessunit'.
+    Throws ValueError otherwise.
+    """
+    if(self.field != Rule.BUSINESS_UNIT_FIELD):
+      raise ValueError("Can't format as Business Unit, since field is set to" + self.format_field())
+    return unicode(list(BusinessUnit.objects.filter(pk__in=self.get_value_set()).all()))
+
+  def _format_functional_area_set(self):
+    """
+    Returns formatted values set if field is set to 'functional area'.
+    Raises ValueError otherwise.
+    """
+    if(self.field != Rule.LOCATION_FIELD):
+      raise ValueError("Can't format as functional area, since field is set to" + self.format_field())
+    return unicode(list(FunctionalArea.objects.filter(pk__in=self.get_value_set()).all()))
+
+  def _format_location_set(self):
+    """
+    Returns formatted values set if field is set to 'location'.
+    Raises ValueError otherwise.
+    """
+    if(self.field != 3):
+      raise ValueError("Can't format as location, since field is set to" + self.format_field())
+    return unicode(list(Location.objects.filter(pk__in=self.get_value_set()).all()))
+
+  def format_field(self):
+    """
+    Returns the formatted `field` for this Rule.
+    """
+    return [value for key,value in enumerate(Rule.RULE_FIELD) if value[0] == self.field][0][1]
+
+  def evaluate(self, chunks):
+    """Evaluates the rule against the given chunk instances. This results in a
+    filtered list of chunk instances.
+    """
+    # These fields are filtered based on sets of allowed ID's, 
+    # so interpret the json as such
+    allowed_ids = []
+    if (self.field in [Rule.BUSINESS_UNIT_FIELD, Rule.FUNCTIONAL_AREA_FIELD, Rule.LOCATION_FIELD]):
+      allowed_ids = json.loads(self.value_set)
+    else:
+      raise DBConsistencyError('Rule {:d} has an invalid field value.'.format(self.id))
+    # Do the filtering, based on ID's
+    if (self.field == Rule.BUSINESS_UNIT_FIELD):
+      return [c for c in chunks if c.business_unit.id in allowed_ids]
+    elif (self.field == Rule.FUNCTIONAL_AREA_FIELD):
+      return [c for c in chunks if c.functional_area.id in allowed_ids]
+    elif (self.field == Rule.LOCATION_FIELD):
+      return [c for c in chunks if c.location.id in allowed_ids]
+
+  def get_value_set(self):
+    """
+    Returns value_set in a Pythonic data structure.
+    """
+    return json.loads(self.value_set)
+
+  def set_value_set(self, value_set):
+    """
+    Accepts a pythonic value_set and sets it in the correct format.
+    """ 
+    self.value_set = json.dumps(value_set)
+
+  def __str__(self):
+    return ' '.join([self.role.name, str(self.field)])
+
+  class Meta:
+    app_label= 'database'
+    db_table= 'rule'
+
+
+

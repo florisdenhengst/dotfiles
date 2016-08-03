@@ -1,0 +1,320 @@
+import cvxopt as co
+from kernel import Kernel
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+import pprint
+import sklearn as sk
+from sklearn import grid_search
+from svdd import SVDD
+import sklearn
+from sklearn.cross_validation import StratifiedKFold
+from sklearn.utils.estimator_checks import check_estimator
+from sklearn.utils import check_array
+from sklearn.utils.validation import column_or_1d
+import sys
+from ssad_wrapper import *
+from midpoint_normalize import *
+import json
+import os
+import time
+from optimals import optimals
+
+import rpy2
+from rpy2.robjects import numpy2ri
+rpy2.robjects.numpy2ri.activate()
+import rpy2.robjects as robjects
+
+POS_LABEL = -1
+K_TYPE = 'rbf'
+N_FOLDS = 5
+USAGE = '''Usage: python learning_curve_intra.py 
+  <method>
+  <scaled_data_file>
+  <unscaled_data_file>
+  <classes_file>
+  <json_output_prefix>
+  <?imgs_to_dir>
+  <?n_jobs>
+  <?n_folds>
+  '''
+co.solvers.options['show_progress'] = False
+co.cvxprog.options['show_progress'] = False
+co.coneprog.options['show_progress'] = False
+
+def rank_based_disagreement(ranks1, ranks2, ignore = None):
+  '''Feed in JUST THE RANKS (i.e. not the indices).
+  Returns index of element which has the highest rank-based difference.'''
+  assert ranks1.shape == ranks2.shape
+  rank_diffs = np.abs(ranks1 - ranks2)
+  if ignore is not None:
+    # disable everything in selection
+    rank_diffs[ignore] = float('-inf')
+  return np.argmax(rank_diffs)
+
+def ranked_indices(scores_to_rank):
+  # append indices column-wise
+  scores_to_rank = np.transpose(np.vstack((scores_to_rank, np.arange(0,scores_to_rank.shape[0]))))
+  # now sort them
+  scores_to_rank = scores_to_rank[scores_to_rank[:,0].argsort(axis=0)]
+  # append new indices to denote ranks
+  scores_to_rank = np.transpose(np.vstack((scores_to_rank[:,0],
+                                         scores_to_rank[:,1],
+                                         np.arange(0,scores_to_rank.shape[0]))))
+  # reorder to get original ordering
+  ranks = scores_to_rank[scores_to_rank[:,1].argsort(axis=0)][:,2:3]
+  return ranks
+
+def assign_optional_arg(index, argname):
+  try:
+    globals()[argname] = sys.argv[index]
+  except IndexError:
+    print('No arg {} provided.'.format(argname))
+
+if len(sys.argv) < 5:
+  print()
+
+try:
+  method = sys.argv[1]
+  data_file = sys.argv[2]
+  unscaled_data_file = sys.argv[3]
+  classes_file = sys.argv[4]
+  output_file = sys.argv[5]
+except IndexError:
+  print(USAGE)
+  exit(1)
+
+for i, arg in enumerate(['img_to_dir', 'n_jobs', 'n_folds']):
+  assign_optional_arg(i+6, arg)
+
+
+# read input file 
+data = np.loadtxt(open(data_file,'rb'), delimiter=',')
+
+# read unscaled input file
+unscaled_data = np.loadtxt(open(unscaled_data_file, 'rb'), delimiter=',')
+
+settings = None
+datasets = ['usg', 'abalone', 'thyroid']
+for dataset in datasets:
+  if dataset in data_file:
+    print("Detected '{}' as dataset.".format(dataset))
+    settings = optimals[dataset]
+    break
+
+if dataset != 'thyroid':
+  assert data.shape == unscaled_data.shape
+
+# read classes file
+trues = np.loadtxt(open(classes_file, 'rb'), delimiter=',')[:,1]
+y_true = trues
+assert np.min(y_true) == -1
+assert np.max(y_true) == 1
+assert len(np.unique(y_true)) == 2
+
+# validate json output
+with open(output_file, 'w+') as f:
+  print('output file validated')
+
+# set optimal parameters
+if settings is None:
+  settings = {
+      'ssad': {
+        'C_base': 0.0005,
+        'k_param': 0.0003,
+        },
+      'svc': {
+        'C': 35.6225,
+        'gamma': 0.1374,
+        'probability': True,
+        }
+      }
+  print('Using default settings')
+if method == 'svc':
+  model_t = sk.svm.SVC
+elif method == 'ssad':
+  model_t = SSAD_WRAPPER
+else:
+  print("Unknown method '{}'!".format(method))
+  exit(1)
+
+scorer = sk.metrics.recall_score
+
+ns_hints = []
+scores = []
+
+# fire up an R instance and inject the method into it
+with open('LOFscore.R') as lof_score_file:
+  method_definition = lof_score_file.read()
+
+robjects.r(method_definition)
+py_lof_score = robjects.r['LOFscore']
+
+# Five fold-cross validation 
+folds = StratifiedKFold(trues, N_FOLDS)
+
+
+for fold_c, (train_fold, test_fold) in enumerate(folds):
+  ns_hints.append([])
+  scores.append([])
+  x_train = data[train_fold]
+  x_test = data[test_fold]
+  y_train = trues[train_fold]
+  y_test = trues[test_fold]
+
+  x_train_lof = unscaled_data[train_fold]
+  
+  # convert x_train into an R object (automagically via import of numpy2ri)
+  lofscores = py_lof_score(x_train_lof, settings['LOF']['kmin'], settings['LOF']['kmax'])
+  assert len(lofscores) == x_train.shape[0]
+
+  # have to use separate copies here (working will be modified)
+  unsup_scores = np.array(lofscores)
+  working_unsup_scores = np.array(lofscores)
+  assert unsup_scores.max() > 0
+
+  unsup_ranks = ranked_indices(unsup_scores)
+  y_working = np.zeros(len(y_train))
+  assert y_working.shape == y_train.shape
+
+  hints_range = range(len(y_train))
+  print('hints range len', len(hints_range))
+  for i, n_hints in enumerate(hints_range):
+    assert y_working.shape == y_train.shape
+    # build model
+    model = model_t(**settings[method])
+
+    # remove all entries for which no label is present and store in separate object for SVC
+    labelled = y_working != 0
+    unlabelled = np.logical_not(labelled)
+
+    assert sum(y_working == -1) + sum(y_working == 1) == n_hints
+    assert sum(y_working == 0) + n_hints == len(y_train)
+    assert sum(labelled) == n_hints
+
+    assert len(np.unique(working_unsup_scores)) > 1
+    unsup_query_index = np.argmax(working_unsup_scores)
+
+    # set up training data
+    if method == 'ssad':
+      # ssad can use all instances, but not all y_true
+      training_set = x_train
+      # deep copy to solve heisenbug?
+      y_train_working = np.empty_like(y_working)
+      y_train_working[:] = y_working
+    else:
+      # svc can only use labelled instances
+      x_train_working = x_train[labelled,:]
+      y_train_working = y_working[labelled]
+
+    if method == 'ssad' or (method == 'svc' and len(np.unique(y_train_working)) == 2):
+      if method == 'svc' or len(np.unique(y_train_working)) > 2:
+        # svm requires both negative and positive labels
+        assert y_train_working.max() == 1
+        assert y_train_working.min() == -1
+      model = model.fit(x_train_working, y_train_working)
+    elif np.unique(y_train_working) > 2:
+      print('More than 2 classes known!!')
+      exit(1)
+    else:
+      # we cannot fit the model, leave it as-is
+      pass
+
+    sup_min_distance_index = None
+    sup_query_index = None
+
+    # query in alternating fashion.
+    if i % 2 == 0:
+      # 'margin' strategy <- These are points about which 'supervised component' is uncertain
+      try:
+        sklearn.utils.validation.check_is_fitted(model, 'support_')
+        sup_distances = model.decision_function(x_train)
+        assert len(sup_distances) == len(x_train)
+        assert len(sup_distances) == len(y_train)
+        # clamp distances for labelled values to 'inf' in order to be able to select the minimum
+        assert sup_distances.max() < float('inf')
+        sup_distances[labelled] = float('inf')
+        sup_min_distance_index = np.argmin(sup_distances)
+      except sklearn.utils.validation.NotFittedError:
+        # default to the most suspected outlier in order to facilitate quick inclusion of the
+        # fully-supervised method
+        print('Model not fitted yet!')
+        sup_min_distance_index = None
+
+      query_index = sup_min_distance_index or unsup_query_index
+    else:
+      # 'rank based disagreement' strategy
+      try:
+        sklearn.utils.validation.check_is_fitted(model, 'support_')
+        sup_distances = model.decision_function(x_train)
+        sup_ranked = ranked_indices(sup_distances)
+        sup_query_index = rank_based_disagreement(unsup_ranks, sup_ranked, labelled)
+      except sklearn.utils.validation.NotFittedError:
+        # default to the most suspected outlier in order to facilitate quick inclusion of the
+        # fully-supervised method
+        print('Model not fitted yet!')
+        sup_query_index = None
+
+      query_index = sup_query_index or unsup_query_index
+
+    # add label of hinting point to known labels
+    # set distance of working_unsup_scores to -1
+    assert query_index <= len(x_train[:,0])
+    assert working_unsup_scores[query_index] != -1
+    assert y_working[query_index] == 0
+    y_working[query_index] = y_train[query_index]
+    assert y_working[query_index] != 0
+    working_unsup_scores[query_index] = -1
+
+    # measure performances (F1 score)
+    try:
+      sklearn.utils.validation.check_is_fitted(model, 'support_')
+      # predict on all points
+      predictions = model.predict(x_test)
+      score = scorer(y_test, predictions, pos_label=POS_LABEL)
+    except sklearn.utils.validation.NotFittedError:
+      score = 0
+
+    print(n_hints, score)
+    # store result
+    scores[fold_c].append(score)
+    ns_hints[fold_c].append(n_hints)
+
+averaged_scores = np.zeros(len(ns_hints[0]))
+for i, _ in enumerate(scores[0]):
+  scores_folds = [score[i] for score in scores]
+  print(scores_folds)
+  averaged_scores[i] = sum(scores_folds) / len(ns_hints)
+  print(i, averaged_scores[i])
+
+percentage_labelled = np.divide(ns_hints[0], len(ns_hints[0]))
+if img_to_dir is not None:
+  img_out = img_to_dir + '/intra_output_' + method + '_recall.pdf'
+
+plt.figure()
+plt.title('learning curve')
+plt.xlabel('% queried')
+plt.ylabel('Recall')
+plt.plot(percentage_labelled, averaged_scores)
+plt.ylim(0, 1)
+if img_to_dir is not None:
+  plt.savefig(img_out, format='pdf')
+else:
+  plt.show(img_to)
+
+# output json for ssad to file
+dump = json.dumps({'ns_hints': ns_hints, 'scores': scores, 'scorer': scorer.__name__},
+                  indent=2,
+                  sort_keys=True)
+
+# output json for svc to file
+with open(output_file, 'w+') as f:
+  print(dump, file=f)
+
+# create learning plots
+
+
+
+# output learning plot for ssad to file / show
+
+# output learning plot for svc to file / show

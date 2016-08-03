@@ -1,0 +1,29 @@
+<?php
+
+$usr = new User('t_uname', 't_pwd', TRUE, FALSE);
+
+$delete = FALSE;
+try { 
+  $usr->create($db);
+} catch(PDOException $e){
+  if($e->getCode() == 23000){
+    $delete = TRUE ;
+  }
+}
+
+if($delete){
+  try{
+    print("Already present... deleting");
+    $usr->delete($db,'1', '>=');
+  } catch(PDOException $e){
+    print('deleting failed');
+    print($e->getMessage());
+  }
+}
+
+$data = array('users'=> User::get_all_assoc($db));
+$tpl = new TemplateWrapper(TEMPLATE_ROOT . 'management/users.html', $data);
+$result = $tpl->get($dwoo);
+print_r($result);
+
+?>

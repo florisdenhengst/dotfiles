@@ -1,0 +1,249 @@
+import cvxopt as co
+from kernel import Kernel
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+import pprint
+import sklearn as sk
+from sklearn import grid_search
+from svdd import SVDD
+import sklearn
+from sklearn.cross_validation import StratifiedKFold
+from sklearn.utils.estimator_checks import check_estimator
+from sklearn.utils import check_array
+from sklearn.utils.validation import column_or_1d
+import sys
+from ssad_wrapper import *
+from midpoint_normalize import *
+import json
+import os
+import time
+from optimals import optimals
+import operator
+
+MARKER_SIZE = 8
+MARKER_EDGE_WIDTH = 1.5
+MARKER_SCALE = 0.5
+
+USG_COLOR = 'blue'
+THYROID_COLOR = 'red'
+ABALONE_COLOR = 'green'
+
+RANDOM_INDICATOR = 'dashed'
+REG_INDICATOR = 'solid'
+N_LABELS = 20
+
+USG_PLT = {
+    'color': USG_COLOR,
+    'marker': '+',
+    }
+THYROID_PLT = {
+    'color': THYROID_COLOR,
+    'marker': '.',
+    }
+ABALONE_PLT = {
+    'color': ABALONE_COLOR,
+    'marker': ',',
+    }
+
+try:
+  inter_intra = sys.argv[1]
+  precision_recall = sys.argv[2]
+except Exception as e:
+  print('Usage: python combine_learning_curves.py <inter/intra> [output_dir]')
+  exit(1)
+
+try:
+  img_to_dir = sys.argv[3]
+except Exception as e:
+  img_to_dir = None
+
+# Different types require different aggreagtes
+# - intra -- no average
+# - inter -- N_FOLDS
+# - random intra - N_ITERATIONS
+# - random inter - N_FOLDS, N_ITERATIONS
+def dummy_aggr(data):
+  return np.array(data)
+
+def single_aggr(data):
+  '''Performs aggregates on single nested data'''
+  aggregate_len = len(data)
+  data_len = len(data[0])
+  result = np.zeros(data_len)
+  for i in range(data_len):
+    scores = [score[i] for score in data]
+    result[i] = sum(scores) / len(scores)
+  return result
+
+def double_aggr(data):
+  '''Performs aggregates on doubly nested data'''
+  outer_aggregate_len = len(data)
+  inner_aggregate_len = len(data[0])
+  data_len = len(data[0][0])
+
+  averaged_outers = []
+  for i in range(inner_aggregate_len):
+    averaged_outers.append([])
+
+    for j in range(data_len):
+      scores_inners = [score[i][j] for score in data]
+      averaged_outers[i].append(sum(scores_inners) / len(scores_inners))
+
+  result = np.zeros(data_len)
+  for i in range(data_len):
+    scores_inner = [averaged_outer[i]
+                      for averaged_outer
+                      in averaged_outers]
+    result[i] = sum(scores_inner) / len(scores_inner)
+
+  return result
+
+RESULTS_DIR = os.path.dirname(os.path.realpath(__file__)) + '/../results'
+ABALONE = 'abalone'
+THYROID = 'thyroid'
+USG = 'usg'
+
+LEARNING = 'learning'
+
+if inter_intra == 'inter':
+    derp = 'inner'
+else:
+    derp = inter_intra
+
+TYPE = inter_intra
+
+
+svc = inter_intra + '_output_svc_' + precision_recall +'.json'
+random_svc =  '25_random_' + TYPE  + '_svc.json'
+
+# define list of score-files
+files = {
+    'proposed selection mechanism (abalone dataset)':
+      {
+        'file': '/'.join([RESULTS_DIR, ABALONE, LEARNING, svc]),
+        'process_f': {
+          'inter': single_aggr,
+          'intra': dummy_aggr,
+          },
+        },
+    'proposed selection mechanism (thyroid dataset)':
+      {
+        'file': '/'.join([RESULTS_DIR, THYROID, LEARNING, svc]),
+        'process_f': {
+          'inter': single_aggr,
+          'intra': dummy_aggr,
+          },
+        },
+    'proposed selection mechanism (domain dataset)':
+      {
+        'file': '/'.join([RESULTS_DIR, USG, LEARNING, svc]),
+        'process_f': {
+          'inter': single_aggr,
+          'intra': dummy_aggr,
+          },
+        },
+
+#    'random selection (abalone dataset)':
+#      {
+#        'file': '/'.join([RESULTS_DIR, ABALONE, LEARNING, random_svc]),
+#        'process_f': {
+#          'inter': double_aggr,
+#          'intra': single_aggr,
+#          },
+#        },
+#    'random selection (thyroid dataset)':
+#      {
+#        'file': '/'.join([RESULTS_DIR, THYROID, LEARNING, random_svc]),
+#        'process_f': {
+#          'inter': double_aggr,
+#          'intra': single_aggr,
+#          },
+#        },
+#    'random selection (domain dataset)':
+#      {
+#        'file': '/'.join([RESULTS_DIR, USG, LEARNING, random_svc]),
+#        'process_f': {
+#          'inter': double_aggr,
+#          'intra': single_aggr,
+#          },
+#        },
+    }
+# read scores from score files
+datas = {}
+for fname, f_object in files.items():
+  myfile = f_object['file']
+  process_f = f_object['process_f'][inter_intra]
+  # aggregate correctly, i.e. average
+  with open(myfile) as filename:
+    datas[fname] = process_f(json.load(filename)['scores'])
+
+for name, scores in datas.items():
+  print(name)
+  print(scores.min(), scores.max(), scores.shape)
+  print()
+
+# create plot
+plot = plt.figure()
+
+if inter_intra == 'inter':
+  learning_setting = ' multiple data uploads setting'
+else:
+  learning_setting = ' single data upload setting'
+
+plt.title('Learning curves in a' + learning_setting)
+plt.xlabel('% labelled')
+plt.ylabel(precision_recall)
+
+for fname, scores in datas.items():
+  n_labelled = range(1, len(scores) + 1)
+  pct_labelled = [item / len(n_labelled) for item in n_labelled]
+  if 'domain' in fname:
+    opts = USG_PLT
+  elif 'thyroid' in fname:
+    opts = THYROID_PLT
+  elif 'abalone' in fname:
+    opts = ABALONE_PLT
+  else:
+    assert False
+
+  if 'random' in fname:
+    indicator = RANDOM_INDICATOR
+  else:
+    indicator = REG_INDICATOR
+  mark_every = math.ceil(len(n_labelled) / N_LABELS)
+  plt.plot(pct_labelled,
+           scores,
+           ls=indicator,
+           markevery=mark_every,
+           ms=MARKER_SIZE,
+           mew=MARKER_EDGE_WIDTH,
+           label=fname,
+           **opts)
+  print('max', precision_recall )
+  print(fname, np.nanmax(scores), np.argmax(scores) / len(scores))
+
+plt.ylim(0, 1)
+# sort the legend
+ax = plt.gca()
+handles, labels = ax.get_legend_handles_labels()
+
+hl = sorted(zip(handles, labels),
+    key=operator.itemgetter(1))
+s_handels, s_labels = zip(*hl)
+
+# add legend
+plt.legend(
+    s_handels,
+    s_labels,
+    loc='best',
+    prop={'size': 10},
+    markerscale=MARKER_SCALE)
+
+# output / plot
+if img_to_dir is not None:
+  img_out = img_to_dir + 'learning_curves_combined_' + inter_intra + '_' + precision_recall + '.pdf'
+  plt.savefig(img_out, format='pdf')
+else:
+  plt.show()
+

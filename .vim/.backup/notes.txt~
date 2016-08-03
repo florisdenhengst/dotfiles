@@ -1,0 +1,61 @@
+Design - 8.0
+  - Identification of shared variables is good!
+  - Clear description of method for returning results.
+  - Description of used data structures is good, however the link with
+    different state objects that can represent the same state object is not
+    made correctly.
+  - Random permutations of post().
+  - The Graph object is not thread-safe by declaring its references volatile!
+    Thread-safety means that methods in the class are not guaranteed to be
+    correct when executed concurrently. As stated in the general feedback, a
+    per-thread Graph object can solve this.
+  - Improvements
+    - wait() instead of spin lock <- okay!
+    - HashSet instead of HashMap <- the idea in principle is okay. However,
+      this optimization is not truly one of shared data access. Besides (as
+      stated in the Javadoc on HashSet), its implementation uses a HashMap.
+  - Expected Performance
+    - We expect a comparison between sequential and multithreaded versions.
+    - You correctly identify which are bottlenecks (load balancing and
+      locking). There might have been some optimization oppurtunities there!
+    - Using shutdownNow() or shutdown() would probably have helped.
+
+Evaluation - 6.0
+  - Average of 10 runs.
+  - You used 2, 10, 100, 250 and 500 threads. Why did you use these? Note that
+    a typical DAS4 node supports up to 8 threads natively. This would mean
+    that for almost of the measurements are unreliable, as in these cases
+    multiple threads would be running on the same core.
+  - Only default inputs used.
+  - No visualisation of results.
+  - No mention of speedup.
+
+Implementation - 7.0
+  - Clear separation between 'master' and 'worker' functionality <- good!
+  - The methods for accessing the NNDFS.counter variable are all synchronized
+    on the NNDFS object. This requires that only one counter can be accessed
+    concurrently, even though the algorithm only requires a limitation of one
+    counter *per state*.
+  - There is an obsolete 'synchronized' keyword when incrementing and
+    decrementing counts.
+  - The permutation of the results of post() is implemented awkwardly and
+    inefficiently. It contains the creation of a new Random object and a while
+    loop in which values are removed from the original and added to a copy.
+    This could've been implemented using Collections.shuffle for instance.
+  - The Graph object is not necessary in the NNDFS class. It would've been
+    better to let each thread create its own initial state from its own Graph
+    object.
+  - The references nndfs and red in Worker are not declared volatile.
+  - The wrapper class for AtomicCounter is not really necessary.
+  - A 'count' is added for every call of dfs_blue even though it is only
+    necessary when the state is accepting.
+  - Returning results requires a lock on the nndfs object. A lock on the
+    'cycleFound' variable would've sufficed.
+  - The Workers class implements NDFS (which requires the implementation of
+    some methods). This is not necessary. These required methods are not used.
+  - The Worker class could have been implemented more cleanly: it now contains
+    run(), worker(), start() and ndfs() methods, even though they do more or
+    less the same.
+  - In dfs_red(), the 'red' variable of the parent state s is checked. This
+    should be of the child states t.
+  - Overall: okay.

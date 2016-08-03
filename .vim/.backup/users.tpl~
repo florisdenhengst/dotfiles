@@ -1,0 +1,62 @@
+{extends "menu-page.tpl"}
+
+{block "title"}
+Users
+<a class="btn btn-primary"
+  href="/management/users/new">
+  <span class='glyphicon glyphicon-plus'></span>
+</a>
+{/block}
+
+{block "content"}
+  <div class="row header">
+    <div class="col-xs-2">
+      &nbsp;
+    </div>
+    <div class="col-xs-1">
+      ID
+    </div>
+    <div class="col-xs-5">
+      username
+    </div>
+    <div class="col-xs-1">
+      active
+    </div>
+    <div class="col-xs-2">
+      superuser
+    </div>
+    <div class="col-xs-1">
+      &nbsp;
+    </div>
+  </div>
+  {foreach $users, index, user}
+  <div class="row 
+              {if $index mod 2 == 1}odd{else}even{/if}
+              {if $user.id == $highlight_id} bg-success my-fade-out{/if}">
+    <div class="col-xs-2">
+      <a class="btn btn-primary"
+        href="/management/users/{$user.id}">
+        <span class='glyphicon glyphicon-edit'></span>
+      </a>
+    </div>
+    <div class="col-xs-1">
+      {$user.id}
+    </div>
+    <div class="col-xs-5">
+      {$user.username}
+    </div>
+    <div class="col-xs-1">
+      {$user.active}
+    </div>
+    <div class="col-xs-2">
+      {$user.is_superuser}
+    </div>
+    <div class="col-xs-1">
+      <a class="btn btn-danger"
+        href="/management/users/delete/{$user.id}">
+        <span class='glyphicon glyphicon-remove'></span>
+      </a>
+    </div>
+  </div>
+  {/foreach}
+{/block}

@@ -1,0 +1,24 @@
+
+<div class="log-out">
+  <div class="row">
+   <div class="col-xs-12">
+      <ng-include id="profile-logo" src="'/static/kapstok/logos/profile.svg'"></ng-include>
+      Welcome {{user.username}} 
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-xs-12">
+      <a href="/logout.html">LOG OUT</a>
+    </div>
+  </div>
+  <div class="row" ng-click="$parent.toggleGlobalNav()">
+    <div class="apps-button col-xs-12">
+      APPS
+      <ng-include class="access-apps" ng-show="!$parent.$parent.globalNavIsVisible"
+			    src="'/static/kapstok/logos/see apps.svg'"></ng-include>
+			<ng-include class="access-apps" ng-show="$parent.$parent.globalNavIsVisible"
+			    src="'/static/kapstok/logos/hide apps.svg'"></ng-include>
+    </div>
+  </div>
+</div>
+

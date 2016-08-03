@@ -1,0 +1,251 @@
+"""
+Django settings for framework project.
+
+For more information on this file, see
+https://docs.djangoproject.com/en/1.6/topics/settings/
+
+For the full list of settings and their values, see
+https://docs.djangoproject.com/en/1.6/ref/settings/
+"""
+
+# Build paths inside the project like this: os.path.join(BASE_DIR, ...)
+import os
+from socket import gethostname
+BASE_DIR = os.path.dirname(__file__)
+PROJECT_ROOT = BASE_DIR
+
+
+# Quick-start development settings - unsuitable for production
+# See https://docs.djangoproject.com/en/1.6/howto/deployment/checklist/
+
+ALLOWED_HOSTS = ['*']
+
+TEMPLATE_DIRS = (
+  os.path.join(BASE_DIR, 'templates'),
+)
+
+TEMPLATE_LOADERS = (
+  'django.template.loaders.filesystem.Loader',
+  'django.template.loaders.app_directories.Loader'
+)
+
+try:
+  HOSTNAME = gethostname()
+except:
+  HOSTNAME = 'unknown'
+
+# Application definition
+
+INSTALLED_APPS = (
+  'django.contrib.admin',
+  'django.contrib.auth',
+  'django.contrib.contenttypes',
+  'django.contrib.sessions',
+  'django.contrib.messages',
+  'django.contrib.staticfiles',
+  'django.contrib.admindocs',
+  'pipeline',
+  'layercheck',
+  'database',
+  'workforce',
+  'organisation',
+  'kapstok',
+  'survey',
+  'preference',
+  'succession',
+  'talent',
+#  'debug_toolbar',
+)
+
+MIDDLEWARE_CLASSES = (
+  'kapstok.middleware.RequireLoginMiddleware',
+  'kapstok.middleware.XForwardedForMiddleware',
+  'kapstok.middleware.ExceptionLoggingMiddleware',
+  'django.contrib.sessions.middleware.SessionMiddleware',
+  'django.middleware.common.CommonMiddleware',
+  'django.contrib.auth.middleware.AuthenticationMiddleware',
+  'django.contrib.messages.middleware.MessageMiddleware',
+  'django.middleware.clickjacking.XFrameOptionsMiddleware',
+  'django.middleware.locale.LocaleMiddleware',
+  'django.middleware.csrf.CsrfViewMiddleware',
+  'kapstok.middleware.UserExtensionMiddleware',
+  'kapstok.middleware.GlobalFilterMiddleware',
+  'kapstok.middleware.AppAccessMiddleware',
+# TO USE THE DJANGO TOOLBAR ON JSON REQUESTS, ENABLE THESE:
+#  'debug_toolbar.middleware.DebugToolbarMiddleware',
+#  'kapstok.middleware.NonHtmlDebugToolbarMiddleware',
+)
+
+ROOT_URLCONF = 'urls'
+
+WSGI_APPLICATION = 'wsgi.application'
+
+
+# Database
+# https://docs.djangoproject.com/en/1.6/ref/settings/#databases
+
+try:
+  sitesettings = __import__("sitesettings")
+  # override settings from sitesettings
+  for attr in filter(lambda x: not x.startswith("__"), dir(sitesettings)):
+    globals()[attr] = getattr(sitesettings, attr)
+
+except ImportError:
+  raise Exception("""Could not read sitesettings.py.
+Did you copy sitesettings.py.example to sitesettings.py and edit it?""")
+
+# Internationalization
+# https://docs.djangoproject.com/en/1.6/topics/i18n/
+
+LANGUAGE_CODE = 'en-us'
+
+TIME_ZONE = 'UTC'
+
+USE_I18N = True
+
+USE_L10N = True
+
+USE_TZ = True
+
+
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/1.6/howto/static-files/
+
+STATIC_URL = '/static/'
+LOGIN_URL = '/app/login'
+MEDIA_ROOT = '/media/'
+
+STATICFILES_STORAGE = 'pipeline.storage.PipelineStorage'
+
+STATICFILES_FINDERS = (
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+    'pipeline.finders.ManifestFinder',
+    'pipeline.finders.PipelineFinder',
+)
+
+STATICFILES_DIRS = (
+  os.path.join(BASE_DIR, "bower"),
+  os.path.join(BASE_DIR, "static")
+)
+
+# Set to False in sitesettings if you want to disable compression
+# PIPELINE_ENABLED = True
+PIPELINE_COMPILERS = (
+  'pipeline.compilers.less.LessCompiler',
+)
+
+PIPELINE_CSS_COMPRESSOR = 'pipeline.compressors.NoopCompressor'
+PIPELINE_JS_COMPRESSOR = 'pipeline.compressors.NoopCompressor'
+PIPELINE_LESS_BINARY = os.path.join(BASE_DIR, 'node_modules/.bin/lessc')
+PIPELINE_CSS = {
+    'kapstok': {
+        'source_filenames': (
+            'kapstok/less/kapstok.less',
+        ),
+        'output_filename': "kapstok/less/kapstok-compressed.css"
+    }
+}
+PIPELINE_JS = {
+    'kapstok': {
+        'source_filenames': (
+            # jquery, then angular
+            
+            'jquery/dist/jquery.js',
+            'angular/angular.js',
+            'angular-ui-router/release/angular-ui-router.js',
+            'angular-sanitize/angular-sanitize.js',
+            'angular-animate/angular-animate.js',
+            'angular-bootstrap/ui-bootstrap-tpls.js',
+            
+            # other bower dependencies
+            
+            'colorbox/jquery.colorbox-min.js',
+            'd3/d3.js',
+            'd3-tip/index.js',
+            'nedb/browser-version/out/nedb.js',
+            'jqueryui/jquery-ui.js',
+            'pivottable/dist/pivot.js',
+            'isteven-angular-multiselect/angular-multi-select.js',
+            'Stickyfill/dist/stickyfill.js',
+            
+            # application-wide modules
+            
+            'kapstok/js/kapstok.js',
+            'kapstok/js/auth.js',
+            'kapstok/js/navigation.js',
+            'kapstok/js/filter.js',
+            'kapstok/js/learn.js',
+            'kapstok/js/widgets.js',
+            'kapstok/js/save-svg-as-png.js',
+            'kapstok/js/ng-repeat-directives.js',
+            'kapstok/js/datatable.js',
+            'kapstok/js/fo-include.js',
+            'kapstok/js/compare.js',
+            
+            # application widget directives
+            
+            'kapstok/js/widgets/fo-loading.js',
+            'kapstok/js/widgets/fo-message.js',
+            'kapstok/js/widgets/fo-barchart.js',
+            'kapstok/js/widgets/fo-search-box.js',
+            'kapstok/js/widgets/fo-statbox.js',
+            'kapstok/js/widgets/fo-stat.js',
+            'kapstok/js/widgets/fo-profile-lightbox.js',
+            'kapstok/js/widgets/fo-distribution.js',
+            'kapstok/js/widgets/fo-multi-select.js',
+            'kapstok/js/widgets/fo-google-line.js',
+            'kapstok/js/widgets/fo-google-bar.js',
+            'kapstok/js/widgets/fo-google-area.js',
+            
+            # home page
+            
+            'kapstok/js/home.js',
+            
+            # workforce module
+            
+            'workforce/workforce.js',
+            
+            # organisation module
+            
+            'organisation/js/organisation-controller.js',
+            'organisation/js/headcount-controller.js',
+            'organisation/js/overview-controller.js',
+            'organisation/js/overview-layer-controller.js',
+            'organisation/js/layers-controller.js',
+            'organisation/js/span-controller.js',
+            
+            # Layercheck module
+            
+            'layercheck/layercheck.js',
+            
+            # succession module
+            
+            'succession/js/succession.js',
+            'succession/js/sankey.js',
+            'succession/js/sankey_plugin.js',
+            'succession/js/network.js',
+            
+            # prefscan module
+            
+            'preference/js/preference.js',
+            'preference/js/bar-chart.js',
+            'preference/js/column-chart.js',
+            'preference/js/line-chart.js',
+            'preference/js/breakdown-controller.js',
+            'preference/js/comments-controller.js',
+            'preference/js/history-controller.js',
+            'preference/js/overview-controller.js',
+            'preference/js/package-provider-controller.js',
+            'preference/js/preference-controller.js',
+            'preference/js/statistics-controller.js',
+            'preference/js/summary-controller.js',
+            'preference/js/survey-controller.js',
+            
+            # talent module
+            
+            'talent/talent.js',
+        ),
+        'output_filename': "kapstok/js/kapstok-compressed.js"
+    }
+}

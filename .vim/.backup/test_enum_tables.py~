@@ -1,0 +1,205 @@
+from django.test import TransactionTestCase
+from database.models import *
+from django.db import connection
+import collections
+
+class EnumTableTestCase(TransactionTestCase):
+
+  fixtures = ['enumdata']
+  
+  def assertModelListsEqual(self, a, b):
+    """
+    Asserts that the models in lists a and b are equal
+    """
+    a.sort(key=lambda x: x.id)
+    b.sort(key=lambda x: x.id)
+    self.assertEqual(a, b)
+
+  def generic_count_members(self, model_cls):
+    """
+    The number of elements returned by ids() and members() without
+    arguments must equal the number of elements in the table.
+    """
+    table_name = model_cls._meta.db_table
+    cursor = connection.cursor()
+    cursor.execute("SELECT COUNT(*) FROM {}".format(table_name))
+    expected_member_count = cursor.fetchone()[0]
+
+    actual_member_count = len(model_cls.ids())
+    actual_member_count_ids = len(model_cls.members())
+    self.assertEquals(expected_member_count, actual_member_count)
+    self.assertEquals(expected_member_count, actual_member_count_ids)
+
+  def generic_all_names_present(self, model_cls):
+    """
+    Tests whether all original_names found in the table equal the names
+    returned by members()
+    """
+    table_name = model_cls._meta.db_table
+    # Get list of all distinct original names
+    cursor = connection.cursor()
+    cursor.execute("SELECT originalname FROM {}".format(table_name))
+    expected_members = [member[0] for member in cursor.fetchall()]
+    # Get a list of unique original_name's from our API
+    actual_members = [member.original_name for member in model_cls.members()]
+    # Sort both lists
+    expected_members.sort()
+    actual_members.sort()
+    self.assertEquals(expected_members, actual_members)
+
+  def generic_all_ids_present(self, model_cls):
+    """
+    Tests whether all ids found in the table equal the ids returned by ids()
+    """
+    table_name = model_cls._meta.db_table
+    # Get sorted list of ids form a query
+    cursor = connection.cursor()
+    cursor.execute("SELECT id FROM {}".format(table_name))
+    expected_ids = list(cursor.fetchall()).sort()
+    # Get sorted list of ids from enum table API
+    actual_ids = model_cls.ids().sort()
+    self.assertEquals(expected_ids, actual_ids)
+
+  def generic_filter_score(self, model_cls):
+    """
+    Tests whether members() raises errors in the right scenarios,
+    depending on 'minscore' and 'maxscore' and otherwise gives the correct
+    result.
+    """
+    table_name = model_cls._meta.db_table
+    for minscore in [0, 100, 800]:
+      for maxscore in [100, 400, 1200]:
+        if (minscore < maxscore and minscore >= ENUM_MIN_SCORE and maxscore < ENUM_MAX_SCORE):
+          # These combinations of min/max must yield a correct
+          # Get sorted list of ids from all members within the score range
+          cursor = connection.cursor()
+          cursor.execute("SELECT id FROM {} WHERE score BETWEEN {} AND {}".format(table_name, minscore, maxscore))
+          expected_ids_with_score = [result[0] for result in list(cursor)].sort()
+          # Get sorted list of ids from Enum table API
+          actual_ids_with_score = model_cls.ids(min_score=minscore, max_score=maxscore).sort()
+          self.assertEquals(expected_ids_with_score, actual_ids_with_score)
+        else:
+          # All the other combinations of min/max must lead to an exception
+          try:
+            actual_ids_with_score = model_cls.ids(min_score=minscore, max_score=maxscore)
+          except ValueError:
+            return
+          else:
+            self.fail("Unexpected exception", e)
+          self.fail("ValueError expected because {} and {} are invalid min/max scores.".format(minscore, maxscore))
+
+  def sets_not_overlapping(self, *args):
+    """
+    Checks whether the partitions (args) are non-overlapping
+    """
+    # Assert that all sets are non-overlapping
+    for i in range(0, len(args)):
+      for j in range(0, len(args)):
+        if i != j:
+          self.assertTrue( len(args[i] & args[j]) == 0 )
+
+  def test_talentstatus_enum_correctness(self):
+    self.generic_count_members(TalentStatus)
+    self.generic_all_names_present(TalentStatus)
+    self.generic_all_ids_present(TalentStatus)
+    self.generic_filter_score(TalentStatus)
+
+  def test_retentionrisk_enum_correctness(self):
+    self.generic_count_members(RetentionRisk)
+    self.generic_all_names_present(RetentionRisk)
+    self.generic_all_ids_present(RetentionRisk)
+    self.generic_filter_score(RetentionRisk)
+
+  def test_retentionriskreason_enum_correctness(self):
+    self.generic_count_members(RetentionRiskReason)
+    self.generic_all_names_present(RetentionRiskReason)
+    self.generic_all_ids_present(RetentionRiskReason)
+    self.generic_filter_score(RetentionRiskReason)
+
+  def test_performancestatus_enum_correctness(self):
+    self.generic_count_members(PerformanceStatus)
+    self.generic_all_names_present(PerformanceStatus)
+    self.generic_all_ids_present(PerformanceStatus)
+    self.generic_filter_score(PerformanceStatus)
+
+  def test_potential_enum_correctness(self):
+    self.generic_count_members(Potential)
+    self.generic_all_names_present(Potential)
+    self.generic_all_ids_present(Potential)
+    self.generic_filter_score(Potential)
+
+  def test_mobility_enum_correctness(self):
+    self.generic_count_members(Mobility)
+    self.generic_all_names_present(Mobility)
+    self.generic_all_ids_present(Mobility)
+    self.generic_filter_score(Mobility)
+
+  def test_contracttype_enum_correctness(self):
+    self.generic_count_members(ContractType)
+    self.generic_all_names_present(ContractType)
+    self.generic_all_ids_present(ContractType)
+
+  def test_contracttype_direct_filter_is_correct(self):
+    # Test whether direct contracts are correct
+    expected_direct_contracts = list(ContractType.objects.filter(direct=True).all())
+    actual_direct_contracts = list(ContractType.members(direct=True))
+    self.assertModelListsEqual(expected_direct_contracts, actual_direct_contracts)
+    # Test whether indirect contracts are correct
+    expected_indirect_contracts = list(ContractType.objects.filter(direct=False).all())
+    actual_indirect_contracts = list(ContractType.members(direct=False))
+    self.assertModelListsEqual(expected_indirect_contracts, actual_indirect_contracts)
+
+  def test_jobstatus_major_type_filter_is_correct(self):
+    """
+    For each distinct major type, get all jobstatuses. The union must equal the
+    complete set of job statuses. Also, members() should return a the same
+    set as is returned by the query.
+    """
+    major_types = {jobstatus.major_type for jobstatus in JobStatus.objects.all()}
+    # Test if API gives same response as query when requesting all members with a major_type
+    for mtype in major_types:
+      members_with_major_type = JobStatus.members(major_type=mtype)
+      expected_members_with_major_type = list(JobStatus.objects.filter(major_type=mtype).all())
+      self.assertModelListsEqual(members_with_major_type, expected_members_with_major_type)
+    # Test that the union of all sets with an equal major_type, gives all jobstatusses
+    union = []
+    for mtype in major_types:
+      union += JobStatus.members(major_type=mtype)
+    self.assertModelListsEqual(list(JobStatus.objects.all()), union)
+
+  def test_succession_term_filtering_is_correct(self):
+    """
+    For each distinct major term, get all succession_terms. The union must
+    equal the complete set of succession terms. Also, members() should
+    return a the same set as is returned by the query.
+    """
+    # Test if API gives same response as query when requesting all members with a major_term
+    major_terms = {term.major_term for term in SuccessionTerm.objects.all()}
+    for term in major_terms:
+      members_with_major_term = SuccessionTerm.members(major_term=term)
+      expected_members_with_major_term = list(SuccessionTerm.objects.filter(major_term=term).all())
+      self.assertModelListsEqual(members_with_major_term, expected_members_with_major_term)
+    # Test that the union of all sets with an equal major_term, gives all succession terms
+    union = []
+    for term in major_terms:
+      union += SuccessionTerm.members(major_term=term)
+    self.assertModelListsEqual(list(SuccessionTerm.objects.all()), union)
+
+  def test_grade_global_grade_filter_is_correct(self):
+    """
+    For each distinct global_grade, get all grades. The union must equal the
+    complete set of grades. Also, members() should return a the same set
+    as is returned by the query.
+    """
+    # When querying for all grades with a global_grade, the enum table API must return
+    # the same result as a direct query
+    global_grades= {grade.global_grade for grade in Grade.objects.all()}
+    for gg in global_grades:
+      members_with_gg = Grade.members(global_grade=gg)
+      expected_members_with_gg = list(Grade.objects.filter(global_grade=gg).all())
+      self.assertModelListsEqual(members_with_gg, expected_members_with_gg)
+    # The union of the grades for each global_grade, must yield the set of all grades
+    union = []
+    for gg in global_grades:
+      union += Grade.members(global_grade=gg)
+    self.assertModelListsEqual(list(Grade.objects.all()), union)

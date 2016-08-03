@@ -1,0 +1,39 @@
+{% verbatim %}
+
+<div class="relative">
+  <script type="text/ng-template" id="node.html">
+    <label ng-click="node.toggle()">
+      <img ng-class="{opened: node.children}"
+          ng-show="node.hasChildren"
+          src="/static/kapstok/logos/arrowRight.png" />
+      {{node.self[0].f}}
+    </label>
+     
+    <span class="explore">
+      {{node.self[1].v}}
+      <a ng-if="'talent.distribution' | includedByState"
+          ng-href="#/talent/distribution/{{data.title.toLowerCase()}}/{{node.self[0].v}}"
+          title="Explore">
+        <ng-include src="'/static/kapstok/ui/magnifying-glass-transparent.svg'"></ng-include>
+      </a>
+    </span>
+
+    <ul class="tree" ng-if="node.children">   
+      <li  ng-animate=" 'animate' "ng-repeat="node in node.children"
+          ng-include="'node.html'">
+      </li>
+    </ul>
+  </script>
+
+  <div class="row">
+    <div class="col-lg-offset-2 col-lg-8">
+      <ul class="tree">
+        <li ng-repeat="node in tree.children"
+            ng-include="'node.html'">
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+{% endverbatim %}

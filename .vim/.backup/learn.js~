@@ -1,0 +1,84 @@
+(function() {
+
+var learn = angular.module('fo.learn', []);
+
+/**
+ * The LearnService service maintains the global state of the filter. Like any service, it is
+ * instantiated once at the start of the application. This instance is then shared between any
+ * function that injects LearnService. You can use it like this in your controller:
+ *
+ * myModule.controller('MyController', function($scope, LearnService) {
+ *   $scope.filter = LearnService;
+ *   // your templates now have access to e.g.: learn.isVisible()
+ *   
+ *   LearnService.toggle();
+ * })
+ */
+
+learn.service('LearnService', function($log, $http, $state) {
+  var self = this;
+
+  this._visible = false;
+  
+  /**
+   * Returns whether the filter is shown in the sidebar.
+   */
+  
+  this.isVisible = function() {
+    return this._visible;
+  }
+  
+  // Toggle filter
+  this.toggle = function() {
+    this._visible = !this._visible;
+  }
+  
+  
+
+});
+
+/**
+ * Implements the <fo-learn> element. You can use it like this:
+ *
+ * <fo-learn</fo-learn>
+ */
+
+learn.directive('foLearn', function($log, $window, $state, LearnService) {
+  
+  return {
+    restrict: 'E',
+    replace: true,
+    scope: {}, // isolated scope because fo-learn should only interact with LearnService service
+    templateUrl: 'learn/fo-learn.html',
+    link: function($scope, $element, $attrs) {      
+
+      /**
+       * Main code
+       */
+      
+      $scope.learn = LearnService;
+      $scope.templateUrlLoaded = false;
+      
+      $scope.getLearnTemplateURL = function() {
+        $log.info('test');
+        var state = $state.current;
+        
+        // For some reason, this function is called by angular when $state.current is undefined
+        // So, only update when there is a current state
+        if(!state.templateUrl)
+          return;
+        
+        if(!state.templateUrl) {
+          $log.error("fo-learn: State does not have a template URL");
+        }
+        else {
+          $log.info("loaded"  +state.templateUrl.replace(".html", '-learn.html'));
+          return state.templateUrl.replace(".html", "-learn.html");
+          $scope.templateUrlLoaded = true;
+        }
+      }
+    }
+  }
+});
+
+})();

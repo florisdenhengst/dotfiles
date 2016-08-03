@@ -1,0 +1,20 @@
+library('DMwR')
+# Returns a vector of LOF scores based on all LOF-values in [min_k, max_k]
+# arguments:
+#   - data: a data frame containing the data (should all be numeric)
+#   - min_k: the start of the range of K for which to calculate the LOF score
+#   - max_k: the end of the range of K for which to calculate the LOF score
+LOFscore <- function(data, min_k, max_k){
+  # set up a range of k's
+  kaas <- seq(min_k, max_k, by=1)
+  # allocate a matrix to contain all scores
+  outlier.scores = matrix(data=NA,
+                          ncol=length(kaas),
+                          nrow=length(data[[1]]))
+
+  # loop over k's range and calculate the score
+  for(i in 1:length(kaas)){
+    outlier.scores[,i] <- lofactor(data, k=kaas[i])
+  }
+  LOFscore <- apply(outlier.scores, 1, max)
+}

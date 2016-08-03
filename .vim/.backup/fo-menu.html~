@@ -1,0 +1,49 @@
+{% verbatim %}
+<div class="navbar row">
+  <div class="col-xs-12">
+    <div class="row app-header">
+      <a class="app-logo col-xs-3" ng-click="changeState(appMenu.sref);" ><ng-image src="{{appMenu.logoSrc}}" /></a>
+      <div class="col-xs-9"> 
+        <div class="row">
+          <div class="col-xs-12">
+            <fo-menu-logout></fo-menu-logout>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-xs-12">
+            <ul>
+              <ng-transclude></ng-transclude>
+            </ul> 
+
+          </div>
+        </div>
+      </div>
+      <div class="app-subheader"></div>
+
+      <div class="app-filter">
+        <div class="row">
+          <div class="col-xs-3">
+            <div class="filter-toggle" ng-click="filter.toggle()">
+              <ng-include ng-hide="filter.isVisible()"
+              src="'/static/kapstok/logos/see filter.svg'"></ng-include>
+              <ng-include ng-show="filter.isVisible()"
+              src="'/static/kapstok/logos/hide filter.svg'"></ng-include> 
+              FILTER
+            </div>
+          </div>
+
+          <div class="col-xs-9">
+            <ul>
+              <li ng-repeat="(filterName, filterSelection) in filter.selections"
+              ng-click="filter.reset(filterName)"
+              ng-show="filter.hasSelection(filterName)">
+              {{filterName}} <img src="/static/kapstok/logos/reset filter.png">
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endverbatim %}

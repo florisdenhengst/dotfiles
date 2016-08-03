@@ -1,0 +1,58 @@
+{% verbatim %}
+<div class='navbar'>
+  <div class="app-header">
+    <div class="row" style="min-width:1000px;">
+      <a class="app-logo col-xs-3" href="#/succession/"><img
+        src="/static/succession/img/succession_planning_logo.svg" /></a>
+      <div style="min-width:500px;" class="app-nav col-xs-offset-1 col-xs-5" ng-show="selectedPage != 'landingpage'">
+        <ul>
+          <li class="theme" ng-repeat="item in items">
+          <a href="{{item.url}}">{{item.title}}</a>
+          <!--TODO: SUBPAGE-ITEMS (DO SOMETHING SMART) 
+          <ul class="theme-nav" ng-show="selectedPage == '{{page.title}}'">
+            <li class="subtheme" ng-class="{'active-subtab': selectedSubPage == subpage.title}" ng-repeat="subpage in page.subpages">
+            <a href="#/succession?page={{page.title}}&subpage={{subpage.title}}">
+              {{subpage.title}}
+            </a>	    
+            </li>
+          </ul> -->
+          </li >
+          <!--TODO: OPEN GLOBAL NAV 
+          <li class="theme">
+          <a href="http://www.google.com">
+            + apps
+          </a>
+          </li>--> 
+        </ul> 
+      </div>
+      <menulogout></menulogout>
+    </div>
+  </div>
+  <div class="app-subheader">
+    <div class="app-filter">
+      <div class="row">
+        <div class="col-lg-3">
+          <div class="filter-toggle" ng-click="filter.toggle()">
+            <ng-include ng-hide="filter.isVisible()"
+            src="'/static/kapstok/logos/see filter.svg'"></ng-include>
+            <ng-include ng-show="filter.isVisible()"
+            src="'/static/kapstok/logos/hide filter.svg'"></ng-include> 
+            FILTER
+          </div>
+        </div>
+
+        <div class="col-lg-9">
+          <ul>
+            <li ng-repeat="(filterName, filterSelection) in filter.selections"
+            ng-click="filter.reset(filterName)"
+            ng-show="filter.hasSelection(filterName)">
+            {{filterName}} <img src="/static/kapstok/logos/reset filter.png">
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endverbatim %}

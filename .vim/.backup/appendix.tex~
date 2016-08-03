@@ -1,0 +1,148 @@
+\appendix
+\chapter{Hyperparameter Selection Unsupervised Component}
+  \label{ch:unsup_param_selection}
+
+  \begin{figure*}[!htb]
+    \centering
+    \begin{subfigure}[t]{.49\textwidth}
+      \centering
+      \includegraphics[width=1\textwidth]{appendix/lofplots/usg/top_5-crop.pdf}
+      \caption{Domain dataset}
+    \end{subfigure}
+    ~
+    \begin{subfigure}[t]{.49\textwidth}
+      \centering
+      \includegraphics[width=1\textwidth]{appendix/lofplots/abalone/top_5-crop.pdf}
+      \caption{Abalone}
+    \end{subfigure}
+    \begin{subfigure}[t]{.49\textwidth}
+      \centering
+      \includegraphics[width=1\textwidth]{appendix/lofplots/thyroid/top_5-crop.pdf}
+      \caption{Allhypo Thyroid}
+    \end{subfigure}
+    \caption{The PR curves for top-5 settings of $k_{min}, k_{max}$ for LOF on
+  all used datasets, based on AUC-PR.}
+    \label{fig:lof_top_5}
+  \end{figure*}
+
+  \begin{figure*}[!htb]
+    \centering
+    \begin{subfigure}[t]{.49\textwidth}
+      \centering
+      \includegraphics[width=1\textwidth]{appendix/lofplots/usg/top_1000-crop.pdf}
+      \caption{Domain dataset}
+    \end{subfigure}
+    ~
+    \begin{subfigure}[t]{.49\textwidth}
+      \centering
+      \includegraphics[width=1\textwidth]{appendix/lofplots/abalone/top_1000-crop.pdf}
+      \caption{Abalone}
+    \end{subfigure}
+    \begin{subfigure}[t]{.49\textwidth}
+      \centering
+      \includegraphics[width=1\textwidth]{appendix/lofplots/thyroid/top_1000-crop.pdf}
+      \caption{Allhypo Thyroid}
+    \end{subfigure}
+    \caption{The PR curves for varying values of parameters $k_{min}, k_{max}$ for LOF
+    on all used datasets.}
+    \label{fig:lof_top_1000}
+  \end{figure*}
+
+  \label{ch:loci_param_selection}
+  \begin{figure*}[!htb]
+    \centering
+    \begin{subfigure}[t]{.49\textwidth}
+      \centering
+      \includegraphics[width=1\textwidth]{appendix/lociplots/usg/top_5-crop.pdf}
+      \caption{Domain dataset}
+    \end{subfigure}
+    ~
+    \begin{subfigure}[t]{.49\textwidth}
+      \centering
+      \includegraphics[width=1\textwidth]{appendix/lociplots/abalone/top_5-crop.pdf}
+      \caption{Abalone}
+    \end{subfigure}
+    \begin{subfigure}[t]{.49\textwidth}
+      \centering
+      \includegraphics[width=1\textwidth]{appendix/lociplots/thyroid/top_5-crop.pdf}
+      \caption{Allhypo Thyroid}
+    \end{subfigure}
+    \caption{The PR curves for top-5 settings of $r_{max}$ for LOCI on all used
+  datasets, based on AUC-PR.}
+    \label{fig:loci_top_5}
+  \end{figure*}
+
+  \begin{figure*}[!htb]
+    \centering
+    \begin{subfigure}[t]{.49\textwidth}
+      \centering
+      \includegraphics[width=1\textwidth]{appendix/lociplots/usg/top_1000-crop.pdf}
+      \caption{Domain dataset}
+    \end{subfigure}
+    ~
+    \begin{subfigure}[t]{.49\textwidth}
+      \centering
+     \includegraphics[width=1\textwidth]{appendix/lociplots/abalone/top_1000-crop.pdf}
+      \caption{Abalone}
+    \end{subfigure}
+    \begin{subfigure}[t]{.49\textwidth}
+      \centering
+      \includegraphics[width=1\textwidth]{appendix/lociplots/thyroid/top_1000-crop.pdf}
+      \caption{Allhypo Thyroid}
+    \end{subfigure}
+    \caption{The PR curves for varying values of parameters $r_{max}$ for LOCI
+    on all used datasets.}
+    \label{fig:loci_top_1000}
+  \end{figure*}
+
+\chapter{Hyperparameter Selection Supervised Component}
+  \label{ch:unsup_param_selection}
+
+
+  \begin{figure*}[!htb]
+    \centering
+    \begin{subfigure}[t]{.49\textwidth}
+      \centering
+      \includegraphics[width=1\textwidth]{appendix/ssad_cross_validation/usg-crop.pdf}
+      \caption{Domain dataset}
+    \end{subfigure}
+    ~
+    \begin{subfigure}[t]{.49\textwidth}
+      \centering
+      \includegraphics[width=1\textwidth]{appendix/ssad_cross_validation/abalone-crop.pdf}
+      \caption{Abalone}
+    \end{subfigure}
+    \begin{subfigure}[t]{.49\textwidth}
+      \centering
+      \includegraphics[width=1\textwidth]{appendix/ssad_cross_validation/thyroid-crop.pdf}
+      \caption{Allhypo Thyroid}
+    \end{subfigure}
+    \caption{Results of five-fold cross validated parameter grid search for SSAD
+      method on a logarithmic scale for parameters $C$ and $\gamma$.}
+    \label{fig:ssad_grid_search}
+  \end{figure*}
+
+  \label{ch:c_svc_param_selection}
+  \begin{figure*}[!htb]
+    \centering
+    \begin{subfigure}[t]{.49\textwidth}
+      \centering
+      \includegraphics[width=1\textwidth]{appendix/svc_cross_validation/usg-crop.pdf}
+      \caption{Domain dataset}
+    \end{subfigure}
+    ~
+    \begin{subfigure}[t]{.49\textwidth}
+      \centering
+      \includegraphics[width=1\textwidth]{appendix/svc_cross_validation/abalone-crop.pdf}
+      \caption{Abalone}
+    \end{subfigure}
+    \begin{subfigure}[t]{.49\textwidth}
+      \centering
+      \includegraphics[width=1\textwidth]{appendix/svc_cross_validation/thyroid-crop.pdf}
+      \caption{Allhypo Thyroid}
+    \end{subfigure}
+    \caption{Results of five-fold cross validated parameter grid search for C-SVC
+      method on a logarithmic scale for parameters $C$ and $\gamma$.}
+    \label{fig:c_svc_grid_search}
+  \end{figure*}
+

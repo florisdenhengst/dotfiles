@@ -1,0 +1,436 @@
+(function() {
+
+  var successionplanning = angular.module('successionplanning', []);
+
+  /**
+   * Client-side pagination helper filter.
+   * Returns a slice of 'input'-array starting from 'start'
+   */
+  successionplanning.filter('startFrom', function(){
+    return function(input, start) {
+      start = +start; //cast to int
+      return input.slice(start);
+    }
+  });
+
+  /**
+   * Filter to enable multiplication 
+   */
+  successionplanning.filter('multiply', function(){
+    return function(input, by){
+      input = +input;
+      by = +by;
+      return input * by;
+    }
+  });
+
+  successionplanning.controller('SuccessionplanningController',
+    function($scope, $animate, $window, $timeout, $http, $log, DataTable, FilterData) {
+
+      // all pages and subpages
+      $scope.pages = [
+        {title: 'landingpage', subpages: []}, 
+          {title: 'overview', subpages: [
+            {title: 'summary'},
+          {title: 'network'},
+          ]},
+          {title: 'risk', subpages: [
+            {title: 'positions'},
+          {title: 'individuals'},
+          ]},
+          {title: 'quality', subpages: [
+            {title: 'flow chart'},
+          {title: 'leadership pipeline'},
+          ]},
+          {title: 'power report', subpages: []}
+        ];
+
+
+
+      var dataSource = '/successionplanning/data/';
+      var jsonRequestOptions = { responseType: 'json' };
+      var positionDetailDataSource = '/successionplanning/position/';
+      var personDetailDataSource = '/successionplanning/person/';
+      // lightbox sizing constants
+      var cardWidth = 800;
+      var cardHeight = 450;
+
+      $scope.summary = {};
+      // These hardcoded values will have to be replaced by server-side
+      // calculated metrics 
+      $scope.summary.terms = {
+        "overall" : {
+          "title": "overall",
+          "nPlans": 0,
+          "nPositionsWithPlan": 4967,
+          "nListed": 17822,
+          "avgListed": 0.8,
+          "avgAvailable": 0.98 
+        },
+        "shortTerm" : {
+          "title": "short term",
+          "nPlans": 5174,
+          "nPositionsWithPlan": 2410,
+          "nListed": 2310,
+          "avgListed": 1.,
+          "avgAvailable": 0.48
+        },
+        "midTerm" : {
+          "title": "mid term",
+          "nPlans": 4102,
+          "nPositionsWithPlan": 3791,
+          "nListed": 5691,
+          "avgListed": 2.1,
+          "avgAvailable": 0.51 
+        },
+        "longTerm" : {
+          "title": "long term",
+          "nPlans": 5901,
+          "nPositionsWithPlan": 4506,
+          "nListed": 9821,
+          "avgListed": 2.4,
+          "avgAvailable": 0.82 
+        }
+      };
+
+      $scope.summary.selectedTerm = $scope.summary.terms.overall;
+      /**
+       * This function controls the term buttons summary page
+       */
+      $scope.summary.selectTerm = function(term){
+        $scope.summary.selectedTerm = $scope.summary.terms[term];
+      };
+
+      // variable used by the loading screen. If > 0, something is loading
+      $scope.currentlyLoading = 0;
+
+      /**
+       * Expresses whether loading is done or not.
+       */
+      $scope.doneLoading = function(){
+        return ($scope.selectedPage == 'landingpage' || $scope.currentlyLoading < 1);
+      }
+
+      // Initialize table variables in order for pagination etc. to work
+      // These are used at the risk/positions page 
+      $scope.positionTable = {};
+      $scope.candidateTable = {};
+      $scope.cardPositionTable= {};
+      $scope.cardPersonTable = {};
+
+      $scope.positionTable.pageSize =  10;
+      $scope.positionTable.currentPage = 1;
+      $scope.positionTable.predicate = "effective.shortTerm";
+      $scope.positionTable.reverse = "true";
+      $scope.positionTable.numberOfPages = function(){
+        return Math.ceil($scope.positions.length / $scope.positionTable.pageSize);
+      }
+      $scope.cardPositionTable.predicate = "person.firstName";
+      $scope.cardPositionTable.reverse = false;
+      
+      // Similar as for the positions-page 
+      // These are used at the risk/candidates page 
+      $scope.candidateTable.pageSize = 10;
+      $scope.candidateTable.currentPage = 1;
+      $scope.candidateTable.predicate = "listed.shortTerm";
+      $scope.candidateTable.reverse = "true";
+      $scope.candidateTable.numberOfPages = function(){
+        return Math.ceil($scope.persons.length / $scope.candidateTable.pageSize);
+      }
+
+      $scope.cardPersonTable.predicate = "position.title";
+      $scope.cardPersonTable.reverse = false;
+
+      // initialize variables to store positions and candidates data
+      $scope.positions = [];
+      $scope.persons = [];
+
+      // initially nothing is selected (risk/positions and risk/persons pages)
+      $scope.selectedPosition = {};
+      $scope.selectedPerson = {};
+
+      /**
+       * Function to handle event of a position being selected on the
+       * risk/positions page. A lightbox should show more details on the
+       * selected position.
+       */
+      $scope.selectPosition = function(position){
+        $("#colorbox").css("opacity", 0);
+        $http.get(positionDetailDataSource + position.positionId + "/", jsonRequestOptions)
+          .success(function(data){
+          $scope.selectedPosition = data;
+          $.colorbox({
+            inline:true,
+            href:"#positionCard",
+            rel: "positionCard",
+            transition: "fade",
+            width: cardWidth + 'px',
+            height: cardHeight + 'px',
+            closeButton: false,
+            onOpen:function(){
+              $("#colorbox").css("opacity", 0);
+            },
+            onComplete:function(){
+              $("#colorbox").css("opacity", 1);
+            }
+          });
+        })
+      }
+
+      /**
+       * Function to handle event if a person is selected on the
+       * risk/candidates page. A lightbox should show more details on the
+       * selected person. 
+       */
+      $scope.selectPerson = function(person, cBoxHref){
+        $("#colorbox").css("opacity", 0);
+        $http.get(personDetailDataSource + person.employeeId + "/", jsonRequestOptions).success(function(data){
+          $scope.selectedPerson = data;
+          $.colorbox({
+            inline:true,
+            rel:"personCard",
+            href: "#personCard", 
+            transition: "fade",
+            width: cardWidth + 'px',
+            height: cardHeight + 'px',
+            closeButton: false,
+            onOpen:function(){
+              $("#colorbox").css("opacity", 0);
+            },
+            onComplete:function(){
+              $("#colorbox").css("opacity", 1);
+            }
+          });
+        })
+      }
+
+      // lists of all possible types and terms of sankey diagrams for the
+      // quality/flow_chart-page
+      $scope.sankeyTypes = ['location', 'businessUnit', 'functionalArea'];
+      $scope.sankeyTerms = ['ShortTerm', 'MidTerm', 'LongTerm'];
+
+      // holder for the sankey diagram data
+      $scope.sankeyData = [];
+
+      // initialial selections
+      $scope.selectedSankeyType = "location";
+      $scope.selectedSankeyTerm = "ShortTerm";
+
+      // initially, look at an aggregate level of 1 below the root.
+      $scope.selectedSankeyDepth = 1;
+
+      // load all sankey data
+      for(var i = 0; i < $scope.sankeyTypes.length; i++){
+        loadSankeyDataTerms($scope.sankeyTypes[i]);
+      }
+
+      /**
+       * Boots loading all sankey data.
+       */
+      function loadSankeyDataTerms(type){
+        for(var i = 0; i < $scope.sankeyTerms.length; i ++){
+          $scope.sankeyData[type] = [];
+          loadSankeyData(type, $scope.sankeyTerms[i]);	
+        }
+      }
+
+      /**
+       * Retrieves sankey data for a given type and term
+       */ 
+      function loadSankeyData(type, term){
+        $scope.currentlyLoading ++;
+        $http.get('/successionplanning/sankey/' + type + '/' + term + '/', jsonRequestOptions).success(function(data){
+          $scope.sankeyData[type][term] = data;
+          $scope.currentlyLoading--;
+        })
+        .error(function(){
+          $scope.currentlyLoading--;
+          alert("Error loading data!");	
+        });
+      }
+
+      /**
+       * Handles selection of different sankey term.
+       */
+      $scope.selectSankeyTerm = function(term){
+        $scope.selectedSankeyTerm = term;
+      }
+
+      /**
+       * Handles selection of different sankey term.
+       */
+      $scope.selectSankeyType = function(type){
+        $scope.selectedSankeyType = type;
+      }
+
+      /**
+       * Handles altering of sankey depth.
+       * Switches between one level below root detail level and lowest detail
+       * level.
+       */
+      $scope.flipSankeyDepth = function(){
+        if($scope.selectedSankeyDepth == 1){
+          $scope.selectedSankeyDepth = 100;
+        } else {
+          $scope.selectedSankeyDepth = 1;
+        }
+        $scope.bootSankeys();	
+      }
+
+      /**
+       * Exports currently selected sankey diagram.
+       */
+      $scope.exportSankey = function(){
+        console.log($scope.selectedSankeyTerm);
+        console.log($scope.selectedSankeyType);
+        var elem = document.getElementById($scope.selectedSankeyTerm +
+                                           $scope.selectedSankeyType +
+                                           "Sankey").children[0];
+        saveSvgAsPng(elem, "crunchr-flowchart-" + $scope.selectedSankeyTerm + "-" + $scope.selectedSankeyType+".png", 2);
+      };
+     
+      /**
+       * Helper method to boot all sankey diagrams.
+       */
+      $scope.bootSankeys = function(){
+        for(var i = 0; i < $scope.sankeyTypes.length; i++){
+          var sankeyType = $scope.sankeyTypes[i];
+          bootSankey(sankeyType);
+        }
+      }
+
+      /**
+       * Helper method to boot all sankey diagrams for a type.
+       */
+      function bootSankey(sankeyType){
+        for(var i = 0; i < $scope.sankeyTerms.length; i++){
+          var term = $scope.sankeyTerms[i];
+          bootSankeyTerm(sankeyType, term);
+        }
+      }
+
+      /**
+       * Calculates the values for the current level of detail and creates a
+       * sankey diagram for these values.
+       */
+      function bootSankeyTerm(sankeyType, sankeyTerm){
+        if($scope.sankeyData === undefined) return;
+        //use deep copy of data, otherwise references get scrambled
+        var data = jQuery.extend(true, {}, $scope.sankeyData[sankeyType][sankeyTerm]);
+        if(data !== undefined){
+          var links = data.links;
+          var treeList = data.treeList;
+          var aggregatedLinks = [];
+
+          // aggregate to correct level of detail by adding the values from all
+          // children, starting from the selected level of detail
+          links.forEach(function(link){
+            var sourceNode = treeList[link.source - 1];
+            var targetNode = treeList[link.target - 1];
+            // find correct sourceNode and targetNode parents to aggregate to
+            var parentSourceNode = sourceNode;
+            var parentTargetNode = targetNode;
+            
+            while(parentSourceNode.depth > $scope.selectedSankeyDepth 
+              && treeList[parentSourceNode.parent_id] != undefined){
+                parentSourceNode = treeList[parentSourceNode.parent_id -1];
+              }
+            while(parentTargetNode.depth > $scope.selectedSankeyDepth 
+              && treeList[parentTargetNode.parent_id] != undefined){
+                parentTargetNode = treeList[parentTargetNode.parent_id -1];
+              }
+            parentSourceNode.links[parentTargetNode.id] = (parentSourceNode.links[parentTargetNode.id] | 0) + link.value;	
+          });
+
+          // create links between sources and targets, containing correct value
+          treeList.forEach(function(node){
+            if(node.depth <= $scope.selectedSankeyDepth){
+              var nodeLinks = node.links;
+              for(var index in nodeLinks){
+                aggregatedLinks.push({
+                  "source": node.id,
+                  "target": parseInt(index),
+                  "value" : nodeLinks[index]
+                });
+              }
+            }
+          });
+          var allNodes = [];
+          var sourceNodeMap = [];
+          var targetNodeMap = [];
+          var nNodes = 0;
+
+          // extract all nodes that have at least 1 link. This is necessary, as
+          // otherwise the nodes containing no incoming or outgoing links are
+          // rendered as well.
+          
+          // extract source nodes
+          aggregatedLinks.forEach(function(link){
+            if(sourceNodeMap[link.source] === undefined){
+              sourceNodeMap[link.source] = nNodes;
+              allNodes.push({
+                "name": treeList[link.source - 1].name
+              });
+              link.source = nNodes;
+              nNodes ++;
+            } else {
+              link.source = sourceNodeMap[link.source];
+            }
+          });
+          maxNodeIndex = 0;
+
+          // extract target nodes
+          aggregatedLinks.forEach(function(link){
+            if(targetNodeMap[link.target] === undefined){
+              targetNodeMap[link.target] = nNodes;
+              allNodes.push({
+                "name": treeList[link.target - 1].name
+              });
+              link.target = nNodes;
+              nNodes ++;
+            } else {
+              link.target = targetNodeMap[link.target];
+            }
+          });
+          // let external function handle details
+          startSankey(
+              "#" + sankeyTerm + sankeyType + 'Sankey', 
+              {"links": aggregatedLinks,
+                "nodes": allNodes
+              });
+        }
+      }
+
+      $scope.currentlyLoading ++;
+      /**
+       * Retrieves all data and puts it in right format.
+       */
+      $http.get(dataSource, jsonRequestOptions).success(function(data){
+        $scope.counts = data.counts;
+        $scope.counts.totalPositions = 5000;
+        successions = $scope.counts.successions
+      successions.shortTerm.effective.average = 
+        (successions.shortTerm.effective.uniquePersons / $scope.counts.totalPositions);
+      successions.midTerm.effective.average = 
+        (successions.midTerm.effective.uniquePersons / $scope.counts.totalPositions);
+      successions.longTerm.effective.average = 
+        (successions.longTerm.effective.uniquePersons / $scope.counts.totalPositions)
+
+        successions.shortTerm.listed.average = 
+        (successions.shortTerm.listed.uniqueListed / $scope.counts.totalPositions)
+        successions.midTerm.listed.average = 
+        (successions.midTerm.listed.uniqueListed / $scope.counts.totalPositions)
+        successions.longTerm.listed.average = 
+        (successions.longTerm.listed.uniqueListed / $scope.counts.totalPositions)
+
+        $scope.positions = data.positions;
+        $scope.persons = data.persons;
+
+        $scope.currentlyLoading --;
+      })
+      .error(function(){
+        $scope.currentlyLoading--;
+        alert("Error loading data!");
+      });	
+    });
+})();

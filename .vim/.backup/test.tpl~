@@ -1,0 +1,21 @@
+<html>
+  <head>
+    <title>test page</title>
+    <meta http-equiv='refresh' content='30'>
+  </head>
+  <body>
+    <img src='/img/lb.png' style='position: absolute; top: 0; left: 0; '>
+    <img src='/img/rb.png' style='position: absolute; top: 0; right: 0; '>
+    <img src='/img/lo.png' style='position: absolute; bottom: 0; left: 0; '>
+    <img src='/img/ro.png' style='position: absolute; bottom: 0; right: 0; '>
+    <center>
+      <h1>Test page for alignment</h1>
+      {if $errormsg}$errormsg
+      {else}
+        {if $id}<h2>Client id: {$id}</h2>
+        {else}<h2>NOTE: This client has no ID set!</h2>{/if}
+        This page refreshes every 30 seconds
+      {/if}
+    </center>
+  </body>
+</html>

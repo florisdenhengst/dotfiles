@@ -1,0 +1,29 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models, migrations
+import database.models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('database', '0019_auto_20141209_1416'),
+    ]
+
+    operations = [
+        migrations.DeleteModel(
+            name='Chunk',
+        ),
+        migrations.CreateModel(
+            name='Chunk',
+            fields=[
+                ('id', database.models.ChunkField(serialize=False, primary_key=True)),
+                ('business_unit', models.ForeignKey(to='database.BusinessUnit', db_column='businessunit_id')),
+            ],
+            options={
+                'db_table': 'chunk',
+            },
+            bases=(models.Model,),
+        ),
+    ]

@@ -1,0 +1,37 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models, migrations
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+    ]
+
+    operations = [
+        migrations.AlterField(
+            model_name='employee',
+            name='position',
+            field=models.OneToOneField(to_field='position_id', blank=True, null=True, to='database.Position'),
+            preserve_default=True,
+        ),
+        migrations.AlterField(
+            model_name='position',
+            name='dotted_line',
+            field=models.ForeignKey(db_constraint=False, to_field='position_id', null=True, related_name='position_dotted_line', to='database.Position'),
+            preserve_default=True,
+        ),
+        migrations.AlterField(
+            model_name='position',
+            name='solid_line',
+            field=models.ForeignKey(db_constraint=False, to_field='position_id', null=True, related_name='position_solid_line', to='database.Position'),
+            preserve_default=True,
+        ),
+        migrations.AlterField(
+            model_name='succession',
+            name='position',
+            field=models.ForeignKey(to='database.Position', to_field='position_id'),
+            preserve_default=True,
+        ),
+    ]

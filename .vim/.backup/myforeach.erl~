@@ -1,0 +1,12 @@
+-module(myforeach).
+-export([myforeach/3]).
+
+myforeach(List1, List2, Dest) ->
+  lists:append(Dest, 
+               lists:foreach(
+                 fun(N1) ->
+                     lists:foreach(
+                       fun(N2) ->
+                           return {N1, N2}) 
+                       end, List2)
+                 end, List1).

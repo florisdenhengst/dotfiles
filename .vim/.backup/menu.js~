@@ -1,0 +1,54 @@
+(function(){
+  /**
+   * Load the kapstok module, to add our directives
+   */
+
+  var kapstok = angular.module('kapstok');
+
+  /**
+   * Implements the <menu> element, which builds up the menu.
+   * It is contrived of separate menu-items and can be used like this:
+   *
+   * <menu items =  [
+   *                  {
+   *                    url       : '/some/url/',
+   *                    title     : 'Some Title',
+   *                    subpages  : [
+   *                                  {
+   *                                    url       : '/subpage/url/',
+   *                                    title     : 'Sub Page',
+   *                                    subpages  : [....]
+   *                                  },
+   *                                  {
+   *                                    .....
+   *                                  },
+   *                                ]
+   *                  },
+   *                  {
+   *                    url   : '/other/url',
+   *                    title : 'Other title'
+   *                  }
+   *                ]
+   *       
+   *        logo : {
+   *                 image: '/url/to/logo.svg',
+   *                 url:   '/url/to/app/homepage/'
+   *               }>
+   *
+   * </menu> 
+   */
+  kapstok.directive('menu', function(){
+    return {
+      restrict: 'E',
+      replace: true,
+      transclude: true,
+      scope: {
+        selectedPage  : '&',
+        items         : '=items',
+        logo          : '=logo'
+      },
+      templateUrl: '/menu/base.html'
+    };
+  });
+
+})();

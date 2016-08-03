@@ -1,0 +1,460 @@
+id;base
+1;CEO
+2;Employee of Court Officer 
+3;Employee of Infrastructure and Facilities 
+4;Employee of Marine Engineering 
+5;Employee of Community Detention 
+6;Employee of Client Partner / Case Manager 
+7;Employee of Chief Executive / Managing Director 
+8;Employee of Magistrate 
+9;Employee of Geology and Geophysics 
+10;Employee of Logistics 
+11;Employee of Internal Audit (Performance) 
+12;Employee of Call, Contact or Smart Centre 
+13;Employee of Economist 
+14;Employee of Agriculture and Forestry Science 
+15;Employee of Biosecurity 
+16;Employee of Movement Monitoring 
+17;Employee of Chief Medical Advisor 
+18;Employee of Occupational Therapy 
+19;Employee of Technical Writing 
+20;Employee of Testing 
+21;Employee of Cargo Examination 
+22;Employee of Civil Engineering 
+23;Employee of Intelligence Assessment 
+24;Employee of Occupational Health and Safety Advice 
+25;Employee of Indigeneous Specialist Officers 
+26;Employee of Gardening 
+27;Employee of Accounts Receivable / Payable 
+28;Employee of Data Analysis 
+29;Employee of Strategic Leadership 
+30;Employee of Market Research 
+31;Employee of Learning and Development 
+32;Employee of Electrician 
+33;Employee of Curator 
+34;Employee of Personal / Executive Assistance and Support 
+35;Employee of Program and Project Management 
+36;Employee of Houseparent 
+37;Employee of Training and Assessment 
+38;Employee of Compliance Assessment 
+39;Employee of Horticulture 
+40;Employee of Occupational Health and Safety Inspection 
+41;Employee of Campaign 
+42;Employee of Detention Operation 
+43;Employee of Tour Guide 
+44;Employee of Emergency Management 
+45;Employee of Librarians 
+46;Employee of Station Management 
+47;Employee of Chef / Cook 
+48;Employee of Trade Assessment 
+49;Employee of Quarantine 
+50;Employee of Project Management 
+51;Employee of Drafting 
+52;Employee of Workforce Strategy 
+53;Employee of Primairy Products Inspection 
+54;Employee of Systems Integration and Deployment 
+55;Employee of Compliance Field 
+56;Employee of Patents Examination 
+57;Employee of Pricing and Cost Analysis 
+58;Employee of Medical Imaging 
+59;Employee of Dietician 
+60;Employee of Helpdesk / Support 
+61;Employee of Other Engineering 
+62;Employee of Removals 
+63;Employee of Journalism / Authoring / Writing 
+64;Employee of Service Management 
+65;Employee of Cyber Intelligence 
+66;Employee of Entry Officer 
+67;Employee of Government Infrastructure and Base Security Policy 
+68;Employee of Governance and Secretariat 
+69;Employee of National Security Advise 
+70;Employee of Travel 
+71;Employee of Building Maintenance and Fit-Out 
+72;Employee of Parks Management 
+73;Employee of Taxation Inspection 
+74;Employee of Hostel Management 
+75;Employee of External Audit (Performance) 
+76;Employee of Objections and Complaints Resolution 
+77;Employee of External Audit (Financial) 
+78;Employee of Air Traffic Control 
+79;Employee of Signals Intelligence 
+80;Employee of Business Partner 
+81;Employee of Lawyers 
+82;Employee of Knowledge Management 
+83;Employee of International Stakeholder Agreements and Negotiations 
+84;Employee of Mail 
+85;Employee of Cyber Security 
+86;Employee of Debt Recovery Enforcement 
+87;Employee of Administrative Support 
+88;Employee of Records Management 
+89;Employee of Detention Assessment 
+90;Employee of Statistical Officer 
+91;Employee of Electrical Engineering Draftsperson and Technician 
+92;Employee of General Finance 
+93;Employee of Risk Management 
+94;Employee of Recovery and Response 
+95;Employee of Graphic Design 
+96;Employee of Genealogy 
+97;Employee of Processing 
+98;Employee of Fleet Maintenance and Management 
+99;Employee of Networks and Telecommunications 
+100;Employee of Budgets 
+101;Employee of Procurement Policy 
+102;Employee of Veterinarians 
+103;Employee of Environmental Science and Rangers 
+104;Employee of Customer Support 
+105;Employee of Systems Administration 
+106;Employee of Chemical / Materials Engineering 
+107;Employee of Maritime Response 
+108;Employee of Disability Services 
+109;Employee of Other Natural and Physical Science 
+110;Employee of Other Covert 
+111;Employee of Border Enforecement Operations 
+112;Employee of Specialist Training 
+113;Employee of Performance Reporting / Benefits Realisation 
+114;Employee of Trade Technician 
+115;Employee of Investigation 
+116;Employee of Instrument Electrician 
+117;Employee of Generalist Medical Practitioner 
+118;Employee of Organisation and Methods Analyst 
+119;Employee of Architectural, Building and Surveying Technician 
+120;Employee of Life Sciences 
+121;Employee of Job Capability Assessment 
+122;Employee of Cleaner 
+123;Employee of Surveillance 
+124;Employee of Data Entry 
+125;Employee of Urban and Regional Planning 
+126;Employee of Project Reporting 
+127;Employee of Optometry 
+128;Employee of Driver 
+129;Employee of Mechanic 
+130;Employee of Health Promotion 
+131;Employee of Plumbing 
+132;Employee of Survey Development 
+133;Employee of Illustration 
+134;Employee of Trademark / Design Examination 
+135;Employee of Costing 
+136;Employee of Print Machine Operation 
+137;Employee of Community Liaison 
+138;Employee of Counter Intelligence 
+139;Employee of Privacy Impect Assessment 
+140;Employee of Physiotherapy 
+141;Employee of Education 
+142;Employee of Human Resource Advice 
+143;Employee of Intelligence Analysis 
+144;Employee of General Tradesperson 
+145;Employee of Rostering and Workload Management 
+146;Employee of Mathematician 
+147;Employee of Marketing 
+148;Employee of Program Advice and Support 
+149;Employee of Electronics Engineering 
+150;Employee of Family Consultant 
+151;Employee of Advice 
+152;Employee of Useability Design 
+153;Employee of Water Inspection 
+154;Employee of Dog Handling / Training 
+155;Employee of Forensic Document Examination 
+156;Employee of Relationship / Stakeholder Management 
+157;Employee of Clerk of Court 
+158;Employee of Civil Engineering Draftsperson and Technician 
+159;Employee of Information Management 
+160;Employee of Programme Support 
+161;Employee of Public Relations 
+162;Employee of CCTVm Radio and Satellite Technician 
+163;Employee of Training and Development 
+164;Employee of Web and Multimedia Content Development 
+165;Employee of Member 
+166;Employee of Programme Management 
+167;Employee of Industrial Relations 
+168;Employee of Litigation Officer 
+169;Employee of Electronics Engineering Draftsperson and Technician 
+170;Employee of Refuelling 
+171;Employee of Research 
+172;Employee of Fraud Control and Corruption Prevention 
+173;Employee of Systems Analysis and Design 
+174;Employee of Library Assistance 
+175;Employee of Taxation Accounting 
+176;Employee of Business Management 
+177;Employee of Legal Advice 
+178;Employee of Legal Officer 
+179;Employee of Development and Programming 
+180;Employee of Tribunal Member 
+181;Employee of Character 
+182;Employee of Hydrology 
+183;Employee of Personnel Security 
+184;Employee of Geospatial Intelligence 
+185;Employee of Speech Professionals and Audiology 
+186;Employee of Co-design Planning 
+187;Employee of Change Management 
+188;Employee of Imagery Intelligence 
+189;Employee of Grants Management 
+190;Employee of Indigeneous Health Workers 
+191;Employee of Facilities Management 
+192;Employee of Nurse 
+193;Employee of General Accounting 
+194;Employee of Entity Targeting 
+195;Employee of Actuary 
+196;Employee of Conference and / or Event Organization 
+197;Employee of Pathology 
+198;Employee of Internal Audit (Financial) 
+199;Employee of Policy Development 
+200;Employee of Tourist Information Officer 
+201;Employee of Border Intelligence 
+202;Employee of Social Work 
+203;Employee of Security 
+204;Employee of Freedom of Information 
+205;Employee of Valuation 
+206;Employee of Plant Breeders Rights Examination 
+207;Employee of Legal Secretary 
+208;Employee of Weith and Measurement Inspection 
+209;Employee of Engineering Management 
+210;Employee of Corporate and Business Planning 
+211;Employee of Management Accounting 
+212;Employee of Policy Advice 
+213;Employee of Chemist, Food and Wine Science 
+214;Employee of Workplace Relations 
+215;Employee of Fitness for Duty / Return to Work Case Management 
+216;Employee of Detained Goods Management 
+217;Employee of Identity 
+218;Employee of Ministerial and Parliamentary Advice 
+219;Employee of Customer Liaison / Counter 
+220;Employee of Compliance Case Management 
+221;Employee of Cartography and Surveying 
+222;Employee of Reception 
+223;Employee of Editing 
+224;Employee of Workforce Planning 
+225;Employee of Audit Coordination 
+226;Employee of Meat Inspection 
+227;Employee of Payroll 
+228;Employee of Generalist Management 
+229;Employee of Legal Professional 
+230;Employee of Mechanical Engineering Draftsperson and Technician 
+231;Employee of Program Management 
+232;Employee of Ministerial and Parliamentary Support 
+233;Employee of Medical and Pharmaceutical Advice 
+234;Employee of Strategic Design 
+235;Employee of Data Mining 
+236;Employee of Archivist 
+237;Employee of Visa Processing 
+238;Employee of Plant Operation 
+239;Employee of Human Intelligence 
+240;Employee of Status Resolution 
+241;Employee of Conservator 
+242;Employee of Statician 
+243;Employee of Business Process Analysis / Design 
+244;Employee of Carpentry 
+245;Employee of Messaging 
+246;Employee of Evaluation 
+247;Employee of Judge 
+248;Employee of Dentist 
+249;Employee of Youth Worker 
+250;Employee of Financial Anlaysis, Policy and Planning 
+251;Employee of International Delegations Management and Support 
+252;Employee of Debt Recovery 
+253;Employee of Occupational and Environmental Health 
+254;Employee of Programme Reporting 
+255;Employee of Other Building and Engineering Draftsperson / Technicians 
+256;Employee of Information/ Knowledge Management 
+257;Employee of Labourers 
+258;Employee of Contract 
+259;Employee of Communications 
+260;Employee of Specialist Medical Practitioners 
+261;Employee of Electrical Engineering 
+262;Employee of Issue Management 
+263;Employee of Plant Inspection 
+264;Employee of Recruitment / Redeployment 
+265;Employee of Project Support 
+266;Employee of Trade Remedies Case Management 
+267;Employee of Risk Analysis 
+268;Employee of Industrial, Mechanical / Production Engineers 
+269;Employee of Liaison 
+270;Employee of Maritime Standards Specialist 
+271;Employee of Quality Assurance 
+272;Employee of Procurement and Vendor Relations 
+273;Employee of Asset Management (Land & Property) 
+274;Employee of Counselling 
+275;Employee of Psychology 
+276;Employee of Corporate Service Management 
+277;Employee of Technical and Procedural Quality Advice 
+278;Employee of Operations Coordination 
+279;Employee of Gallery or Museum Guide 
+280;Employee of Sales 
+281;Employee of Purchasing 
+282;Employee of Metal Fitter / Machinist 
+283;Employee of Kitchen Hand 
+284;Employee of Pharmacy 
+285;Employee of Organisational Psychology 
+286;Employee of Speechwriting 
+287;Employee of Databases and Data 
+288;Supervisor of Occupational Health and Safety 
+289;Supervisor of Enforcement 
+290;Supervisor of Professional Accounting 
+291;Head of Google Maps 
+292;Manager of Trades 
+293;Manager of Chief Executive / Statutory Office Holder 
+294;Manager of Technician 
+295;Manager of Engineering Professionals 
+296;Manager of Facilities and Property 
+297;Supervisor of Judicial and Other Legal Professionals 
+298;Head of Gmail 
+299;Manager of Lawyers and Legal Advisors 
+300;Manager of Records and Knowledge 
+301;Manager of General Finance and Travel 
+302;Head of Google Mobile 
+303;Manager of Examiners 
+304;Manager of Enforcement 
+305;Supervisor of Land and Asset Management 
+306;Head of Cars 
+307;Manager of Research 
+308;Manager of Natural and Physical Science Professional 
+309;Manager of Health and Allied Health Professionals 
+310;Manager of Collection and Analysis 
+311;Director of Information and Communications Technology 
+312;Supervisor of Numerical Analysis 
+313;Supervisor of Design 
+314;Supervisor of Health and Allied Health Professionals 
+315;Supervisor of Solutions Implementation 
+316;Head of Navigation 
+317;Supervisor of Board Member 
+318;Supervisor of Inspection 
+319;Head of Satalites 
+320;Director of Service Delivery 
+321;Supervisor of Customer Advice and Support 
+322;Supervisor of Examiners 
+323;Supervisor of Writing and Editing 
+324;Head of Design 
+325;Manager of Service Support 
+326;Supervisor of Vehicle and Equipment Maintenance / Operation 
+327;Supervisor of Executive Support 
+328;Head of Security 
+329;Director of Strategic Policy, Reseach, Project and Programme 
+330;Supervisor of Horticulturalists / Gardeners and Labourers 
+331;Supervisor of Project 
+332;Supervisor of Evaluation 
+333;Supervisor of Legislation 
+334;Supervisor of Goverance and Policy 
+335;Head of Database 
+336;Manager of Design 
+337;Manager of Legislation 
+338;Manager of Executive Support 
+339;Director of Intelligence 
+340;Supervisor of Audit 
+341;Supervisor of Librarians 
+342;Supervisor of Service Delivery 
+343;Supervisor of Business Change 
+344;Supervisor of Education and Training 
+345;Head of Mobile 
+346;Manager of Solutions Implementation 
+347;Director of Compliance and Regulation 
+348;Supervisor of Technician 
+349;Head of Tablet 
+350;Manager of Program Delivery 
+351;Manager of Welfare Support Workers 
+352;Supervisor of Transport and Logistics 
+353;Supervisor of Lawyers and Legal Advisors 
+354;Supervisor of Maritime 
+355;Head of Android 
+356;Manager of Production and Dissemination 
+357;Manager of Business Change 
+358;Head of Cars Division 1 
+359;Manager of Vehicle and Equipment Maintenance / Operation 
+360;Manager of Transport and Logistics 
+361;Manager of Board Member 
+362;Supervisor of Gallery, Museum and Tour Guides / Tourist Information 
+363;Supervisor of Compliance / Regulation 
+364;Head of Cars Division 2 
+365;Manager of Project 
+366;Manager of Inspection 
+367;Director of Monitoring and Audit 
+368;Supervisor of Welfare Support Workers 
+369;Supervisor of Human Resource Professional 
+370;Head of Navigation Division 1 
+371;Manager of Management and Planning 
+372;Manager of Professional Accounting 
+373;Manager of Budget, Costs and Financial Analysis 
+374;Director of People 
+375;Supervisor of Programme 
+376;Supervisor of Management and Planning 
+377;Supervisor of Production and Dissemination 
+378;Supervisor of Facilities and Property 
+379;Head of Navigation Division 2 
+380;Manager of Organisational Design 
+381;Manager of Risk 
+382;Manager of Investigation 
+383;Director of Legal and Parliamentary 
+384;Director of Information and Knowledge Management 
+385;Director of Communications and Marketing 
+386;Supervisor of Trades 
+387;Supervisor of Investigation 
+388;Supervisor of General Finance and Travel 
+389;Head of Satalites Division 1 
+390;Manager of Programme 
+391;Supervisor of Strategic Policy 
+392;Head of Satalites Division 2 
+393;Manager of Audit 
+394;Manager of Land and Asset Management 
+395;Supervisor of Risk 
+396;Head of Design Division 1 
+397;Manager of Writing and Editing 
+398;Supervisor of Program Delivery 
+399;Supervisor of Service Support 
+400;Supervisor of IT Business Management 
+401;Head of Design Division 2 
+402;Manager of Strategic Policy 
+403;Supervisor of Legal and Court Officer 
+404;Supervisor of Graphic Design / Illustration 
+405;Head of Security Division 1 
+406;Manager of Horticulturalists / Gardeners and Labourers 
+407;Manager of Hospitality 
+408;Manager of Occupational Health and Safety 
+409;Manager of General Administrative Support 
+410;Supervisor of Organisational Design 
+411;Supervisor of Budget, Costs and Financial Analysis 
+412;Head of Security Division 2 
+413;Manager of Librarians 
+414;Manager of Campaigns and Marketing 
+415;Director of Trades and Labour 
+416;Supervisor of Records and Knowledge 
+417;Supervisor of Solutions Development 
+418;Head of Database Division 1 
+419;Director of Science and Health 
+420;Supervisor of Research 
+421;Supervisor of Natural and Physical Science Professional 
+422;Head of Database Division 2 
+423;Manager of Human Resource Professional 
+424;Manager of Legal and Court Officer 
+425;Director of Accounting and Finance 
+426;Supervisor of General Administrative Support 
+427;Head of Mobile Division 1 
+428;Manager of Procurement and Contracting 
+429;Supervisor of Hospitality 
+430;Supervisor of Ministerial / Cabinet and Parliamentary Liaison 
+431;Supervisor of Engineering Professionals 
+432;Head of Mobile Division 2 
+433;Manager of Ministerial / Cabinet and Parliamentary Liaison 
+434;Manager of Compliance / Regulation 
+435;Director of Administration 
+436;Supervisor of Public Relations and Stakeholder Management 
+437;Supervisor of Campaigns and Marketing 
+438;Head of Tablet Division 1 
+439;Manager of Gallery, Museum and Tour Guides / Tourist Information 
+440;Manager of Customer Advice and Support 
+441;Manager of Solutions Development 
+442;Manager of IT Business Management 
+443;Manager of Education and Training 
+444;Director of Organisation Leadership 
+445;Director of Engineering and Technical 
+446;Supervisor of Procurement and Contracting 
+447;Head of Tablet Division 2 
+448;Manager of Evaluation 
+449;Supervisor of Chief Executive / Statutory Office Holder 
+450;Supervisor of Collection and Analysis 
+451;Head of Android Division 1 
+452;Manager of Numerical Analysis 
+453;Manager of Goverance and Policy 
+454;Manager of Maritime 
+455;Head of Android Division 2 
+456;Manager of Judicial and Other Legal Professionals 
+457;Manager of Service Delivery 
+458;Manager of Public Relations and Stakeholder Management 
+459;Manager of Graphic Design / Illustration 

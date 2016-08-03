@@ -1,0 +1,31 @@
+<?php
+include_once 'settings.php';            // General settings
+include_once 'db.php';	                // DB specific settings and connection 
+include_once 'session_management.php';  // Load enhanced session functions
+
+include_once 'models/DataObject.php'; // First load the base class
+// Load all derived classes 
+foreach(glob("models/*.php") as $file){
+  include_once $file;
+}
+
+$username = $argv[1];  // username provided from command line
+$pw = $argv[2]; // password provided from command line
+$active = True;
+$is_su = True;
+
+try{
+  $dbh = new PDO($connection, DB_USER, DB_PASSWORD, $connection_options);
+}catch(PDOException $e){
+  //TODO: handle error better
+  echo $e->getMessage();
+}
+
+print("Creating new super user with username `$username` and password `$pw`\n");
+$user = User::fromData($username, $pw, $active, $is_su);
+print("Saving new super user...\n");
+$result = $user->create($dbh);
+print($result);
+
+
+?>

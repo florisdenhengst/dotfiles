@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+from django.core.management.base import BaseCommand, CommandError
+from database.models import *
+from database.management.utils import *
+from django.core.management import call_command
+
+class Command(BaseCommand):
+  args = ''
+  help = 'Divide database into a set of chunks, which is required for authorisation'
+  CONFIRM_MESSAGE = """Do you want to Chunk the database? This might take a while!"""
+
+  def handle(self, *args, **kwargs):
+    """
+    Divides the database into chunks.
+    This is required for authorisation.
+    Chunking might take a while.
+    """
+    confirmed = confirm(self.CONFIRM_MESSAGE)
+    if(confirmed):
+      print('Generating chunks...')
+      Chunk.generate_chunks()
+      nr_of_chunks = Chunk.objects.all().count()
+      print('Done!')
+      print('Generated %d chunks' % nr_of_chunks)
+      call_command('update_roles')
+    else:
+      print('No chunks generated')

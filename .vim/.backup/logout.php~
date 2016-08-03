@@ -1,0 +1,35 @@
+<?php
+class logout extends controller{
+  private $_success_tpl = TEMPLATE_ROOT . 'logout.tpl';
+  private $_LOGGED_OUT_MSG = 'You have been successfully logged out.';
+  private $_NOT_LOGGED_IN_MSG = 'You were not logged in!';
+
+  function GET($matches){
+    $params = session_get_cookie_params();
+
+    $data = array();
+    $user = $this->logged_in();
+    if(!$user){
+      $data['message'] = $this->_NOT_LOGGED_IN_MSG;
+    } else {
+      // a user was logged in, but not anymore;
+      $data['message'] = $this->_LOGGED_OUT_MSG;
+    }
+
+    // unset all session vars
+    $_SESSION = array();
+    // unset own var
+    unset($this->_user);
+
+    setcookie(session_name(),
+      '', time() - 42000,
+      $params["path"],
+      $params["domain"],
+      $params["secure"],
+      $params["httponly"]);
+
+    session_destroy();
+    
+    parent::output($this->_success_tpl, $data);;
+  }
+}

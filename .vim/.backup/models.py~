@@ -1,0 +1,1230 @@
+from django.db import models, connection, transaction
+from django.contrib.auth.models import Group
+from datetime import date
+from django.utils import six
+import json
+from django.db import connection, OperationalError
+from django.db.models import * 
+from django.db.models.lookups import * 
+from django.db.models.fields import Field
+from django.core.cache import cache
+import logging
+
+logger = logging.getLogger('database.models')
+
+# Some constants that determine the length of database fields
+FIRST_NAME_LENGTH = 50
+LAST_NAME_LENGTH = 50
+BUSINESS_UNIT_NAME_LENGTH = 80
+FUNCTIONAL_AREA_NAME_LENGTH = 80
+LOCATION_NAME_LENGTH = 50
+DATASOURCE_DESCRIPTION_LENGTH = 500
+ID_STRING_LENGTH = 20
+POSITION_TITLE_LENGTH = 80
+ENUM_ORIGINAL_NAME_LENGTH = 50
+ENUM_DESCRIPTION_LENGTH = 500
+GLOBAL_GRADE_NAME_LENGTH = 50
+LOCAL_GRADE_NAME_LENGTH = 50
+
+# Min/max scores for enum tables (inclusive!)
+ENUM_MIN_SCORE = 0
+ENUM_MAX_SCORE = 999
+
+# Should use this when some inconsistency is found in the data. 
+# Please add a descriptive message
+# TODO: Split this in multiple exception classes when we identify more errors
+class DBConsistencyError(Exception):
+  """Indicates that an inconsistency in the database has been found."""
+  def __init__(self, msg):
+    self.msg = msg
+
+  def __str__(self):
+    return self.msg
+
+
+class AuthorizableQuerySet(models.QuerySet):
+  """
+  Custom QuerySet which provides generic authorization functionality.
+  """
+ 
+  def authorized(self, user, *args, **kwargs):
+    """Wrapper method for QFactory.auth"
+
+    Arguments:
+    * user -- a properly preprocessed request.user object.
+    * [*args] -- any position filter attribute (e.g. Q object) that is acceptaed by a regular .filter() call
+    * [**kwargs] -- any lookup that is accepted by a regular .filter() call.
+    """
+    qf = QFactory(self.model)
+    q_node = qf.auth(user)
+    return self.filter(q_node, *args, **kwargs)
+
+
+class FilterableQuerySet(models.QuerySet):
+  """
+  Custom QuerySet which provides generic filtering functionality.
+  """
+  def filtered(self, global_filter, *args, **kwargs):
+    """Wrapper method for QFactory.filtered.
+
+    Arguments:
+    * global_filter -- a dictionary describing the global filter as present in a
+      request object that has been passed through the GlobalFilterMiddleware.
+    * [*args] -- any position filter attribute (e.g. Q object) that is acceptaed by a regular .filter() call
+    * [**kwargs] -- any lookup that is accepted by a regular .filter() call.
+    """
+    #TODO: Implement that when no selections are set, the 'empty selection' flag is set,
+    #      so that no filtering is applied
+    qf = QFactory(self.model)
+    q_node = qf.filtered(global_filter, *args, **kwargs)
+    
+    # remove any remaining arguments that can't be passed to a regular .filter() call.
+    kwargs.pop('through', None)
+
+    return self.filter(q_node, *args, **kwargs)
+
+class CrunchrQuerySet(AuthorizableQuerySet, FilterableQuerySet):
+  """
+  Custom QuerySet that combines generic filtering and authorization.
+  """
+  # TODO: fix 
+  def auth_filtered(self, request, *args, **kwargs):
+    """Wrapper method for combined QFactory.auth_filtered.
+
+    Arguments:
+      * request -- should contain properly preprocessed global_filter and
+                   user objects.
+      * [through] -- defines the first step in the lookups that auth and global 
+                     filtering make. No first step is made if not provided.
+      * [distinct] -- defines whether the returned results should be unique.
+                      Default is 'True'. Provide distinct=False argument if
+                      non-unique results are required.
+      * [active] -- defines whether or not to filter on 'active' jobs. Default
+                    is 'True'. Provide active=False  argument if non-active
+                    results are required.
+      * [*args] -- any positional filter (e.g. Q object) that is accepted by a regular .filter() call
+      * [**kwargs] -- any lookup that is accepted by a regular .filter() call
+    """
+    # use .pop() to remove argument from kwargs. Default is True.
+    distinct = kwargs.pop('distinct', True)
+    active = kwargs.pop('active', 
+        self.model != MultiPosition and self.model != MultiPositionHierarchy)
+    qf = QFactory(self.model)
+
+    auth_filter_q = qf.auth_filtered(request.user, request.global_filter, **kwargs)
+
+    # remove any remaining arguments that can't be passed to a regular .filter() call.
+    # Note that all regular lookups (e.g. field1__field2__lookup=value) can be passed.
+    kwargs.pop('through', None)
+
+    if active:
+      activity_q = qf.get_q_node('status', True)
+    else:
+      activity_q = Q()
+
+    result = self.filter(auth_filter_q & activity_q, *args, **kwargs)
+    if distinct:
+      return result.distinct()
+    else:
+       return result
+    
+    
+class JobManager(models.Manager):    
+  def get_queryset(self):
+    return super(JobManager, self).get_queryset().filter(status__active=True)    
+
+
+class FilterableModel(models.Model):
+  """
+  Base class for all models on which the global filter can be aplied.
+  """
+  objects = FilterableQuerySet.as_manager()
+
+  class Meta:
+    abstract = True
+
+
+class AuthorizableModel(models.Model):
+  """
+  Base class for all models on which authorization can be performed.
+  """
+  objects = AuthorizableQuerySet.as_manager()
+
+  class Meta:
+    abstract = True
+
+
+class CrunchrModel(FilterableModel, AuthorizableModel):
+  """
+  Class that is composed of FilterableModel and AuthorizableModel.
+  Its default Manager contains all functions that provide
+  authorization functionality. 
+  """
+  objects = CrunchrQuerySet.as_manager()
+
+  class Meta:
+    abstract = True
+
+
+class HierarchyModel():
+    """
+    Base class for models that are a hierarchy. This class 
+    allows for the creation of methods that perform actions 
+    on hierarchy, like determining depth or getting child 
+    nodes.
+    """
+
+    def child_ids(self, parent):
+      """Returns a list of all direct and indirect child IDs of a given parent ID.
+      
+      This method returns a list of all direct and indirect child IDs of a given parent ID
+      of one of the three possible hierarchal filter options geography, functional area or business unit.
+      
+      Arguments:
+        
+      * parent -- The id of the element to retrieve all children id's of
+      """
+
+      # Create a key for storing and retrieving the results from cache
+      key = self.__class__.__name__ + str(parent)
+
+      result = cache.get(key)
+
+      model = self.__class__
+
+      if result is None:
+        # This query is necessary as the Django ORM 
+        # does not support recursive queries
+        query = '''
+            WITH RECURSIVE all_children(parent_id, id) AS (
+              SELECT parent_id, id FROM %s  
+            UNION ALL
+                SELECT child.parent_id, all_children.id
+                FROM %s child
+                JOIN all_children ON all_children.parent_id = child.id
+            )
+            SELECT id FROM all_children WHERE parent_id = %%s
+        '''  % (model._meta.db_table, model._meta.db_table)
+
+        # Query for the children
+        children = model.objects.raw(query, [parent])
+        
+        # Store the children IDs in a list
+        result = [row.id for row in children]
+
+        # Store in cache
+        cache.set(key, result, 3600)
+
+      return result
+        
+# Custom Managers to retrieve models with active job statusses only
+
+
+class ActivePersonManager(models.Manager):
+  def get_queryset(self):
+    return super(ActivePersonManager, self).get_queryset().filter(employee__job__status__active=True).distinct()
+
+class ActiveEmployeeManager(models.Manager):
+  def get_queryset(self):
+    return super(ActiveEmployeeManager, self).get_queryset().filter(job__status__active=True).distinct()
+
+class ActiveJobManager(models.Manager):    
+  def get_queryset(self):
+    return super(ActiveJobManager, self).get_queryset().filter(status__active=True)  
+
+class ActivePositionManager(models.Manager):
+  def get_queryset(self):
+    return super(ActivePositionManager, self).get_queryset().filter(job__status__active=True).select_related('title')
+
+class ActivePositionHierarchyManager(models.Manager):
+  def get_queryset(self):
+    return super(ActivePositionHierarchyManager, self).get_queryset().filter(position__job__status__active=True)  
+
+class EnumTable(object):
+  """
+  Specifies all operations that are supported for generic enumeration tables.
+  It relies on the actual Model of the enumtable to override _members_filter()
+  to specify custom filtering operations for that particular enumtable. There are
+  a number of mixins which also define _members_filter() for the fields they add.
+  """
+
+  # Dictionary containing all enum-table information
+  _enums = {}
+
+  @classmethod
+  def _lazy_init(cls):
+    """
+    Loads the entire enumtable into memory (for a given model class cls).
+    """
+    if not issubclass(cls, models.Model):
+      raise TypeError(str(cls)+" is not a django Model")
+    if not cls.__name__  in EnumTable._enums:
+      EnumTable._enums[cls.__name__] = {member.id: member for member in cls.objects.all()}
+
+  @staticmethod
+  def _get_enum(enum_class):
+    """
+    Gets the enum values for a given class, from the enum dictionary (cache)
+    """
+    enum_class._lazy_init() 
+    return EnumTable._enums[enum_class.__name__]
+
+  @classmethod
+  def _members_filter(cls, member, **kwargs):
+    """
+    Determines whether the enum member passes the filter, specified using the keyword
+    arguments. True indicates it passes. This method is used by members_dict(), members()
+    and ids().
+
+    Each enum table model may inherit from a number of mixins, which introduce
+    implementations for this method. All implementations will be chained
+    together by calling super() (using MRO). Please make sure that the
+    EnumTable class is listed last in the list of superclasses. That way, true
+    will be returned for all members that pass all conditions.
+    """
+    return True
+
+  @classmethod
+  def members_dict(cls, **kwargs):
+    """
+    Returns a dictionary of (ID, member) which meet certain criteria as specified
+    using keyword arguments (check _members_filter).
+    cls is the class on which the method is called.
+    """
+    return {member_id: member for member_id, member in EnumTable._get_enum(cls).items()
+                              if cls._members_filter(member, **kwargs)} 
+
+  @classmethod
+  def members(cls, **kwargs):
+    """
+    Returns a list of members which meet certain criteria as specified
+    using keyword arguments (check _members_filter). 
+    """
+    return [member for member_id, member in EnumTable._get_enum(cls).items()
+                   if cls._members_filter(member, **kwargs)]
+
+  @classmethod
+  def ids(cls, **kwargs):
+    """
+    Returns a list of ids which meet certain criteria as specified
+    using keyword arguments (check _members_filter). 
+    """
+    return [member_id for member_id, member in EnumTable._get_enum(cls).items()
+                      if cls._members_filter(member, **kwargs)]
+
+class MissingDataEnumModel(models.Model):
+  """
+  A mixin model for enum tables which support missing data. Adds 'missing' filter option.
+  """
+  missing = models.BooleanField(default=False, null=False)
+
+  @classmethod
+  def _members_filter(cls, member, **kwargs):
+    is_missing = kwargs.get('missing')
+    return ((is_missing == None or is_missing == member.missing) and 
+           super(MissingDataEnumModel, cls)._members_filter(member, **kwargs))
+
+  class Meta:
+    abstract = True
+
+class OrderedEnumModel(models.Model):
+  """
+  Mixin for all enum models that have a score. Use min_score and max_score
+  as keyword arguments in members_dict(), members() or ids() to retrieve only
+  the members that have a score in this range.
+  """
+  score = models.IntegerField()
+
+  @classmethod
+  def _members_filter(cls, member, **kwargs):
+    min_score = kwargs.get('min_score') or ENUM_MIN_SCORE
+    max_score = kwargs.get('max_score') or ENUM_MAX_SCORE
+    # Validate score range
+    if min_score < ENUM_MIN_SCORE or max_score > ENUM_MAX_SCORE:
+      raise ValueError("Min/max should be in {}<=x<{} range. min={} max={}"
+        .format(ENUM_MIN_SCORE, ENUM_MAX_SCORE, min_score, max_score))
+    if min_score >= max_score:
+      raise ValueError("Min should be less than max. min={} max={}"
+        .format(min_score, max_score))
+    return (member.score >= min_score and member.score < max_score and
+           super(OrderedEnumModel, cls)._members_filter(member, **kwargs))
+
+  class Meta:
+    abstract = True
+
+class Person(CrunchrModel):
+  MALE = "M"
+  FEMALE = "F"
+  OTHER = "O"
+  UNKNOWN = "U"
+  GENDER_CHOICES = (
+          (MALE, "Male"),
+          (FEMALE, "Female"),
+          (OTHER, "Other"),
+          (UNKNOWN, "Unknown"),
+  )
+
+  first_name       = models.CharField(max_length=FIRST_NAME_LENGTH, db_column="firstname")
+  last_name        = models.CharField(max_length=LAST_NAME_LENGTH, db_column="lastname")
+  gender           = models.CharField(max_length=1, choices=GENDER_CHOICES, default=UNKNOWN)
+  date_of_birth    = models.DateField(null=True, db_column="dateofbirth")
+  date_in_service  = models.DateField(null=True, db_column="dateinservice")
+  photo            = models.ImageField(upload_to='person_photos', null=True)
+
+  active = ActivePersonManager.from_queryset(CrunchrQuerySet)()
+  
+  def date_to_age(date_to_convert):
+    today = date.today()
+    return today.year - date_to_convert.year - ((today.month, today.day) < (date_to_convert.month, date_to_convert.day))
+  
+  def __str__(self):
+    date_of_birth = str(self.date_of_birth) if self.date_of_birth is not None else '0000-00-00'
+    return ' '.join([str(str(self.pk)), " - ", self.first_name, self.last_name, ":", self.gender, date_of_birth])
+
+  class Meta:
+    db_table= 'person'
+
+
+class DataSource(models.Model):
+  user          = models.ForeignKey(settings.AUTH_USER_MODEL)
+  upload_date   = models.DateField(db_column="uploaddate")
+  month         = models.IntegerField()
+  description   = models.CharField(max_length=DATASOURCE_DESCRIPTION_LENGTH)
+  
+  def __str__(self):
+    return ' '.join([str(self.pk), " - ", str(self.upload_date), ":", self.description]) 
+  
+  class Meta:
+    db_table= 'datasource'
+
+
+class TalentStatus(OrderedEnumModel, MissingDataEnumModel, EnumTable):
+  original_name = models.CharField(max_length=ENUM_ORIGINAL_NAME_LENGTH, db_column="originalname")
+  description   = models.CharField(max_length=ENUM_DESCRIPTION_LENGTH, blank=True, default="")
+  
+  class Meta:
+    db_table = 'talentstatus'
+
+
+class RetentionRisk(OrderedEnumModel, MissingDataEnumModel, EnumTable):
+  original_name = models.CharField(max_length=ENUM_ORIGINAL_NAME_LENGTH, db_column="originalname")
+  description   = models.CharField(max_length=ENUM_DESCRIPTION_LENGTH, blank=True, default="")
+  
+  class Meta:
+    db_table = 'retentionrisk'
+
+
+class RetentionRiskReason(MissingDataEnumModel, EnumTable):
+  original_name = models.CharField(max_length=ENUM_ORIGINAL_NAME_LENGTH, db_column="originalname")
+  description   = models.CharField(max_length=ENUM_DESCRIPTION_LENGTH, blank=True, default="")
+  
+  class Meta:
+    db_table = 'retentionriskreason'
+
+
+class PerformanceStatus(OrderedEnumModel, MissingDataEnumModel, EnumTable):
+  original_name = models.CharField(max_length=ENUM_ORIGINAL_NAME_LENGTH, db_column="originalname")
+  description   = models.CharField(max_length=ENUM_DESCRIPTION_LENGTH, blank=True, default="")
+  
+  class Meta:
+    db_table = 'performancestatus'
+
+
+class Potential(OrderedEnumModel, MissingDataEnumModel, EnumTable):
+  original_name = models.CharField(max_length=ENUM_ORIGINAL_NAME_LENGTH, db_column="originalname")
+  description   = models.CharField(max_length=ENUM_DESCRIPTION_LENGTH, blank=True, default="")
+  
+  class Meta:
+    db_table = 'potential'
+
+
+class Mobility(OrderedEnumModel, MissingDataEnumModel, EnumTable):
+  original_name = models.CharField(max_length=ENUM_ORIGINAL_NAME_LENGTH, db_column="originalname")
+  description   = models.CharField(max_length=ENUM_DESCRIPTION_LENGTH, blank=True, default="")
+  
+  class Meta:
+    db_table = 'mobility'
+
+
+class Grade(OrderedEnumModel, MissingDataEnumModel, EnumTable):
+  global_grade  = models.CharField(max_length=GLOBAL_GRADE_NAME_LENGTH, null=True, db_column="globalgrade")
+  local_grade   = models.CharField(max_length=LOCAL_GRADE_NAME_LENGTH, null=True, db_column="localgrade")
+  description   = models.CharField(max_length=ENUM_DESCRIPTION_LENGTH, blank=True, null=True)
+
+  @classmethod
+  def _members_filter(cls, member, **kwargs):
+    """
+    Grade supports filtering on global_grade and local_grade.
+    Filtering on score and missing is implemented by the respective mixin models
+    """
+    global_grade = kwargs.get('global_grade')
+    local_grade  = kwargs.get('local_grade')
+    return ((global_grade == None or member.global_grade == global_grade) and
+           (local_grade == None or member.local_grade == local_grade) and
+           super(Grade, cls)._members_filter(member, **kwargs))
+
+  def __str__(self):
+    description = self.description if self.description is not None else ''
+    global_grade = self.global_grade if self.global_grade is not None else ''
+    local_grade = self.local_grade if self.local_grade is not None else ''
+
+    return ' '.join([str(self.pk), " - global grade:", global_grade, ", local grade:", local_grade, ", score:",
+               str(self.score)]) 
+  
+  class Meta:
+    db_table = 'grade'
+
+
+class BusinessUnit(CrunchrModel, HierarchyModel):
+  name      = models.CharField(max_length=BUSINESS_UNIT_NAME_LENGTH, null=True)
+  parent    = models.ForeignKey("BusinessUnit", null=True)
+   
+  def __str__(self):
+    name = self.name if self.name is not None else '' 
+    return '%s - %s' % (str(self.pk), name)
+
+  class Meta:
+    db_table = 'businessunit'
+
+
+class FunctionalArea(CrunchrModel, HierarchyModel):
+  name        = models.CharField(max_length=FUNCTIONAL_AREA_NAME_LENGTH)
+  parent      = models.ForeignKey("FunctionalArea", null=True)
+
+  def __str__(self):
+    name = self.name if self.name is not None else '' 
+    return '%s - %s' % (str(self.pk), name)
+    
+  class Meta:
+    db_table = 'functionalarea'
+
+class Location(CrunchrModel, HierarchyModel):
+  name      = models.CharField(max_length=LOCATION_NAME_LENGTH)
+  parent    = models.ForeignKey("Location", null=True)
+  
+  def __str__(self):
+    name = self.name if self.name is not None else '' 
+    return '%s - %s' % (str(self.pk), name)
+    
+  class Meta:
+    db_table = 'location'
+
+
+class Job(CrunchrModel):
+  position            = models.ForeignKey('Position', db_column='position_id')
+  employee            = models.ForeignKey('Employee', null=True, db_column='employee_id')
+  fte                 = models.PositiveSmallIntegerField(default=100)
+  data_source         = models.ForeignKey(DataSource, db_column="datasource_id")
+  performance_status  = models.ForeignKey(PerformanceStatus, db_column="performancestatus_id", null=True)
+  date_in_position    = models.DateField(null=True, db_column="dateinposition")
+  chunk               = models.ForeignKey('Chunk', null=True, on_delete=models.SET_NULL)
+  status              = models.ForeignKey('JobStatus')
+  job_id              = models.CharField(max_length=ID_STRING_LENGTH, null=True, unique=True, db_column="jobid")
+
+  active = ActiveJobManager.from_queryset(CrunchrQuerySet)()
+  
+  def __str__(self):
+    if(self.employee is not None):
+      employee = "%s %s" % (self.employee.person.first_name, self.employee.person.last_name)
+    else:
+      employee = "VACANT"
+
+    job_id = self.job_id if self.job_id is not None else ''
+    return "%s - %s on %s" % (str(self.pk), self.employee, str(self.position))
+
+  class Meta:
+    db_table = 'job'
+    unique_together = ('employee', 'position')
+
+#TODO: put in an EnumModel and update way MAJOR_TYPES are set up and fix JobStatus.major_type:default=0
+class JobStatus(models.Model, EnumTable):
+  UNKNOWN = 'UNKNOWN'
+  ACTIVE = 'ACTIVE'
+  INACTIVE = 'INACTIVE'
+  FIRED = 'FIRED'
+  GOOD_LEAVER = 'GOOD_LEAVER'
+  BAD_LEAVER = 'BAD_LEAVER'
+  RETIRED = 'RETIRED'
+  VACANT_POSITION = 'VACANT_POSITION'
+  MAJOR_TYPES = (
+       (UNKNOWN, 0),
+       (ACTIVE, 1),
+       (INACTIVE, 2),
+       (FIRED, 3),
+       (GOOD_LEAVER, 4),
+       (BAD_LEAVER, 5),
+       (RETIRED, 6),
+       (VACANT_POSITION, 7),
+       )
+  original_name       = models.CharField(max_length=ENUM_ORIGINAL_NAME_LENGTH, null=True, db_column="originalname")
+  description         = models.CharField(max_length=ENUM_DESCRIPTION_LENGTH, blank=True, default="")
+  major_type          = models.IntegerField(choices=MAJOR_TYPES, default=0, db_column='majortype')
+  active              = models.BooleanField(default=True)
+
+  @classmethod
+  def _members_filter(cls, member, **kwargs):
+    """
+    JobStatus supports filtering using 'active' and 'major_type' keyword arguments
+    """
+    active      = kwargs.get('active')
+    major_type  = kwargs.get('major_type')
+    return ((active == None or member.active == active) and
+           (major_type == None or member.major_type == major_type) and
+           super(JobStatus, cls)._members_filter(member, **kwargs))
+
+  def __str__(self):
+    original_name = self.original_name if self.original_name is not None else ''
+    active = 'active' if self.active else 'inactive'
+    return "%s - %s (%s)" % (str(self.pk), original_name, active)
+
+  class Meta:
+    db_table = 'jobstatus'
+
+
+class ContractType(MissingDataEnumModel, EnumTable):
+  original_name   = models.CharField(max_length=ENUM_ORIGINAL_NAME_LENGTH, db_column="originalname")
+  description     = models.CharField(max_length=ENUM_DESCRIPTION_LENGTH, blank=True, default="")
+  direct          = models.BooleanField(default=True)
+
+  @classmethod
+  def _members_filter(cls, member, **kwargs):
+    """
+    ContractType supports filtering using 'direct'  
+    (and 'missing' implemented by MissingDataEnumModel)
+    """
+    direct = kwargs.get('direct')
+    return ((direct == None or member.direct == direct) and
+           super(ContractType, cls)._members_filter(member, **kwargs))
+
+  class Meta:
+    db_table = 'contracttype'
+
+class PositionManager(models.Manager):
+  def get_queryset(self):
+    return super(PositionManager, self).get_queryset().select_related('title')
+
+class Position(CrunchrModel):
+  position_id      = models.CharField(max_length=ID_STRING_LENGTH, null=True, unique=True, db_column="positionid")
+  title            = models.ForeignKey("PositionTitle", null=True)
+  # dotted_line and solid_line are nullable. This is necessary for the root (CEO) node in the implied hierarchy.
+  dotted_line      = models.ForeignKey("Position", related_name="Dotted Line",
+                                      null=True, db_constraint=False, db_column="dottedline_id")
+  solid_line       = models.ForeignKey("Position", related_name="SolidLine", 
+                                      null=True, db_constraint=False, db_column="solidline_id")
+  grade            = models.ForeignKey(Grade)
+  business_unit    = models.ForeignKey(BusinessUnit, db_column="businessunit_id")
+  functional_area  = models.ForeignKey(FunctionalArea, db_column="functionalarea_id")
+  location         = models.ForeignKey(Location, db_column="location_id")
+
+  active = ActivePositionManager.from_queryset(CrunchrQuerySet)()
+  objects = PositionManager.from_queryset(CrunchrQuerySet)()
+  
+  def __str__(self):
+    title = self.title.title if self.title is not None else ''
+    return "%s - %s" % (str(self.pk), title) 
+  
+  class Meta:
+    db_table = 'position'
+
+class PositionTitle(CrunchrModel):
+  title = models.CharField(max_length=POSITION_TITLE_LENGTH, unique=True)
+  missing = models.BooleanField(default=False, null=False)
+
+  def __str__(self):
+    return str(self.title)
+
+  class Meta:
+    db_table = 'positiontitle'
+
+
+class MultiPosition(CrunchrModel):
+  title                  = models.ForeignKey("PositionTitle", null=True)
+  dotted_line            = models.ForeignKey("Position", related_name="multiposition_dotted_line",
+                                            null=True, db_constraint=False, db_column="dottedline_id")
+  solid_line             = models.ForeignKey("Position", related_name="multiposition_solid_line", 
+                                            null=True, db_constraint=False, db_column="solidline_id")
+  grade                  = models.ForeignKey(Grade)
+  business_unit          = models.ForeignKey(BusinessUnit, db_column="businessunit_id")
+  functional_area        = models.ForeignKey(FunctionalArea, db_column="functionalarea_id")
+  location               = models.ForeignKey(Location, db_column="location_id")
+  headcount              = models.PositiveIntegerField()
+  total_fte              = models.PositiveIntegerField(db_column='totalfte')
+  gender_count_male      = models.PositiveIntegerField(db_column='gendercountmale')
+  gender_count_female    = models.PositiveIntegerField(db_column='gendercountfemale')
+  gender_count_other     = models.PositiveIntegerField(db_column='gendercountother')
+  gender_count_unknown   = models.PositiveIntegerField(db_column='gendercountunknown')
+  age_average            = models.DecimalField(null=True, max_digits=13, decimal_places=10, db_column='ageaverage')
+  years_of_service_avg   = models.DecimalField(null=True, max_digits=13, decimal_places=10, db_column='yearsofserviceavg')
+  years_in_position_avg  = models.DecimalField(null=True, max_digits=13, decimal_places=10, db_column='yearsinpositionavg')
+  multiposition_id       = models.CharField(max_length=ID_STRING_LENGTH, null=True, unique=True, db_column="multipositionid")
+  chunk                  = models.ForeignKey('Chunk', null=True, on_delete=models.SET_NULL)
+  data_source            = models.ForeignKey(DataSource, db_column="datasource_id")
+
+  objects = PositionManager.from_queryset(CrunchrQuerySet)()
+
+  def __str__(self):
+    title = self.title.title if self.title is not None else ''
+    return "%s - %s" % (str(self.pk), title)
+
+  class Meta:
+    db_table = 'multiposition'
+
+
+class Employee(CrunchrModel):
+  person                = models.OneToOneField(Person, db_column="person_id")
+  talent_status         = models.ForeignKey(TalentStatus, db_column="talentstatus_id")
+  retention_risk        = models.ForeignKey(RetentionRisk, db_column="retentionrisk_id")
+  retention_risk_reason = models.ForeignKey(RetentionRiskReason, db_column="retentionriskreason_id")
+  potential             = models.ForeignKey(Potential, db_column="potential_id")
+  mobility              = models.ForeignKey(Mobility, db_column="mobility_id")
+  grade                 = models.ForeignKey(Grade, db_column="grade_id")
+  employee_id           = models.CharField(max_length=ID_STRING_LENGTH, null=True, unique=True, db_column="employeeid")
+  contract_type         = models.ForeignKey('ContractType', null=True, on_delete=SET_NULL, db_column='contracttype_id')
+ 
+  active = ActiveEmployeeManager.from_queryset(CrunchrQuerySet)()
+  
+  def get_related_field_of_attrib(attrib):
+    """
+    Return related fields for attribute.
+    Can be used by the generic filter.
+    """
+    if attrib in ["gender", "first_name", "last_name"]:
+      return "person__" + attrib
+    elif attrib in ["title", "businessUnit", "functionalArea", "location"]:
+      return "position__" + attrib
+    elif attrib in ["years_of_service", "years_in_position", "age"]:
+      return "converteddates__" + attrib
+    else:
+      return attrib
+  
+  def __str__(self):
+    person = self.person.first_name + " " + self.person.last_name
+    return "%s - %s" % (str(self.pk), person) 
+ 
+  class Meta:
+    db_table = 'employee'
+
+
+# TODO: Turn into an enum model
+class SuccessionTerm(OrderedEnumModel, EnumTable):
+  SHORT_TERM = 1
+  MID_TERM = 2
+  LONG_TERM = 3
+  MAJOR_TERMS = ((1, 'short term'), 
+                 (2, 'mid term'), 
+                 (3, 'long term'))
+  original_name   = models.CharField(max_length=ENUM_ORIGINAL_NAME_LENGTH, null=True, db_column="originalname")
+  description     = models.CharField(max_length=ENUM_DESCRIPTION_LENGTH, blank=True, default="")
+  major_term      = models.IntegerField(choices=MAJOR_TERMS, db_column='majorterm')
+
+  @classmethod
+  def _members_filter(cls, member, **kwargs):
+    """
+    SuccessionTerm's can be filtered using major_term (and with min_score and max_score
+    because we include the OrderedEnumModel mixin)
+    """
+    major_term = kwargs.get('major_term')
+    return ((major_term == None or major_term == member.major_term) and 
+           super(SuccessionTerm, cls)._members_filter(member, **kwargs))
+  
+  def __str__(self):
+    original_name = self.original_name if self.original_name is not None else ''
+    return '%s - %s (%s)' % (str(self.pk), original_name, self.score)
+    
+  class Meta:
+    db_table = 'successionterm'
+
+
+class Succession(CrunchrModel):
+    position    = models.ForeignKey(Position, db_column="position_id")
+    employee    = models.ForeignKey(Employee, db_column="employee_id")
+    term        = models.ForeignKey(SuccessionTerm)
+
+    def __str__(self):
+      return ' '.join([str(self.position), str(self.employee), str(self.term)]) 
+    
+    class Meta:
+      db_table = 'succession'
+
+
+# Describes a partition of the data that is protected by access privileges.
+# Each role grants access to a set of chunks
+class Chunk(models.Model):
+  business_unit = models.ForeignKey(BusinessUnit, null=False, db_column='businessunit_id')
+  functional_area = models.ForeignKey(FunctionalArea, null=False, db_column='functionalarea_id')
+  location = models.ForeignKey(Location, null=False)
+
+  @staticmethod
+  def generate_chunks(): 
+    """Regenerates the contents of the chunk table. It first drops all rows. Then all 
+    positions and employees are iterated to identify and create all chunks. Finally,
+    we will make sure that all Positions will reference the newly created chunks
+    """    
+#    chunk_set = [
+#        (pos["business_unit"], pos["functional_area"], pos["location"]) 
+#        for pos 
+#        in Position.objects.values("business_unit", "functional_area", "location").distinct()
+#    ]
+    chunks_query = """
+      SELECT DISTINCT location_id, businessunit_id, functionalarea_id FROM position
+      UNION
+      SELECT DISTINCT location_id, businessunit_id, functionalarea_id FROM multiposition"""
+    cursor = connection.cursor()
+    cursor.execute(chunks_query)
+    chunk_set = cursor.fetchall()
+
+
+    new_chunks = [
+        Chunk(location_id=chunk[0], business_unit_id=chunk[1], functional_area_id=chunk[2]) 
+        for chunk
+        in chunk_set
+    ]
+
+    Chunk.objects.bulk_create(new_chunks)
+    
+    # Populate Position.chunk_id
+    new_chunks = Chunk.objects.all()
+    Chunk._update_chunk_ids(new_chunks)
+          
+  @transaction.atomic      
+  def _update_chunk_ids(new_chunks):
+    for i, chunk in enumerate(new_chunks):
+      Job.objects.filter(
+          position__business_unit=chunk.business_unit, 
+          position__functional_area=chunk.functional_area, 
+          position__location=chunk.location
+      ).update(chunk = chunk)
+      MultiPosition.objects.filter(
+          business_unit=chunk.business_unit, 
+          functional_area=chunk.functional_area, 
+          location=chunk.location
+      ).update(chunk = chunk)
+
+  def __str__(self):
+    return 'Chunk: ['.join([self.business_unit.name, ' - ', self.functional_area.name, ' - ', self.location.name, ']',]) 
+
+  class Meta:
+    db_table= 'chunk'
+
+
+class Role(models.Model):
+  """The role has a one-to-one mapping with a Django auth group. It has a name, description
+  as well as multiple rules. Roles without rules do not provide access to any data.
+  The chunks the role gives access to are stored in the chunks many-to-many relation and should be 
+  regenerated when any of the rules of the role changes."""
+  name = models.CharField(max_length=50)
+  description = models.CharField(max_length=500)
+  group = models.OneToOneField(Group)
+  chunks = models.ManyToManyField(Chunk, related_name='roles', null=True)
+
+  def create_business_unit_rule(self, allowed_business_units):
+    """Creates a rule for this role that checks whether the data is part of
+    specific business units. Note that the hierarchy is not respected (i.e
+    when A is the parent of B, including A does not imply that B will pass
+    the rule."""
+    value_set_json = json.dumps([bu.id for bu in allowed_business_units])
+    rule = Rule(field = Rule.BUSINESS_UNIT_FIELD, role = self, value_set = value_set_json)
+    rule.save()
+
+  def create_functional_area_rule(self, allowed_functional_areas):
+    """ Creates a rule for this role that grants access based on the functional
+    area. Note that the hierarchy is not respected (i.e when A is the
+    parent of B, including A does not imply that B will pass the rule."""
+    value_set_json = json.dumps([fa.id for fa in allowed_functional_areas])
+    rule = Rule(field = Rule.FUNCTIONAL_AREA_FIELD, role = self, value_set = value_set_json)
+    rule.save()
+
+  def create_location_rule(self, allowed_locations):
+    """Creates a rule for this role that allows access based on location. Note
+    that the hierarchy is not respected (i.e when A is the parent of B,
+    including A does not imply that B will pass the rule."""
+    value_set_json = json.dumps([loc.id for loc in allowed_locations])
+    rule = Rule(field = Rule.LOCATION_FIELD, role = self, value_set = value_set_json)
+    rule.save()
+
+  @staticmethod
+  def update_all():
+    """Updates chunks for all roles. We should call this after regenerating the chunks."""
+    for role in Role.objects.all():
+      role.update()
+
+  def update(self):
+    """Updates the chunks to which this role grants access. This is done by evaluating all
+    the rules on the total chunk set, which leaves us with the accessible ones. """
+    self.chunks.clear()
+    allowed_for_role = Chunk.objects.all()
+    for rule in self.rules.all():
+      allowed_for_role = rule.evaluate(allowed_for_role)
+    self.chunks.add(*allowed_for_role)
+
+  def get_chunk_ids(self):
+    """Returns a set containing the ID's of all chunks we have access to."""
+    return {chunk.id for chunk in self.chunks.all()}
+
+  @staticmethod
+  def for_user(user):
+    """Get the set of roles of a user."""
+    return {group.role for group in user.groups.all() if hasattr(group, 'role')}
+
+  @staticmethod
+  def get_chunk_ids_for_user(user):
+    """Gets all chunk ids for a user. This will inspect all the roles of the user and create
+    the union of all chunk id's accessible to these roles."""
+    if(hasattr(user, 'chunk_ids') and user.chunk_ids is not None):
+      return user.chunk_ids
+    chunks_for_roles = [role.get_chunk_ids() for role in Role.for_user(user)]
+    return set().union(*chunks_for_roles)
+
+  def __str__(self):
+    return str(self.pk) + ' - ' + self.name
+
+  class Meta:
+    db_table= 'role'
+
+class Rule(models.Model):
+  """A rule specifies a condition that must be true for data to become visible to the user.
+  When a role has multiple rules, all rules must be true (AND) before data is shown.
+  A rule is always applied to a specific field, which is one of the fields in RULE_FIELD.
+ 
+  The valueset will contain a set of IDs into a table specific to the field. For example
+  field=location will result in the IDs pointing into the location table."""
+  BUSINESS_UNIT_FIELD = 1
+  FUNCTIONAL_AREA_FIELD = 2
+  LOCATION_FIELD = 3
+  RULE_FIELD = (
+    (BUSINESS_UNIT_FIELD,    'businessunit'),
+    (FUNCTIONAL_AREA_FIELD,  'functionalarea'),
+    (LOCATION_FIELD,         'location'),
+  )
+  field = models.IntegerField(choices=RULE_FIELD)
+  # This is a JSON field because the set of 'allowed' values can be described in different
+  # ways depending on 'field'. For example, we can have a set of ID's (for location, business unit)
+  # Alternatively, we can have a min/max filter if we want to filter salary or grade
+  # Since we will always pre-process the rules, the DB does not need to query this field, which
+  # is why we can use JSON instead of a datatype the DB understands
+  value_set = models.TextField()
+  role = models.ForeignKey(Role, related_name='rules')
+
+  @staticmethod
+  def get_field_enum_id(rule_field):
+    """
+    Returns the enum value for a given rule_field String.
+    Example: 
+    get_enum_id('businessunit') returns 1
+    """
+    return [value for key, value in enumerate(Rule.RULE_FIELD) 
+             if value[1] == rule_field][0][0]
+
+  def format_value_set(self):
+    """
+    Returns formatted value_set.
+    """
+    if(self.field == Rule.BUSINESS_UNIT_FIELD):
+      return self._format_business_unit_set()
+    if(self.field == Rule.FUNCTIONAL_AREA_FIELD):
+      return self._format_function_area_set()
+    if(self.field == Rule.LOCATION_FIELD):
+      return self._format_location_set()
+
+  def _format_business_unit_set(self):
+    """
+    Returns formatted values set if field is set to 'businessunit'.
+    Throws ValueError otherwise.
+    """
+    if(self.field != Rule.BUSINESS_UNIT_FIELD):
+      raise ValueError("Can't format as Business Unit, since field is set to" + self.format_field())
+    return unicode(list(BusinessUnit.objects.filter(pk__in=self.get_value_set()).all()))
+
+  def _format_functional_area_set(self):
+    """
+    Returns formatted values set if field is set to 'functional area'.
+    Raises ValueError otherwise.
+    """
+    if(self.field != Rule.LOCATION_FIELD):
+      raise ValueError("Can't format as functional area, since field is set to" + self.format_field())
+    return unicode(list(FunctionalArea.objects.filter(pk__in=self.get_value_set()).all()))
+
+  def _format_location_set(self):
+    """
+    Returns formatted values set if field is set to 'location'.
+    Raises ValueError otherwise.
+    """
+    if(self.field != 3):
+      raise ValueError("Can't format as location, since field is set to" + self.format_field())
+    return unicode(list(Location.objects.filter(pk__in=self.get_value_set()).all()))
+
+  def format_field(self):
+    """
+    Returns the formatted `field` for this Rule.
+    """
+    return [value for key,value in enumerate(Rule.RULE_FIELD) if value[0] == self.field][0][1]
+
+  def evaluate(self, chunks):
+    """Evaluates the rule against the given chunk instances. This results in a
+    filtered list of chunk instances.
+    """
+    # These fields are filtered based on sets of allowed ID's, 
+    # so interpret the json as such
+    allowed_ids = []
+    if (self.field in [Rule.BUSINESS_UNIT_FIELD, Rule.FUNCTIONAL_AREA_FIELD, Rule.LOCATION_FIELD]):
+      allowed_ids = json.loads(self.value_set)
+    else:
+      raise DBConsistencyError('Rule {:d} has an invalid field value.'.format(self.id))
+    # Do the filtering, based on ID's
+    if (self.field == Rule.BUSINESS_UNIT_FIELD):
+      return [c for c in chunks if c.business_unit.id in allowed_ids]
+    elif (self.field == Rule.FUNCTIONAL_AREA_FIELD):
+      return [c for c in chunks if c.functional_area.id in allowed_ids]
+    elif (self.field == Rule.LOCATION_FIELD):
+      return [c for c in chunks if c.location.id in allowed_ids]
+
+  def get_value_set(self):
+    """
+    Returns value_set in a Pythonic data structure.
+    """
+    return json.loads(self.value_set)
+
+  def set_value_set(self, value_set):
+    """
+    Accepts a pythonic value_set and sets it in the correct format.
+    """ 
+    self.value_set = json.dumps(value_set)
+
+  def __str__(self):
+    return ' '.join([self.role.name, str(self.field)])
+
+  class Meta:
+    db_table= 'rule'
+
+
+class ViewManager(models.Manager):
+  """Manager for Models that are linked to Postgres Views.
+  This manager overrides all methods that try to alter the data (e.g. save(),
+  create(), delete(), etc.).
+  These methods now result in a NotImplementedError."""
+  def bulk_create(self, *args, **kwargs):
+    raise NotImplementedError
+   
+  def create(self, *args, **kwargs):
+    raise NotImplementedError
+   
+  def get_or_create(self, *args, **kwargs):
+    raise NotImplementedError
+   
+  def delete(self, *args, **kwargs):
+    raise NotImplementedError
+   
+  def update(self, *args, **kwargs):
+    raise NotImplementedError
+
+  @staticmethod
+  def refresh_materialized_views(**kwargs):
+    """Checks if any materialized views exists and refreshes them.
+       Returns the number of refreshed materialized views or raises an 
+       OperationalError if the postgres function for refreshing 
+       materialized views does not exists."""
+    schema = kwargs.get('schema', 'public')
+
+    cursor = connection.cursor()
+    # Check if necessary function exists
+    function_name = 'refreshallmaterializedviews'
+    function_exists_query = """SELECT COUNT(*) FROM pg_proc WHERE proname = %s"""
+    cursor.execute(function_exists_query, [function_name])
+    n_functions = cursor.fetchone()[0]
+
+    if(n_functions != 1):
+      # Function does not exist
+      raise OperationalError('No function exists for refreshing materialized views!')
+    
+    qry = """SELECT RefreshAllMaterializedViews(%s);"""
+    cursor.execute(qry, [schema])
+    return cursor.fetchone()[0]
+
+class CrunchrViewModel(CrunchrModel):
+  """Base class which is the root of our models that match Postgres Views.
+  Its default Manager contains all functions that provide
+  authorization functionality and overrides functions that alter the DB.
+  These now throw NotImplementedErrors.
+
+  Note that all CrunchrViewModels are also Filterable and Authorizable at 
+  the moment."""
+  objects = ViewManager.from_queryset(CrunchrQuerySet)()
+
+  class Meta:
+    abstract = True
+
+class ConvertedDatesPerson(CrunchrViewModel):
+  person            = models.OneToOneField(Person, primary_key=True, on_delete=DO_NOTHING)
+  age               = models.FloatField()
+  years_of_service  = models.FloatField(db_column="yearsofservice")
+
+
+  class Meta:
+    managed = False
+    db_table = 'view_converteddatesperson'
+
+class ConvertedDatesJob(CrunchrViewModel):
+  job               = models.OneToOneField(Job, primary_key=True, on_delete=DO_NOTHING)
+  years_in_position = models.FloatField(db_column="yearsinposition")
+
+  class Meta:
+    managed = False
+    db_table = 'view_converteddatesjob'
+
+
+class ShortTermSuccessors(CrunchrViewModel):
+  position                = models.OneToOneField(Position, db_column="position", primary_key=True, on_delete=DO_NOTHING)
+  title                   = models.CharField(max_length=200)
+  listed_successors       = models.FloatField()
+
+  class Meta:
+    managed = False
+    db_table = 'view_shorttermsuccessors'
+
+
+class MidTermSuccessors(CrunchrViewModel):
+  position                = models.OneToOneField(Position, db_column="position", primary_key=True, on_delete=DO_NOTHING)
+  title                   = models.CharField(max_length=200)
+  listed_successors       = models.FloatField()
+
+  class Meta:
+    managed = False
+    db_table = 'view_midtermsuccessors'
+
+
+class LongTermSuccessors(CrunchrViewModel):
+  position                = models.OneToOneField(Position, db_column="position", primary_key=True, on_delete=DO_NOTHING)
+  title                   = models.CharField(max_length=200)
+  listed_successors       = models.FloatField()
+
+  class Meta:
+    managed = False
+    db_table = 'view_longtermsuccessors'
+
+
+class ShortTermAvailableSuccessors(CrunchrViewModel):
+  position        = models.OneToOneField(Position, db_column="position", primary_key=True, on_delete=DO_NOTHING)
+  title           = models.CharField(max_length=200)
+  effective       = models.FloatField()
+
+  class Meta:
+    managed = False
+    db_table = 'view_shorttermavailablesuccessors'
+
+
+
+class MidTermAvailableSuccessors(CrunchrViewModel):
+  position        = models.OneToOneField(Position, db_column="position", primary_key=True, on_delete=DO_NOTHING)
+  title           = models.CharField(max_length=200)
+  effective       = models.FloatField()
+
+  class Meta:
+    managed = False
+    db_table = 'view_midtermavailablesuccessors'
+
+
+class LongTermAvailableSuccessors(CrunchrViewModel):
+  position        = models.OneToOneField(Position, db_column="position", primary_key=True, on_delete=DO_NOTHING)
+  title           = models.CharField(max_length=200)
+  effective       = models.FloatField()
+
+  class Meta:
+    managed = False
+    db_table = 'view_longtermavailablesuccessors'
+
+
+class ShortTermBench(CrunchrViewModel):
+  employee  = models.OneToOneField(Employee, db_column="employee", primary_key=True, on_delete=DO_NOTHING)
+  sucs      = models.IntegerField()
+
+  class Meta:
+    managed = False
+    db_table = 'view_shorttermbench'
+
+
+class MidTermBench(CrunchrViewModel):
+  employee   = models.OneToOneField(Employee, db_column="employee", primary_key=True, on_delete=DO_NOTHING)
+  sucs      = models.IntegerField()
+
+  class Meta:
+    managed = False
+    db_table = 'view_midtermbench'
+
+
+class LongTermBench(CrunchrViewModel):
+  employee    = models.OneToOneField(Employee, db_column="employee", primary_key=True, on_delete=DO_NOTHING)
+  sucs        = models.IntegerField()
+
+  class Meta:
+    managed = False
+    db_table = 'view_longtermbench'
+
+
+class TotalBench(CrunchrViewModel):
+  employee    = models.OneToOneField(Employee, db_column="employee", primary_key=True, on_delete=DO_NOTHING)
+  sucs        = models.IntegerField()
+
+  class Meta:
+    managed = False
+    db_table = 'view_totalbench'
+
+
+class PositionHierarchy(CrunchrModel):
+    position        = models.OneToOneField(Position, db_column="position_id", primary_key=True)
+    layer           = models.IntegerField(default=0)
+    direct_span     = models.IntegerField(default=0, db_column="directspan")
+    indirect_span   = models.IntegerField(default=0, db_column="indirectspan")
+
+    active = ActivePositionHierarchyManager.from_queryset(CrunchrQuerySet)()
+    ''' DEPRECATED SOON
+    def get_related_field_of_attrib(attrib):
+      if attrib in ["gender", "first_name", "last_name"]:
+        return "position__job__employee__person__" + attrib
+      elif attrib in ["title","positionGrade", "businessUnit", "functionalArea", "location"]:
+        return "position__" + attrib
+      elif attrib in ["years_of_service", "age"]:
+        return "position__job__employee__converteddatesemployee__" + attrib
+      elif attrib in ["years_in_position"]:
+        return "position__job__converteddatesjob__" + attrib
+      elif attrib in ["talent_status", "retention_risk", "potential", "mobility", "contract_type"]:
+        return "position__job__employee__" + attrib
+      elif attrib in ["performance_status", "job_status"]:
+        return "position__job__" + attrib
+      elif attrib in ["succession_term"]:
+        return "position__succession__term__" + attrib
+      else:
+        return None
+    '''    
+    class Meta:
+      db_table = 'positionhierarchy'
+      ordering = ['layer', '-direct_span']
+
+
+class MultiPositionHierarchy(CrunchrModel):
+    multi_position  = models.OneToOneField(MultiPosition, db_column="multiposition_id", primary_key=True)
+    layer           = models.IntegerField(default=0)
+    ''' DEPRECATED SOON
+    def get_related_field_of_attrib(attrib):
+      if attrib in ["title", "positionGrade", "businessUnit", "functionalArea", "location"]:
+        return "multi_position__" + attrib
+      else:
+        return None
+    '''
+    class Meta:
+      db_table = 'multipositionhierarchy'
+      ordering = ['layer']
+
+from database.q_factory import *
+
+
+def get_lookup_of_attrib_title(attrib):
+  if attrib in ["talent_status", "succession_term", "retention_risk", "performance_status", "potential", "mobility", "contract_type", "job_status"]:
+    return "__original_name"
+  elif attrib in ["grade", "employeeGrade", "positionGrade"]:
+    return "__global_grade"
+  elif attrib in ["location", "functional_area", "business_unit"]:
+    return "__name"
+  elif attrib in ["gender"]:
+    return ""
+  else:
+    return None 

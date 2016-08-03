@@ -1,0 +1,75 @@
+<?php
+class timeslots extends controller{
+  function __construct(){
+    parent::__construct();
+    $this->_list_tpl = TEMPLATE_ROOT . 'management/timeslots.tpl';
+    $this->_edit_tpl = TEMPLATE_ROOT . 'management/edit-timeslot.tpl';
+    $this->_create_tpl = TEMPLATE_ROOT . 'management/create-timeslot.tpl';
+    $this->_ANYONE_CAN_EDIT = TRUE;
+  }
+
+  function POST($id){
+    global $_SESSION;
+    $this->_matches = $id;
+    if(count($id) > 2){
+      if($this->_user['is_superuser'] && isset($_POST['owner'])){
+        $owner_id = $_POST['owner'];
+      } else {
+        $owner_id = $this->_user['id'];
+      }
+      $newTimeSlot = $id[2] == "new";
+
+      $start = TimeSlot::formatDate($_POST['start']);
+      $end = TimeSlot::formatDate($_POST['end']);
+      $label = $_POST['label'];
+      if($label === ""){
+        $label = NULL;
+      }
+      $timeSlot = TimeSlot::fromData($label, $owner_id, $start, $end);
+      if(!$newTimeSlot){
+        // an id was provided. We're updating the given id.
+        $timeSlot->id = $id[2];
+        $id = $timeSlot->update($this->_db);
+      } else {
+        $id = $timeSlot->create($this->_db);
+      }
+      $this->all($id);
+    } else {
+      // no id was provided. Which timeslot are we trying to update??
+      // TODO: this might have to result in creating a new timeslot 
+      throw new Exception('Tried to alter timeslot without providing ID');
+    }
+  }
+  
+  function edit($id){
+    $timeslot = TimeSlot::get_auth_assoc($this->_db, $id);
+    if($timeslot == NULL){
+      $this->_response_not_authorized(
+        'Oops',
+        "Couldn't find Timeslot with id '$id'"
+      );
+    } else {
+      $data = array(
+        'timeslot' => $timeslot,
+        'user'     => $this->_user,
+        'users'    => User::get_dropdown_options($this->_db, $this->_user)
+      );
+      parent::output($this->_edit_tpl, $data);
+    }
+  }
+  
+  function delete($id){
+    $result = TimeSlot::delete($this->_db, $id);
+    $this->all($this->_db);
+  }
+
+  function all($highlighId=FALSE){
+    $data = array(
+      'timeslots' => TimeSlot::get_all_auth_assoc($this->_db,
+                                                  $this->_user),
+      'highlight_id' => $highlighId
+    );
+    parent::output($this->_list_tpl, $data);
+  }
+}
+?>

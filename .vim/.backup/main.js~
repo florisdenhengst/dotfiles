@@ -1,0 +1,9 @@
+var FADE_OUT_TIME = 2000;
+var FADE_OUT_DURATION = 1000;
+var ANIMATION_STYLE = 'swing';
+
+$(document).ready(function(){
+  setTimeout(function(){
+    $('.bg-success').removeClass('bg-success');
+  }, FADE_OUT_TIME);
+});

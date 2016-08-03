@@ -1,0 +1,125 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <errno.h>
+#include <string.h>
+#include <signal.h>
+
+/* Required nr of command line arguments*/
+#define REQ_ARGS 2
+char REAL_TIME[9] = "realtime";
+
+/* count the number of expected signals.*/
+volatile sig_atomic_t expected_signals = 0;
+
+void signal_handler(int sig, siginfo_t *info, void *extra){
+  printf("signal from child %d\n", info->si_pid);
+  expected_signals--;
+}
+
+void child(int expdtn_arrvd_signal){
+  printf("started child %d\n", getpid());
+  kill(getppid(), expdtn_arrvd_signal);
+
+  exit(0);
+}
+
+void parse_args(int argc, char *argv[], int* n_children, int* real_time_signals){
+  char normal_or_realtime[9];
+  int equal;
+  if(argc != REQ_ARGS + 1){
+    printf("Usage: ./out [n_children] <realtime/normal> \n");
+    exit(EXIT_FAILURE);
+  }
+
+  /* convert char[] to integer and save in n_children*/
+  *n_children = atoi(argv[1]);
+
+  /* if 'realtime' is provided as argument, we'll use a real time SIGNAL */
+  equal = strcmp(argv[2], REAL_TIME);
+  printf("eqaul %d\n", equal);
+  if(equal == 0){
+    *real_time_signals = 0;
+    strcpy(normal_or_realtime, "realtime");
+  } else {
+    *real_time_signals = 1;
+    strcpy(normal_or_realtime, "normal");
+  }
+  printf("Starting using %d threads and %s signals\n", *n_children, normal_or_realtime);
+}
+
+int main(int argc, char *argv[]){
+  int n_children,               // n of required forks / child processes
+      real_time,                // 1 for real_time. 0 for normal
+      started_children,         // number of children that was started before
+      running_children,         // *current* number of running child processes
+      done_status,              // save status of exiting child status
+      used_signal;              // the signal that is being used for this test run
+
+  pid_t process_id,             // store result of fork()
+        done_pid;               // process_id of a child that has exited
+
+  
+  parse_args(argc, argv, &n_children, &real_time);
+  
+  if(real_time == 0){
+    // any signal between SIGRTMIN and SIGRTMAX will do
+    used_signal = SIGRTMIN + 1;
+  } else {
+    /* we can use SIGUSR1 for instance */
+    used_signal = SIGUSR1;
+  }
+
+  /* create struct for setting options*/
+  struct sigaction action_settings;
+  /* create a mask to block all other signals while the handler is running */
+  sigset_t block_mask;
+  /* Fill up the block mask, i.e. block all other signals (except for SIGKILL) */
+  sigfillset(&block_mask);
+
+  /* make a reference to the handler function */
+  action_settings.sa_sigaction = signal_handler; 
+  /* set the mask blocking all other signals to this handler */
+  action_settings.sa_mask = block_mask;
+  /* sa_flags enables us to choose between different kinds of behavior.
+   * We'll go for SA_SIGINFO as it inserts some process info to the signal handler function call.*/
+  action_settings.sa_flags = SA_SIGINFO;
+  /* system call to set behavior of used_signal */
+  sigaction (used_signal, &action_settings, NULL);
+
+  /* we know the amount of children, i.e. the amount of expected signals */
+  expected_signals = n_children;
+  
+  /* spawn children */
+  running_children = 0;
+  for(started_children = 0; started_children < n_children; started_children++){
+    process_id = fork();
+    if(process_id == -1){
+      /* fork failed */
+      perror("Fork failed!");
+    } else if(process_id == 0){
+      /* child process */
+      child(used_signal);
+    } else{
+      /* parent process */
+      running_children ++;
+    }
+  }
+  /* Let's check if everyone has signaled to the parent ... */
+  while(expected_signals > 0){
+    printf("parent waiting for %d children to signal\n", expected_signals);
+    sleep(1);
+  }
+  printf("All children signaled!\n");
+  
+  /* Wait for the child processes to exit cleanly */
+  while(running_children > 0){
+    done_pid = wait(&done_status);
+    printf("child %d exited (%d)\n", (int) done_pid, done_status);
+    running_children --;
+  }
+  printf("====================parent done===============\n");
+
+  sleep(1);
+}

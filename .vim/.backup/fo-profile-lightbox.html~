@@ -1,0 +1,84 @@
+
+<!-- Active position lightbox -->
+<div style="display:none">
+  <div id="activePosition" class="position-info">
+    <ng-include
+      onclick="$.colorbox.close();"
+      class="close"
+      src="'/static/kapstok/logos/close.svg'">
+      </ng-include>
+    <h1 ng-bind-html="positionDetails ? (positionDetails['last-name'].v + ', ' + positionDetails['first-name'].v) : '&nbsp;'"></h1>
+    
+    <div class="spoc" ng-show="positionDetails['direct-span-list'].v.length > 0">
+    
+      <h2>DIRECT SPAN</h2>
+      
+      <div class="window">
+        <ol>
+          <li class="incentive" ng-repeat="p in positionDetails['direct-span-list'].v"
+              ng-click="callCallbackFunction(positionDetails['layer'].v + 1, p.v)">
+              {{p.f}}
+          </li>
+        </ol>
+      </div>
+    </div>
+    
+    <table>
+      <th colspan="2"><h2>PROFILE INFORMATION</h2></th>
+      
+      <tr>
+        <td>Reporting Layer:</td>
+        <td class="incentive" 
+          ng-click="goToReportingLayer()">
+          {{positionDetails['layer'].v}}
+         </td>
+      </tr>
+      <tr>
+        <td>Direct Span:</td>
+        <td>{{positionDetails['direct-span'].v}}</td>
+      </tr>
+      <tr>
+        <td>Indirect Span:</td>
+        <td>{{positionDetails['indirect-span'].v}}</td>
+      </tr>
+      
+      <tr />
+      
+      <tr>
+        <td>Gender:</td>
+        <td>{{positionDetails['gender'].v}}</td>
+      </tr>
+      <tr>
+        <td>Age:</td>
+        <td>{{positionDetails['age'].v}}</td>
+      </tr>
+      <tr>
+        <td>Job title:</td>
+        <td>{{positionDetails['job-title'].v}}</td>
+      </tr>
+      <tr>
+        <td>Location:</td>
+        <td>{{positionDetails['location'].v}}</td>
+      </tr>        
+      <tr>
+        <td>Functional Area:</td>
+        <td>{{positionDetails['function'].v}}</td>
+      </tr>
+      <tr>
+        <td>Business Unit:</td>
+        <td>{{positionDetails['business'].v}}</td>
+      </tr>
+      
+      <tr />
+      
+      <tr ng-show="positionDetails['boss'].v">
+        <td>Boss:</td>
+        <td class="incentive" 
+            ng-click="callCallbackFunction(positionDetails['layer'].v - 1, positionDetails['boss'].v)">
+          {{positionDetails['boss'].f}}
+        </td>
+      </tr>
+    </table>
+    
+  </div>
+</div>

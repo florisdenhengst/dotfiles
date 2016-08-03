@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""Contains the succession importer"""
+
+from database.csvtool import consts
+from database.csvtool import base
+from database.csvtool import EnumColumnMapper
+from database.csvtool import TableColumnMapper
+from database.models import core
+from database.models import Position
+from database.models import Employee
+from database.models import DataSource
+from database.models import SuccessionTerm
+from django.db import transaction
+from django.db import DatabaseError
+import traceback
+
+def can_import_succession(capture_month, log, **options):
+  if (DataSource.objects.filter(timeslice__capture_month=capture_month,
+                                csv_format=DataSource.CSV_CORE)
+                       .count() != 1):
+    log.report_error("No core dataset was imported for month {}. Cannot import succession data!" \
+                     .format(capture_month))
+    return False
+  if SuccessionTerm.objects.count() == 0:
+    log.report_error("No SuccessionTerms in database. Please add them and retry")
+    return False
+  return True
+
+
+def parse_succession_csv(csv_reader, log, *args, **options):
+  # Check for missing columns
+  csv_column_names = csv_reader.__next__()
+  for column_name in consts.SUCCESSION_REQUIRED_CSV_COLUMNS:
+    if column_name not in csv_column_names:
+      log.report_error("Missing csv column {}".format(column_name))
+
+  term_cm = EnumColumnMapper.create_from_db('term', 'SuccessionTerm', log)
+  succession_mapper = TableColumnMapper(log, 'Succession', 'crunchr_succession_id', \
+    ['employee', 'position', 'term', 'succession_id'],
+    ['employee', 'position', 'term'])
+
+  # Parse csv rows into dictionaries and iterate over these
+  rowdicts = base.rows_to_rowdicts(csv_reader, csv_column_names, log)
+  for rowdict in rowdicts:
+    log.row_nr = rowdict[consts.CSV_ROW_KEY]
+
+    # Validate columns
+    base.process_integer(log, rowdict, 'crunchr_succession_id')
+    base.process_string(log, rowdict, 'succession_id', max_length=core.ID_STRING_LENGTH)
+    base.process_string(log, rowdict, 'employee', required=True, max_length=core.ID_STRING_LENGTH)
+    base.process_string(log, rowdict, 'position', required=True, max_length=core.ID_STRING_LENGTH)
+    term_cm.process(rowdict)
+
+    # Group individual columns into succession table entry
+    succession = succession_mapper.process(rowdict)
+    row_nr = rowdict[consts.CSV_ROW_KEY]
+    rowdict.clear()
+    rowdict[consts.CSV_ROW_KEY] = row_nr
+    rowdict['succession'] = succession
+
+  if not log.is_ok():
+    return None
+
+  # Validate employee ids / position_ids
+  employee_id_map = {e[0]:e[1] for e in Employee.objects.values_list('employee_id', 'id').all()}
+  position_id_map = {p[0]:p[1] for p in Position.objects.values_list('position_id', 'id').all()}
+  for rowdict in rowdicts:
+    log.row_nr = rowdict[consts.CSV_ROW_KEY]
+    succession = rowdict['succession']
+    employee_id = succession.fields.get('employee')
+    position_id = succession.fields.get('position')
+    if employee_id not in employee_id_map:
+      log.report_error("invalid employee id {} in succession".format(employee_id))
+      continue
+    if position_id not in position_id_map:
+      log.report_error("invalid position id {} in succession".format(position_id))
+      continue
+    succession.fields['employee'] = employee_id_map[employee_id]
+    succession.fields['position'] = position_id_map[position_id]
+
+  return rowdicts
+
+
+def import_succession(rowdicts, datasource, log, **options):
+  """Inserts successions into database"""
+  try:
+    for batch in base.transaction_batches(rowdicts):
+      with transaction.atomic():
+        for rowdict in batch:
+          log.row_nr = rowdict[consts.CSV_ROW_KEY]
+          succession = rowdict['succession']
+          # Insert succession and link it to the datasource
+          succession.fields['data_source'] = datasource.id
+          succession.insert()
+  except DatabaseError as dbe:
+    log.report_error("Database Exception caught: {}".format(dbe))
+    log.report_error("Stacktrace: {}".format(traceback.format_exc()))

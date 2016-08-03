@@ -1,0 +1,256 @@
+from database.models import *
+
+class ModelRoutingError(Exception):
+  """Indicates that no routes are found between two models.
+  This can have two causes:
+      - the model on which is being filtered is not filterable
+      - the attribute on which is being filtered is not supported
+  """
+  def __init__(self, msg):
+    self.msg = msg
+
+  def __str__(self):
+    return self.msg
+
+class InvalidAttributeError(Exception):
+  """Indicates that an invalid attribute is present in the selections
+  passed to the global filter."""
+  def __init__(self, msg):
+    self.msg = msg
+
+  def __str__(self):
+    return self.msg
+
+
+class QFactory():
+  """Builds Q objects for global filtering and authorisation."""
+  # THese selections are interpreted as being 'empty'
+  __EMPTY_SELECTIONS = [(), [], {}, None, '']
+
+  # Dictionary containing all filter attributes and their corresponding
+  # Django model Fields and filter lookups.
+  filter_attributes = {
+    "location":           {
+                            'field':     Position._meta.get_field('location'),
+                            'lookup': '_id__in',
+                          },
+    "functionalArea":     {
+                            'field':     Position._meta.get_field('functional_area'),
+                            'lookup': '_id__in',
+                          },
+    "businessUnit":       {
+                            'field':     Position._meta.get_field('business_unit'),
+                            'lookup': '_id__in',
+                          },
+    "jobTitle":           {
+                            'field':     Position._meta.get_field('id'),
+                            'lookup': '__in',
+                          },
+    "gender":             {
+                            'field':     Person._meta.get_field('gender'),
+                            'lookup': '__in',
+                          },
+    "age":                {
+                            'field':     ConvertedDatesPerson._meta.get_field('age'),
+                            'lookup': '__range',
+                          },
+    "talentStatus":       {
+                            'field':     Employee._meta.get_field('talent_status'),
+                            'lookup': '_id__in',
+                          },
+    "performanceStatus":  {
+                            'field':     Job._meta.get_field('performance_status'),
+                            'lookup': '_id__in',
+                          },
+    "grade":              {
+                            'field':     Employee._meta.get_field('grade'),
+                            'lookup': '_id__in',
+                          },
+    "chunk":              {
+                            'field':    Job._meta.get_field('chunk')
+                            'lookup': '_id__in',
+                          },
+  }
+  
+  # MultiPositions should be filtered in a different way, this dictionary
+  # describes on which attributes MultiPositions can be filtered and which
+  # lookup to apply.
+  multiposition_filter_attributes = {
+    "jobTitle":           {
+                            'field':     MultiPosition._meta.get_field('id'),
+                            'lookup': '__in',
+                          },
+    "functionalArea":     {
+                            'field':     MultiPosition._meta.get_field('functional_area'),
+                            'lookup': '_id__in',
+                          },
+    "businessUnit":       {
+                            'field':     MultiPosition._meta.get_field('business_unit'),
+                            'lookup': '_id__in',
+                          },
+    "location":           {
+                            'field':     MultiPosition._meta.get_field('location'),
+                            'lookup': '_id__in',
+                          },
+    "grade":              {
+                            'field':     MultiPosition._meta.get_field('grade'),
+                            'lookup': '_id__in',
+                          },
+  }
+  
+  # Dictionary containing all routes from Django models to other Django models
+  # that are necessary for filtering.
+  routes = {
+      Person:
+        { Employee:             "employee__",
+          Job:                  "employee__job__",
+          Position:             "employee__job__position__",
+          ConvertedDatesPerson: "converteddatesperson__",
+          Person:               "",
+        },
+
+      Employee: 
+        { Person:               "person__",
+          Job:                  "job__",
+          Position:             "job__position__",
+          ConvertedDatesPerson: "person__converteddatesperson__",
+          Employee:             "",
+        },
+
+      Position: 
+        { Job:                  "job__",
+          Employee:             "job__employee__",
+          Person:               "job__employee__person__",
+          ConvertedDatesPerson: "job__employee__person__converteddatesperson__",
+          Position:             "",
+        },
+
+      Job: 
+        { Person:               "employee__person__",
+          Employee:             "employee__",
+          Position:             "position__",
+          ConvertedDatesPerson: "employee__person__converteddatesperson__",
+          Job:                  "",
+        },
+      ConvertedDatesPerson:
+        { Person:               "person__",
+          Employee:             "person__employee__",
+          Position:             "person__employee__job__position__",
+          Job:                  "person__employee__job__",
+          ConvertedDatesPerson: ""
+        },
+      Succession:
+        { Person:               "position__job__employee__person__",
+          Employee:             "position__job__employee__",
+          Position:             "position__",
+          Job:                  "position__job__",
+          ConvertedDatesPerson: "position__job__employee__person__converteddatesperson__",
+        },
+    }
+
+  @staticmethod
+  def get_path_to_field(from_model, to_field):
+    """Function that returns the field from a Django Model to a Django Field
+    in a string format."""
+    try:
+      model_to_model_route = GlobalFilter.routes[from_model][to_field.model]
+    except KeyError:
+      raise ModelRoutingError("No route found from %s to %s" %
+          (str(from_model), str(to_field.model))
+        )
+    return model_to_model_route + to_field.name
+
+  @staticmethod
+  def get_q_node(model, to_attribute, selection, prefix):
+    """Returns a Q object describing the filter that should be applied to a model
+    in order to filter it on the attribute using the selection."""
+    if(selection in GlobalFilter.__EMPTY_SELECTIONS):
+      return Q()
+    # find the Field in which attribute can be found.
+    try:
+      to_field = GlobalFilter.filter_attributes[to_attribute]['field']
+    except KeyError:
+      raise InvalidAttributeError("'%s' is not a valid filter attribute" %
+          (str(to_attribute))
+        )
+    # find the route from the model we want to filter to the Field
+    lookup = prefix + GlobalFilter.get_path_to_field(model, to_field)
+    # apply the correct filter lookup
+    lookup += GlobalFilter.filter_attributes[to_attribute]['lookup']
+    
+    filter_part = {lookup: selection}
+    return Q(**filter_part)
+
+  @staticmethod
+  def get_filter(model, selections, *args, **kwargs):
+    """Returns a Q object describing the filter that should be aplied to a model
+    in order to filter it on selections. Provide the key-word argument 'through'
+    containing a field of model in a string in order to define the field through
+    which should be filtered."""
+    through = kwargs.get('through', None)
+    prefix = kwargs.get('prefix', '')
+    if(through is not None):
+      # The first step to take in routing is defined by a (possibly reverse)
+      # related field. We find a reference to this (possibly reverse) related field.
+      # We can't use model._meta.get_field(through), as it does not fetch
+      # reverse related fields.
+      through_field = model._meta.get_field_by_name(through)
+      # Find the model to which the first step is made.
+      if(through_field[2]):
+        # If through_field lives in model, we reference the model it points to.
+        through_model = through_field[0].rel.to
+      else:
+        # If through_field does not exist in model, but is a reverse related
+        # field, we reference the model it lives in.
+        through_model = through_field[0].model
+      # Continue routing from this model as regular, but do append a prefix to ensure the
+      # first step is included in every lookup.
+      return GlobalFilter.get_filter(through_model, selections, prefix = through + '__')
+    else:
+      # No first step is defined. We can use the default route.
+      if(model is MultiPosition):
+        # MultiPositions form a special case, as we can also filter them on some
+        # attributes (e.g. 'location') that reside in different models by
+        # default.
+        return GlobalFilter.__get_multiposition_filter(selections, prefix)
+      # Default case: instantiate an empty Q object (note than empty Q object
+      # will result in no filtering.
+      result = Q()
+      for k in selections:
+        # Fech Q objects for all attributes and chain them using 'AND'.
+        result = result & GlobalFilter.get_q_node(model, k, selections[k], prefix)
+      return result
+
+  @staticmethod
+  def __get_multiposition_filter_part(to_attribute, selection, prefix):
+    """Returns a Q object describing the filter that should be aplied to a model
+    in order to filter it on the attribute using the selection, tailored
+    for filtering on the MultiPositions model."""
+    if(selection in GlobalFilter.__EMPTY_SELECTIONS):
+      return Q()
+    # find the Field in which attribute can be found.
+    try:
+      to_field = GlobalFilter.multiposition_filter_attributes[to_attribute]['field']
+    except KeyError: 
+      raise InvalidAttributeError("MultiPositions can't be filtered on attribute '%s'" %
+          (str(to_attribute))
+        )
+    # we want to filter on the mp.field 
+    lookup = prefix + to_field.name 
+    # apply the correct filter lookup
+    lookup += GlobalFilter.multiposition_filter_attributes[to_attribute]['lookup']
+    
+    filter_part = {lookup: selection}
+    return Q(**filter_part)
+
+
+  @staticmethod
+  def __get_multiposition_filter(selections, prefix):
+    """MultiPositions require custom filtering. This method provides the
+    functionality."""
+    result = Q()
+    for k in selections:
+      result = result & GlobalFilter.__get_multiposition_filter_part(k, 
+        selections[k], prefix)
+    return result
+

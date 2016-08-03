@@ -1,0 +1,17 @@
+<html>
+  <head>
+    <title>Event Display Maintenance</title>
+  </head>
+
+  <h1>Users</h1>
+  <body>
+    <table>
+      {foreach $users user}
+      <tr>
+        <td>{$user.id}</td>
+        <td><{$user.username}</td>
+      </tr>
+      {/foreach}
+    </table>
+  </body>
+</html>

@@ -1,0 +1,137 @@
+from csv_preparser import *
+import matplotlib.pyplot as plt
+import numpy as np
+import sklearn as sk
+from sklearn import metrics # import precision_recall_curve
+import sys
+
+def get_bracket(data, start, end):
+  # we have to add +1 since slicing results in index bracket_end - 1 being the last
+  return data[:, bracket_start:bracket_end + 1]
+
+def finalize_scores(data):
+  # extract a final score for each entry for all scores.
+  return [max(row) for row in data]
+
+if len(sys.argv) < 4:
+  print('Usage: python plot_lof <bracket_size> <score_file> <classes_file> <?save_to_dir>')
+  exit(1)
+
+DELIMITER = ','
+COL_OFFSET = 1
+TOP_N = 1000
+ALPHA = .02
+
+bracket_size = int(sys.argv[1])
+score_file = sys.argv[2]
+classes_file = sys.argv[3]
+save_to_dir = None
+if len(sys.argv) == 5:
+  save_to_dir = sys.argv[4]
+
+n_cols = detect_n_cols(score_file, DELIMITER)
+# skip the first col, it contains a header
+cols_to_use = range(COL_OFFSET, n_cols - COL_OFFSET)
+
+sprint("Reading matrix from score file...")
+data = np.loadtxt(open(score_file, "rb"), delimiter=DELIMITER, skiprows=1, usecols=cols_to_use)
+print("done!")
+
+original_data = data
+n_rows = data.shape[0]
+n_cols = data.shape[1]
+print("Found {} rows and {} cols".format(n_rows, n_cols))
+
+sprint("Reading matrix from classes file...")
+classes = np.loadtxt(open(classes_file, "rb"), delimiter=DELIMITER, skiprows=0)
+print("done!")
+
+assert classes.shape[0] == data.shape[0]
+
+colnames = head(score_file, delim=DELIMITER)[min(cols_to_use):max(cols_to_use)+1]
+assert len(colnames) == data.shape[1]
+
+aucs = []
+for bracket_size in [1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 65, 70]:
+    bracket_columns = [range(x, x+bracket_size) for x in range(n_cols-bracket_size)]
+    print("Using {} brackets.".format(len(bracket_columns)))
+
+    for bracket_range in bracket_columns:
+      bracket_start = min(bracket_range)
+      bracket_end = max(bracket_range)
+
+      # determine per-instance highest score within the bracket
+      bracket = get_bracket(data, bracket_start, bracket_end)
+      assert bracket.shape[0] == data.shape[0]
+      assert bracket.shape[1] == len(bracket_range)
+
+      final_scores = finalize_scores(bracket)
+      assert len(final_scores) == bracket.shape[0]
+
+      assert len(classes[:,1]) == len(final_scores)
+
+      # determine PR-curve
+      (precision, recall, _) = metrics.precision_recall_curve(classes[:,1], final_scores, pos_label=-1)
+
+      # calculate AUR
+      auc = metrics.auc(recall, precision)
+      aucs.append((bracket_range, auc, (precision, recall)))
+
+# sort aucs by auc
+aucs = sorted(aucs, key=lambda tup: tup[1], reverse=True)
+
+# count the number of positives
+n_positives = len([y for y in classes[:,1] if y > 0])
+
+failures= 0
+for (thisrange, auc, (precision, recall)) in aucs[0:TOP_N]:
+  label = '{}-{}:{:0.4f}'.format(
+                                 colnames[min(thisrange)],
+                                 colnames[max(thisrange)],
+                                 auc)
+  absolute_recall = sorted([r*n_positives for r in recall])
+  try:
+    plt.plot(recall, precision, label=label, alpha=ALPHA, color='k')
+  except:
+    failures += 1
+
+plt.xlabel('Recall')
+plt.ylabel('Precision')
+plt.title('PR curves for LOF for top {} ranges for parameter k.'.format(TOP_N-failures))
+  
+# plot aur score
+if save_to_dir:
+  plt.savefig('{}/{}'.format(save_to_dir, 'top_{}.pdf'.format(TOP_N), type='pdf'))
+else:
+  plt.show()
+plt.clf()
+
+failures= 0
+TOP_N = 5
+label_handles = []
+label_labels = []
+for (thisrange, auc, (precision, recall)) in reversed(aucs[0:TOP_N]):
+  label = 'k=[{}, {}]: AUC={:0.4f}'.format(
+                                 colnames[min(thisrange)],
+                                 colnames[max(thisrange)],
+                                 auc)
+  label_labels.append(label)
+  try:
+    line, = plt.plot(recall, precision, label=label)
+    label_handles.append(line)
+  except:
+    failures += 1
+
+label_handles = list(reversed(label_handles))
+label_labels = list(reversed(label_labels))
+plt.xlabel('Recall')
+plt.ylabel('Precision')
+plt.legend(label_handles, label_labels, loc='upper right', prop={'size': 10})
+plt.title('PR curves for LOF for top {} ranges for parameter k.'.format(TOP_N-failures))
+
+# plot aur score
+if save_to_dir:
+  plt.savefig('{}/{}'.format(save_to_dir, 'top_{}.pdf'.format(TOP_N), type='pdf'))
+else:
+  plt.show()
+

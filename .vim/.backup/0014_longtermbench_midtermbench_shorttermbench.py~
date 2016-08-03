@@ -1,0 +1,60 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models, migrations
+import os
+
+def get_file(file_name):
+  f = open(os.path.join(os.path.dirname(__file__), file_name))
+  query = f.read()
+  return query
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('database', '0013_position_chunk'),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='LongTermBench',
+            fields=[
+                ('id', models.OneToOneField(primary_key=True, serialize=False, db_column='id', to='database.Employee')),
+                ('sucs', models.IntegerField()),
+            ],
+            options={
+                'db_table': 'view_longtermbench',
+                'managed': False,
+            },
+            bases=(models.Model,),
+        ),
+        migrations.CreateModel(
+            name='MidTermBench',
+            fields=[
+                ('id', models.OneToOneField(primary_key=True, serialize=False, db_column='id', to='database.Employee')),
+                ('sucs', models.IntegerField()),
+            ],
+            options={
+                'db_table': 'view_midtermbench',
+                'managed': False,
+            },
+            bases=(models.Model,),
+        ),
+        migrations.CreateModel(
+            name='ShortTermBench',
+            fields=[
+                ('id', models.OneToOneField(primary_key=True, serialize=False, db_column='id', to='database.Employee')),
+                ('sucs', models.IntegerField()),
+            ],
+            options={
+                'db_table': 'view_shorttermbench',
+                'managed': False,
+            },
+            bases=(models.Model,),
+        ),
+
+        migrations.RunSQL(get_file("0014_longtermbench_midtermbench_shorttermbench.sql"),
+                         "DROP VIEW IF EXISTS view_shorttermbench, view_midtermbench,
+                         view_longtermbench, view_totalbench"),
+    ]

@@ -1,0 +1,28 @@
+{extends "base.tpl"}
+
+{block "custom-css"}
+    <link rel="stylesheet" href="/css/login.css">
+{/block}
+
+{block "title"}
+   Welcome to Eventcast!
+{/block}
+
+{block "content"}
+     <form class="form-signin"  method='post' accept-charset='UTF-8'>
+        <h2 class="form-signin-heading">Please sign in</h2>
+				{if $error_message == ""}
+				<div class="alert alert-danger" role="alert">
+					<span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span>
+					<span class="sr-only">Error:</span>
+				  {$errormessage}
+				</div>
+				{/if}
+        <label for="username" class="sr-only">username</label>
+        <input type="username" id="username" class="form-control" name="login-username" placeholder="Username" required autofocus>
+        <label for="inputPassword" class="sr-only">Password</label>
+        <input type="password" id="inputPassword" class="form-control" name="login-password" placeholder="Password" required>
+        <button class="btn btn-lg btn-primary btn-block" type="submit">Sign in</button>
+      </form>
+{/block}
+

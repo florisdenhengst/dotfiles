@@ -1,0 +1,26 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models, migrations
+import django.db.models.deletion
+import database.models
+import os
+
+def get_file(file_name):
+  f = open(os.path.join(os.path.dirname(__file__), file_name))
+  query = f.read()
+  f.close()
+  return query
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('database', '0008_delete_converteddates'),
+    ]
+
+    operations = [
+        migrations.RunSQL(
+            sql=get_file("0009_converteddatesperson_forward.sql"),
+            reverse_sql=get_file("0009_converteddatesperson_backward.sql"),
+        )
+    ]

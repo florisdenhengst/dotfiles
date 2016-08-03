@@ -1,0 +1,22 @@
+<?php
+/***
+ * All database login settings
+ */
+define("DB_HOST", "localhost");		    // DB HOST
+define("DB_USER", "project_youri");	  // DB user
+define("DB_PASSWORD", "test");	      // Password for DB user
+define("DATABASE", "project_youri");	// DB to connect to
+
+$connection_options = array();
+if(DEBUG){
+  $connection_options[PDO::ATTR_ERRMODE] = PDO::ERRMODE_WARNING;
+} else {
+  $connection_options[PDO::ATTR_ERRMODE] = PDO::ERRMODE_EXCEPTION;
+}
+try {
+  $connection = sprintf("mysql:host=%s;dbname=%s", DB_HOST, DATABASE);
+  $db = new PDO($connection, DB_USER, DB_PASSWORD, $connection_options);
+} catch(PDOException $e){
+  echo $e->getMessage();
+}
+?>

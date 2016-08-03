@@ -1,0 +1,94 @@
+from database.models import *
+from django.db import transaction
+
+#loc = Location(name='rootlocation')
+#loc2 = Location(name='other_rootlocation')
+#bu  = BusinessUnit(name='rootBU')
+#bu2  = BusinessUnit(name='other_rootBU')
+#fu  = FunctionalArea(name='rootFU')
+#fu2  = FunctionalArea(name='other_rootFU')
+
+#ssht = loc.save()
+#ssht = bu.save()
+#ssht = fu.save()
+
+#models = []
+
+#ssht = models.append(loc)
+#ssht = models.append(bu)
+#ssht = models.append(fu)
+
+
+#p,created = Position.objects.get_or_create(position_id='PID_1')
+#p.business_unit=bu
+#p.functional_area=fu
+#p.location=loc
+#ssht = p.save()
+#ssht = models.append(p)
+
+
+#p2,created = Position.objects.get_or_create(position_id='PID_2')
+#p2.business_unit=bu
+#p2.functional_area=fu
+#p2.location=loc
+#ssht = p2.save()
+#ssht = models.append(p2)
+
+#mp,created = MultiPosition.objects.get_or_create(
+#    multiposition_id='PID_1')
+#if(created):
+#  mp.business_unit=bu,
+#  mp.location=loc,
+#  mp.functional_area=fu
+#  mp.save()
+
+#models.append(mp) 
+
+#mp2,created = MultiPosition.objects.get_or_create(
+#    multiposition_id='PID_2',
+#    )
+#if(created):
+#  mp2.business_unit=bu2,
+#  mp2.location=loc2,
+#  mp2.functional_area=fu2
+#  mp2.save()
+
+#models.append(mp2) 
+
+
+#mp3,created = MultiPosition.objects.get_or_create(
+#    multiposition_id='PID_3',
+#    )
+#if(created):
+#  mp3.business_unit=bu,
+#  mp3.location=loc,
+#  mp3.functional_area=fu2
+#  mp3.save()
+
+#models.append(mp2) 
+
+
+
+
+tuple_set1 = Position.objects.values('business_unit', 'functional_area', 'location').distinct()
+tuple_set2 = MultiPosition.objects.values('business_unit', 'functional_area', 'location').distinct()
+
+print('')
+print(list(tuple_set1))
+print('')
+print(list(tuple_set2))
+print('')
+print(tuple_set1.query)
+print('')
+final_tuple_set = set(tuple_set1) | set(tuple_set2)
+print(list(final_tuple_set))
+
+
+
+@transaction.atomic
+def remove_all(models):
+  for model in models:
+    model.delete()
+
+
+#remove_all(models)

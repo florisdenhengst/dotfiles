@@ -1,0 +1,47 @@
+{extends "base.html"}
+
+{block "title"}
+Users
+{/block}
+
+{block "content"}
+  <div class="row header">
+    <div class="col-xs-1">
+      &nbsp;
+    </div>
+    <div class="col-xs-2">
+      ID
+    </div>
+    <div class="col-xs-2">
+      username
+    </div>
+    <div class="col-xs-2">
+      active
+    </div>
+    <div class="col-xs-2">
+      superuser
+    </div>
+  </div>
+  {foreach $users, index, user}
+  <div class="row {if index mod 2 == 1}odd{else}even{/if}">
+    <div class="col-xs-1">
+      <a class="btn btn-primary"
+        href="/management/users/edit.php?id={$user.id}">
+        <span class='glyphicon glyphicon-edit'></span>
+      </a>
+    </div>
+    <div class="col-xs-2">
+      {$user.id}
+    </div>
+    <div class="col-xs-2">
+      {$user.username}
+    </div>
+    <div class="col-xs-2">
+      {$user.active}
+    </div>
+    <div class="col-xs-2">
+      {$user.is_superuser}
+    </div>
+  </div>
+  {/foreach}
+{/block}

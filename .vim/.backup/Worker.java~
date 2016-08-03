@@ -1,0 +1,25 @@
+package ndfs.mcndfs_1_naive;
+
+import java.util.concurrent.Callable;
+
+import ndfs.NDFS;
+
+public class Worker implements Callable<Void> {
+	
+	private NDFS ndfs;
+	private String ID;
+	
+	public Worker(NDFS ndfs, long start, int ID) {
+		this.ndfs = ndfs;
+		this.ID = Integer.toString(ID);
+	}
+
+	@Override
+	public Void call() throws Exception {
+        System.out.println("NEW WORKER");
+       	Thread.currentThread().setName(ID);
+        ndfs.ndfs();
+        throw new Error("No result returned");
+	}
+	
+}

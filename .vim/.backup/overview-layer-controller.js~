@@ -1,0 +1,219 @@
+/**
+ * Wrap everything inside a self-executing function to prevent creating globals
+ */
+
+(function() {
+
+var organisation = angular.module('organisation');
+
+organisation.controller('OrganisationOverviewLayerController',
+  function($scope, $rootScope, $state, $animate, $window, $timeout, $http,
+    $log, $location, $anchorScroll, FilterData, DataTable, HttpPostService) {
+
+
+    /*
+     * Helper functions
+     */
+
+    // Go to the top of the page, used after initializing a layer
+    function goToTop() {
+      var old = $location.hash();
+
+      if($scope.selectedSubPage != 'layers') {
+        $location.hash('top');
+        $anchorScroll();
+        $location.hash(old);
+        $window.scrollBy(0, -50);
+      }
+    }
+
+    /*
+     * Scope functions
+     */
+
+    // Go to the previous layer
+    $scope.goToPrevLayer = function() {
+      if($scope.activeLayer == 1)
+        return;
+
+      $scope.goToLayer($scope.activeLayer - 1);
+    }
+
+    // Go to the next layer
+    $scope.goToNextLayer = function() {
+      if($scope.activeLayer >= $scope.numLayerLevels)
+        return;
+
+      $scope.goToLayer($scope.activeLayer + 1);
+    }
+
+    // Go to a specified layer
+    $scope.goToLayer = function(layerLevel) {
+      $scope.activeLayer = layerLevel;
+
+      $state.go("organisation.structure.overview.layer",
+        { level: $scope.activeLayer, position: undefined }, { location: true });
+    }
+
+    // Go to the nearest layer
+    $scope.goToNearestLayer = function() {
+      HttpPostService("/api/organisation/structure/overview/").success(function(data) {
+        var dataTable = new DataTable(data.dataTables[0]);
+        $scope.layers = dataTable.toAssocArayList();
+
+        var minDistance = Number.MAX_VALUE; // Assume that the number of layers does not equal Number.MAX_VALUE
+        var minDistanceLayer = 0;
+
+        for(var i = 0; i < $scope.layers.length; i++) {
+          var layerLevel = $scope.layers[i]["layer"].v;
+          var numPositions = $scope.layers[i]["positions"].v;
+
+          if(numPositions > 0) {
+            var distance = Math.abs(layerLevel - $scope.activeLayer);
+
+            if(distance < minDistance) {
+              minDistance = distance;
+              minDistanceLayer = layerLevel;
+            }
+          }
+        }
+
+        if(minDistance < Number.MAX_VALUE)
+          $scope.goToLayer(minDistanceLayer);
+        else
+          $log.warn("No nearest layer!");
+
+        $timeout(function() {
+          goToTop();
+        });
+      }).error(function(data, status, headers, config) {
+        $log.error("/api/organisation/structure/overview/ could not be retrieved for finding the nearest layer")
+      });
+    }
+
+    // Retrieve position data and show profile light box, which is achieved by changing
+    // the $scope.positionID variable. The fo-profile-box observes this variable.
+    function getPosData(layerLevel, id) {
+      $scope.positionID = id;
+      $scope.profileLightBoxIsVisble = true;
+
+      $state.go("organisation.structure.overview.layer.profile",
+        { level: layerLevel, position: id, page: 0});
+    }
+
+    // Scope function which gets called when a user clicks on a position box
+    $scope.getPositionData = function(posID) {
+      getPosData($scope.activeLayer, posID);
+    }
+
+    // Set the currently selected position
+    // This function is called by the search box when a position is clicked on
+    $scope.setSelectedPosition = function(id, layer) {
+      getPosData(layer, id);
+    }
+
+    // Profile lightbox callback function
+    // This function is called by the profile lightbox directive
+    $scope.profileLightBoxCallback = function(layerLevel, id) {
+      getPosData(layerLevel, id);
+    }
+
+    $scope.profileLightBoxCloseCallback = function() {
+      $state.go("organisation.structure.overview.layer");
+    }
+
+    /*
+     * Main controller code
+     */
+
+    var NUM_POSITIONS_PER_PAGE = 25;
+    var INIT_NUM_POSITIONS_PER_PAGE = NUM_POSITIONS_PER_PAGE - 1;
+    var currentPage;
+
+    // Initialize (or reset) current webpage
+    function initPage() {
+      $scope.activeLayer = $rootScope.getStateParam("level");
+      $scope.positionID = $rootScope.getStateParam("position");
+      $scope.positions = [];
+
+      currentPage = 0;
+
+      if($scope.positionID != undefined)
+        $scope.profileLightBoxIsVisble = true;
+      else
+        $scope.profileLightBoxIsVisible = false;
+    }
+
+    // Retrieve data for currently active layer
+    // (retrieves paginated data; a subsequent call will retrieve the following page)
+    $scope.getData = function() {
+      $scope.ready = false;
+
+      var dataURL = "/api/organisation/structure/overview/layer/" + $scope.activeLayer + "/";
+
+      // Temporarily set max number of layer levels to the active layer level
+      // so the user doesn't see a flickering 'next layer' button
+      if(currentPage == 0)
+        $scope.numLayerLevels = $scope.activeLayer;
+
+      HttpPostService(dataURL, { page: currentPage }).success(function(data) {
+        $log.info("structure.js: /api/organisation/structure/overview/layer data retrieved");
+        
+
+        var dataTable = new DataTable(data.dataTables[0]);
+
+        $scope.positions = $scope.positions.concat(dataTable.toAssocArayList());
+
+        if(currentPage == 0) {
+          $scope.numPositionsShown = INIT_NUM_POSITIONS_PER_PAGE;
+          $scope.totalNumPositions = dataTable.getTableProperty("length");
+          $scope.numLayerLevels = data.maxLayer;
+
+          // Only go to the top of the page when the the first page is loaded
+          $timeout(function() {
+              goToTop();
+          });
+        } else {
+          $scope.numPositionsShown += NUM_POSITIONS_PER_PAGE;
+        }
+
+        $scope.ready = true;
+        currentPage++;
+      }).error(function(data, status, headers, config) {
+        $log.error("structure.js: /api/organisation/structure/overview/layer could not be retrieved")
+      });
+    }
+
+    initPage();
+    $scope.getData();
+
+    // Listen for filter change event, and update when the filter changes
+    $rootScope.$on("filterChanged", function(event, data) {
+      $timeout(function() {
+        $log.info("structure.js: Retrieving filtered data for currently active layer");
+        initPage();
+        $scope.getData();
+      });
+    });
+
+    // Change the active layer to the layer associated with the currently active position
+    // when a profile box is shown.
+    // '$scope.positionDetails' is changed by the fo-profile-box directive when
+    // the currently selected position is changed (e.g. when a user clicks on a position)
+    /*$scope.$watch("positionDetails", function(newValue, oldValue) {
+      if(newValue == undefined)
+        return;
+
+      var positionLayer = newValue["layer"].v;
+
+      $scope.activeLayer = positionLayer;
+      $scope.goToLayer(positionLayer);
+    });*/
+});
+
+/**
+ * Close and execute wrapper function
+ */
+
+
+})();

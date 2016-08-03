@@ -1,0 +1,4 @@
+{extends "management/edit-timeslot.tpl"}
+{block "title"}
+  Create a time slot 
+{/block}

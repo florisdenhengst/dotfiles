@@ -1,0 +1,89 @@
+<?php
+class TimeSlot extends DataObject{
+  const JOIN_TO_USER = 'INNER JOIN `user` ON `timeslot`.`owner` = `user`.`id` ';
+  public static $TABLE = 'timeslot';
+  public $start_time;
+  public $end_time;
+  public $owner;
+  public $label;
+  const DB_DATE_FORMAT = "Y-m-d H:m:s";
+  const FE_DATE_FORMAT = "d-m-Y  H:m";
+
+  public function __construct(){
+    parent::__construct("");
+  }
+
+  public static function fromId($id){
+    $timeSlot = new TimeSlot();
+    $timeSlot->id = $id;
+    return $timeSlot;
+  }
+
+  public static function fromData($label, $owner, $start, $end){
+    $timeSlot = new TimeSlot();
+    $timeSlot->label = $label;
+    $timeSlot->owner = $owner;
+    $timeSlot->start_time = $start;
+    $timeSlot->end_time = $end;
+    return $timeSlot;
+  }
+
+  public static function get_auth_assoc($dbh, $unique_id, $user, $field='id'){
+    $result = parent::get_auth_assoc($dbh, $unique_id, $user, $field);
+    $result['start_time'] = static::frontEndDate($result['start_time']);
+    $result['end_time'] = static::frontEndDate($result['end_time']);
+    return $result;
+  }
+
+  public static function get_assoc($dbh, $unique_id, $field='id'){
+    $result = parent::get_assoc($dbh, $unique_id, $field);
+    $result['start_time'] = static::frontEndDate($result['start_time']);
+    $result['end_time'] = static::frontEndDate($result['end_time']);
+    return $result;
+  }
+
+  /***
+   * Creates a TimeSlot.
+   */
+  public function create($dbh, $columns= "", $values = ""){
+    // all column names in DB
+    $columns = "start_time, end_time, owner, label";
+    // column matching variable names in TimeSlot object 
+    $values = ":start_time, :end_time, :owner, :label";
+    return parent::create($dbh, $columns, $values);
+  }
+
+  /***
+   * Update an existing TimeSlot.
+   */
+  public function update($dbh, $columns="", $values="", $operator=""){
+    $columns = array("start_time", "end_time", "owner", "label");
+    $values = $columns;
+    return parent::update($dbh, $columns, $values);
+  }
+
+
+  /***
+   * Formats from 
+   *  DD-MM-YYYY HH:mm
+   * to
+   *  YYYY-MM-DD HH:mm:ss
+   */
+  public static function formatDate($inputDate){
+    $date = strtotime($inputDate);
+    return date(TimeSlot::DB_DATE_FORMAT, $date);
+  }
+
+  /***
+   * Format from
+   *  YYYY-MM-DD HH:mm:ss
+   * to
+   *  DD-MM-YYYY HH:mm
+   */
+  public static function frontEndDate($inputDate){
+    $date = strtotime($inputDate);
+    return date(TimeSlot::FE_DATE_FORMAT, $date);
+  }
+}
+
+?>

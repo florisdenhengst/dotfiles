@@ -1,0 +1,301 @@
+#!/usr/bin/env python3 
+from django.core.management.base import BaseCommand
+import os
+from database.models import *
+from survey.models import *
+from django.contrib.auth.models import User
+import django.db.models
+from django.db import transaction, OperationalError
+import csv
+import inspect
+from optparse import make_option
+
+
+class Command(BaseCommand):
+  """Allows for importing CSV files into the database.
+
+  This command assumes the CSV's are structured with the first
+  line containing the names of the database columns. It also assumes
+  a semicolon (;) is being used as a delimiter. The name of the 
+  csv file must correspond to the database table, but in lower case. 
+
+  Flags:
+  --a or --auto-id: Skip the 'id' column in the input files and 
+                    automatically generate incrementing id's. 
+                    WARNING: This implicates that CSV's that 
+                    reference foreign keys must also refer to
+                    tables that already have incrementing keys.
+
+  To import a collection of csv's, use the following command:
+    $ ./manage.py import /path/to/csvs/*.csv
+  """
+
+  args = '[--a | --auto-id] <csv1 csv2 ... csvN>'
+  help = 'Import a collection of csv\'s into the database'
+  option_list = BaseCommand.option_list + ( 
+    make_option('--a',
+      action='store_true',
+      default=False
+    ),
+    make_option('--auto-id',
+      action='store_true',
+      default=False
+    ),
+  )
+
+  TEXT_LIKE_FIELDS = [
+      django.db.models.fields.CharField,
+      django.db.models.fields.TextField,
+      ]
+
+
+  def handle(self, *args, **options):
+
+    def get_model(model_name):
+      """Returns model based on name."""
+
+      #remove any prefixes (path)
+      model_name = os.path.basename(model_name)
+      #remove any suffices (like .csv)
+      model_name = model_name.split('.')[0]
+      #capitalize
+      model_name = model_name[0].capitalize() + model_name[1:]
+
+      try:
+        return globals()[model_name]
+      except KeyError:
+        raise NameError("{} is not defined.".format(model_name))
+      
+
+    def get_model_instance(model_name, id):
+      #remove any prefixes (path)
+      model_name = os.path.basename(model_name)
+      #remove any suffices (like .csv)
+      model_name = model_name.split('.')[0]
+      #capitalize
+      model_name = model_name[0].capitalize() + model_name[1:]
+
+      try:
+        return globals()[model_name].objects.get(pk=id)
+      except KeyError:
+        raise NameError("{} is not defined.".format(model_name))
+
+
+    def refresh_materialized_views():
+      """Checks if any materialized views exists and refreshes them."""
+      try:
+        n_materialized_views = ViewManager.refresh_materialized_views()
+      except OperationalError:
+        # Function does not exist
+        print("No function exists for refreshing materialized views!")
+        print("Aborting refreshing materialized views...")
+        return 0
+
+      return n_materialized_views 
+
+
+    @transaction.atomic
+    def empty_tables(csv_paths):
+        """Empties all tables in a single transaction."""
+        for path in csv_paths:
+            model = get_model(path)
+            empty_table(model)
+
+        print("Committing transaction...")
+
+
+    def reset_primary_key_sequence(model, value=1):
+      """Sets the sequence for the primary key so that its next value is '1'."""
+      if value < 1:
+        # can't set negative or zero value
+        value = 1 
+
+      model_table = model._meta.db_table
+      pk_column = model._meta.fields[0].column
+      sequence_name = model_table + '_' + pk_column + '_seq'
+      if value == 1:
+        command ='ALTER SEQUENCE IF EXISTS %s RESTART WITH 1'% sequence_name
+      else:
+        command = "SELECT setval('%s',%d)"%(sequence_name,value)
+
+      
+      cursor = connection.cursor()
+      try:
+        cursor.execute(command)
+      except:
+        return
+
+    def empty_table(model):
+      """Removes all objects for a given model."""
+      model_name = model.__name__
+      print("Adding emptying table '{}' to transaction for model '{}'".format(model._meta.db_table, model_name))
+      model.objects.all().delete()
+      reset_primary_key_sequence(model)
+    
+
+    @transaction.atomic
+    def do_imports(csv_paths, auto_id):
+      """Imports all files from csv_paths through the Django ORM in a single transaction.
+      It assumes the input data is and does not conflict with existing data, otherwise 
+      the transaction will fail.
+      """
+      # loop over csv files
+      while csv_paths:
+        path = csv_paths[0]
+        with open(path) as csvfile:
+          # open file
+          csv_reader = csv.reader(csvfile, delimiter=';')
+          # read column headers
+          columns = csv_reader.__next__()
+
+          if not auto_id and 'id' not in columns:
+            raise RuntimeError("auto generation of ID's is not on, and CSV file %s does not contain an ID column!" % csvfile.name)
+
+          instances_saved = 0
+          max_id = 0
+          # loop over rows
+          for row in csv_reader:
+            model = get_model(path)()
+            # loop over all fields 
+            for i in range(0,len(columns)):
+              field = columns[i]
+              if is_foreign_key(model, field):
+                # the field is a foreign key
+                try:
+                  if is_self_reference(model,field):
+                    foreign_model = get_model_instance(path, row[i])
+                    setattr(model, field, foreign_model)
+                  else:
+                    # This expression retrieves the class to which the foreign key 
+                    # points, converts it to a string and retrieves the name of the model.
+                    # fmn = Foreign Model Name
+                    fmn = str(model._meta.get_field_by_name(field)[0].rel.to).split("'")[1].split(".")[-1]
+
+                    foreign_model = get_model_instance(fmn, row[i])
+                    setattr(model, field, foreign_model)
+                except:
+                  # If the foreign key is empty, try and save the model
+                  # without it
+                  if row[i] == "":
+                    setattr(model, field, None)
+                  else:
+                    # If all else fails, try setting the foreign key column directly.
+                    # This will fail if there are constraints.
+                    setattr(model, field + "_id", row[i])
+              elif is_boolean_field(model, field):
+                if row[i] in ["TRUE", "t", "true", "y", "yes", "on", "1"]:
+                  setattr(model, field, True)
+                elif row[i] in ["FALSE", "f", "false", "n", "no", "off", "0:]"]:
+                  setattr(model, field, False)
+                else:
+                  raise ValueError("Trying to set boolean field to unsupported value %s" % row[i])
+              else:
+                # If the field is not a foreign key or a boolean, simply try to set its value
+                try:
+                  getattr(model, field)
+                except:
+                  raise NameError("Field {} does not exist in this database table.".format(field))
+                # If ID's are to be automatically generated, don't use id's from CSV,
+                # but check to see that the ID in the CSV corresponds to the one expected.
+                if auto_id:
+                  if field != 'id':
+                    setattr(model, field, row[i])
+                  elif int(row[i]) != (instances_saved + 1):
+                    raise ValueError('Value %s does not match expected id %s' % (str(row[i]), str(instances_saved + 1)))
+                # If a CSV contains no value for a certain field,
+                # and the field is not a text-field, we want the 
+                # database to contain the default value for this field.
+                # If it IS a text-like field, just copy the empty string.
+                elif not is_text_like_field(model, field):
+                  if(row[i] is not ''):
+                    setattr(model, field, row[i])
+                else:
+                  setattr(model, field, row[i])
+
+            # We don't need any error checking, as we're doing the updates in a single
+            # commit.
+            model.save()
+            instances_saved = instances_saved + 1
+            if isinstance(model.id, str) and model.id.isdigit():
+              if int(model.id) > max_id:
+                max_id = int(model.id)
+
+          csv_paths.remove(path)
+          print("Added imports for model '{}' to table '{}' to transaction".format(model.__class__.__name__, model._meta.db_table))
+          if not auto_id and isinstance(model.id, str) and model.id.isdigit():
+            print("resetting primary key sequence for {} to {}".format(model.__class__.__name__, max_id))
+            reset_primary_key_sequence(model, max_id)
+      print("Committing transaction...")
+
+
+    def is_text_like_field(model, field_name):
+      field = model._meta.get_field(field_name)
+
+      result = False
+      
+      for text_like_field in self.TEXT_LIKE_FIELDS:
+        if isinstance(field, text_like_field):
+          result = True
+          break
+
+      return result
+      
+
+    def is_boolean_field(model, field):
+      # Get a list of the models fields classes
+      model_fields = model._meta.fields
+      for model_field in model_fields:
+        # The last part of the classname, which is separated by dots
+        # corresponds to the field name given in the csv
+        field_string = str(model_field).split('.')[-1]
+        if field_string == field:
+          # Check whether this field is a subclass of ForeignKey
+          return django.db.models.fields.BooleanField in inspect.getmro(type(model_field))
+
+
+    def is_foreign_key(model, field):
+      # Get a list of the models fields classes
+      model_fields = model._meta.fields
+      for model_field in model_fields:
+        # The last part of the classname, which is separated by dots
+        # corresponds to the field name given in the csv
+        field_string = str(model_field).split('.')[-1]
+        if field_string == field:
+          # Check whether this field is a subclass of ForeignKey
+          return django.db.models.fields.related.ForeignKey in inspect.getmro(type(model_field))
+
+    def is_self_reference(model, field):
+      return type(model) == model._meta.get_field_by_name(field)[0].rel.to
+
+    def print_usage():
+      usage = "Usage: $ ./manage.py import [--a | --auto-id] ./path/to/csvs/*.csv"
+      print(usage)
+
+    auto_id = False
+    if options['a'] or options['auto_id']:
+      auto_id = True
+
+
+    # Check if a path to the csv's is given as argument
+    if(len(args) == 0):
+      print_usage()
+      exit(2)
+
+    csv_paths = list(args)
+
+    print("Starting transaction for emptying tables...")
+    empty_tables(csv_paths)
+    print("Done!")
+    print("")
+
+
+    print("Starting transaction for import...")
+    do_imports(csv_paths, auto_id)
+    print("Done!")
+    print("")
+
+    print("Refreshing materialized views...")
+    n_materialized_views = refresh_materialized_views()
+    print("Done! (refreshed %d materialized views)" % n_materialized_views)
+    print("")
+

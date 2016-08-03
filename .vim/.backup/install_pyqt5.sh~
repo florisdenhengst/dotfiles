@@ -1,0 +1,18 @@
+#!/bin/sh
+wget http://sourceforge.net/projects/pyqt/files/sip/sip-4.16.5/sip-4.16.5.tar.gz &&
+tar xzf sip-4.16.5.tar.gz  &&
+cd sip-4.16.5 &&
+python configure.py  &&
+make  &&
+echo "lekkeraanhetnerden" | sudo -S make install  &&
+cd .. &&
+rm -r sip-4.16.5* &&
+gpl-5.4.tar.gz  &&
+tar xzf PyQt-gpl-5.4.tar.gz   &&
+cd PyQt-gpl-5.4  &&
+python configure.py --qmake /usr/bin/qmake-qt5  &&
+make  &&
+make install  &&
+cd ..  &&
+rm -r PyQt-gpl-54*
+

@@ -1,0 +1,238 @@
+General Notes
+- Notable alternative for OpenRefine is known as DataWrangler:
+  http://vis.stanford.edu/wrangler/ It is not actively supported anymore as
+  the team has moved on to a commercial application Trifacta.
+
+
+Aggrawal - Outlier Analysis: 
+
+Ch1 - Introduction
+- The most important stage in outlier detection in not the method selected,
+  but the choice for a model.
+   - Correlations are present -> use a regression-based technique
+   - Data is clustered -> use a clustering-based technique The choice of the
+     model is almost 100% domain-specific: "Therefore, the core principle of
+     discovering outliers is based on assumptions about the structure of the
+     normal patterns in a given data set. Clearly, the choice of the “normal”
+     model depends highly upon the analyst’s understanding of the natural data
+     patterns in that particular domain"
+- Are outliers present at the boundary of the data by definition?
+  - if yes, we can use distance- or depth-based methods
+  - if no, we can use other multivariate techniques
+- Proximity-based models
+  - clustering - segment points
+  - density-based - segment space
+- Evaluation using PR & Receiver Operating Characteristics Curve
+- Convex Hull (in Feature space?) as SVM alternative
+- "Supervised outlier detection is a (difficult) special case of the classi-
+  fication problem."
+- "Interestingly, EM algorithms can also be used as a final step after many
+  such outlier detection algorithms. The idea is that the distribution of the
+  outlier scores can be treated as univariate data set, which can then be fit
+  to a probabilistic generative model."
+- The ability of such methods [probabilistic modeling] to distinguish between
+  noise and abnormalties limited because of several simplifying assumptions,
+  which ensure that most of the commonly used models are not a very good match
+  for real distributions. For example, the clusters in the data may be of
+  arbitrary shape, and may not fit the Gaussian assumption well. 
+- Skipped - Ch 2
+- Global vs. Local:
+  - Clustering always looks at global values
+  - Density based methods generally look only at local values
+- Intensional Knowledge of Distance-based Outliers: why is an outlier marked
+  as an outlier?
+  - Is a particular set of attributes the minimal set of attributes in which
+    an outlier exists?
+  - Is an outlier dominated by other outliers in the dataset?
+- Histogram-based techniques:
+  - Create (multivariate) bins and count the datapoints in each bin
+  - Use a student's t-distribution to check for extremely low values
+  - It's hard to decide on the width of the bin and the level of
+    dimensionality for the bins.
+  - "Nevertheless, histogram-based techniques find wide applicability in
+    intrusion-detection techniques, because such applications are naturally
+    suited to modeling the normal data with the use of histogram-based
+    profiles."
+- High-dimensional might drown outliers, i.e. data points may be an outlier in
+  a set of attributes, also known as a subspace. This chapter appears to be
+  not relevant as our data is not of such high dimensions.  Specialized for
+  sparse datasets (this might be the case), generally with a low number of
+  outliers.
+  - PCA might help
+
+Ch3 - Supervised methods
+- Supervised classification on outlier detection task is hard because of:
+  - class imbalance, which can be solved by cost-sensitive variations of
+    classification (i.e.  rather have a false negative than a false positive).
+  - positive-unlabeled class problem: some instances are labeled as outlier,
+    but the unlabeled data (considered 'normal') might also contain some
+    outliers.
+  - Partial training information: no labels may exist, data from only the
+    normal class may exist (intrusion detection)
+- Overfitting on the known outliers is a large problem, so methods should be
+  robust.
+- 3.1: "While the use of the unlabeled class provides some advantage to clas-
+  sification in most cases, this is not always true. In some scenarios, the
+  unlabeled class in the training data reflects the behavior of the negative
+  class in the test data very poorly. In such cases, it has been shown, that
+  the use of the negative class actually degrades the effectiveness of
+  classifiers. In such cases, it has been shown in [301] that the use of one-
+  class learners provides more effective results than the use of a standard
+  classifier. Thus, in such situations, it may be better to simply discard the
+  training class examples, which do not truly reflect the behavior of the test
+  data. Most of the one-class SVM classifiers discussed in the previous
+  section can be used in this scenario." [301] X. Li, B. Liu, and S. Ng.
+  Negative Training Data can be Harmful to Text Classification, EMNLP, 2010.
+
+Ch 4 - PROXIMITY-BASED OUTLIER DETECTION
+- Pag. 188!!!
+
+Ch 5 - Skipped
+
+Ch 6 - SUPERVISED OUTLIER DETECTION (& semi supervised outlier detection) 
+-2: Fully supervised method: Rare class detection
+-3: The Semi-Supervised Scenario: Positive and Unlabeled Data
+  - 'Positive' == outliers, 'negative' == normal
+  - Positive & unlabeled is essentially equivalent to learning from positive &
+    negative examples.
+  - Human effort can become huge, therefore use a sampled set as a training
+    set of 'negatives'. However, this sample might as well contain 'positive'
+    contaminants:
+    - 'positive' contaminants can reduce effectiveness, but completely
+      discarding them isn't a very good idea either (i.e. not knowing
+      anything)
+    - using samples might harm the training phase, i.e. when the total
+      population is diverse assuming the 'negatives' in the sample reflect
+      this population well is not a good idea.
+  - Two major methods for solving these problems:
+    - heuristically identify training examples which are negative (normal).
+      Train a classifier on the positive class with some of the confirmed
+      negative classes
+    - Weigh the unlabeled training examples --> 'Partially Supervised
+      Classification of Text Documents' 
+-4.1: One Class Novelty Detection
+  - Basically the same as one-class classification, or unsupervised methods,
+    but the training data is *known* to be just 'normal' (i.e. this
+    assumption should hold!). There is no real other difference between
+    unsupervised or one-class novelty detection.
+  - One-class SVMs don't tend to work very well, are optimized to model the
+    normal data, and not to find what is most *different* from this normal
+    data (simple explanation: any boundary that encircles all data is fine
+    for the first round, what to do next?).
+  - Check out others (such as [91]) which wrap around the presented data and
+    treat everything else as 'novel'. This is basically the same as
+    estimating density using SVMs.  
+    >>>>>>>>>>
+    shouldn't using some dense
+    region identification algorithm be a better way to solve this problem?
+    how about generating examples that are not present in the data?
+    ==========
+-4.2: Combining Novel Class Detection with Rare Class Detection
+  - When labeled rare classes are present, but novel classes may also need to
+    be detected. Most methods consists of 2 parts: 1: Check whether point fits
+    for model based on training data -> if not, flag it as oulier immediately
+    2: If the point fits the model: -> use a classifier to determine whether
+    it is part of the rare class
+  - Might be useful for step2 of approach.  
+-4.3: Online Novelty Detection
+  - Basically refers to Ch 8 
+-5: Human Supervision
+  - Active Learning for outlier detection in two major ways:
+    1: Present pre-filtered results to user, user provides feedback on small
+    [360]
+    2: Combine user-provided examples with results of unsupervised algorithm in
+       order to learn which results of the unsupervised algorithm are relevent
+       [512]
+    >>>>>>>>>>
+    what is the true difference between these two approaches?
+    ==========
+-5.1: Active Learning
+  - The main challenge consists of finding *which* points to query.
+  - Compare ambiguity and uncertainty - these are interesting points.
+  - Select points which are ON the decision boundary.
+  - [360]: Basically only covers Pelleg & Moore.
+    >>>>>>>>>>
+    'High uncertainty: these are the points which have the greatest
+    uncertainty in terms of the component of the model to which they belong.
+    So, for an EM model, such a point would show relatively even soft
+    probabilities for different components of the mixture' -> is this in any
+    way relatable to SVMs?
+    ==========
+  - Query by Committee - basically have a committee of 2. Are there any real
+    differences?
+- Section 5.2 basically describes the research question you had in mind.
+    >>>>>>>>>>
+    CONTINUE
+    ==========
+
+
+Check page 363 of 'An Introduction to Statistical Learning'
+
+B. Liu, W. S. Lee, P. Yu, and X. Li. Partially Supervised Text Classification
+/Positive & Unlabeled data
+  - Initial Classifier as a heuristic for finding 'positive' (outlier) cases
+  - Use this initial classifier along with a set of 'positive' cases to
+    optimize an EM Naive Bayes classifier
+
+Implementation of LOCI
+  - ELKI http://elki.dbs.ifi.lmu.de/
+  - Create your own in R? 
+  - http://madm.dfki.de/rapidminer/anomalydetection (RapidMiner plugin)
+  -
+  
+Implementation of SVM
+  - LIBSVM: http://www.csie.ntu.edu.tw/~cjlin/libsvm/
+
+Active Learning for Anomaly and Rare-Category Detection Pelleg & Moore
+
+- Finding useful anomalies (+)
+- Dataset size: 4000 items, 8 attrs, numerical & categorical, multivariate
+  https://archive.ics.uci.edu/ml/datasets/Abalone
+
+Introduction of framework for identifying useful anomalies for data sets which
+also contain `meaningless' anomalies.  Regard data set as a mixture resulting
+from mixing different populations (mixture model) and uses (needs?) a Gaussian
+Bayes classifier trained using EM.  Hint selection on the basis of outliers
+from the perspective of the components (so: different populations) of the
+mixture model, instead of looking at the global outliers (by looking at the
+distance to center of class or looking at which point is hardest to classify
+(i.e. not very distinctive).
+
+Gaussian Bayes classifier
+ - Recall: Naive Bayes assumes independence between features
+ - Gaussian Bayes classifier assumes 1 ----------------- p(Xi = x | Y = yk) =
+   sqrt(2π σ(ik)^2)
+
+TODO: check for assumptions
+ - Gaussian Bayes classifierge
+
+
+Using Active Learning in Intrusion Detection Magnus Almgren and Erland Jonsson
+
+- Find attacks
+- Performs bad on dataset of ~200 items with 2 anomalies
+- Performs good otherwise
+- Uses SVMs
+- Uses support vectors (landmarks) for querying (slightly adapted)
+- Might do a lot more queries than Pelleg & Moore, but is more backed by
+  theory (the EM algorithm of P&M is not so well understood)
+- Query Functions used:
+  - Random Query (theoretical lower limit)
+  - Greedy Optimal (theoretical upper limit)
+    - label the events that indeed result in the smallest error in the test
+      set
+  - Simple Query Function (based on Uncertainty Sampling)
+    - Sample from the data points on which the model is most 'uncertain', that
+      is: the points closest to the separating hyperplane
+    - Is very unstable (its unclear how reliable its results are)
+  - Balanced Query Function (Simple Query Function with forced pos. and neg.
+    examplars after each other)
+  - Proposal for learner coming up with `imaginary' new events.  Think about
+    how applicable this is!
+  - 
+
+Support Vector Data Description
+- pretty good on describing from an introductory point
+- best description of slack variables in OC-SVM
+- describes boundary with minimal radius around normal points
+- Includes method for incorporating negative (i.e. outlier) examples

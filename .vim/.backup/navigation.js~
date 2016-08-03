@@ -1,0 +1,131 @@
+/**
+ * Wrap everything inside a self-executing function to prevent creating globals
+ */
+
+(function() {
+
+/**
+ * Load the kapstok module, to add our directives
+ */
+
+var kapstok = angular.module('kapstok');
+
+kapstok.filter('toHref', function($state) {
+  return function(stateName) {
+    return $state.href(stateName);
+  }
+});
+
+kapstok.directive('foMenu', function() {
+  return {
+      restrict: 'E',
+      replace: true,
+      transclude: true,
+      scope: true,
+      templateUrl: 'static/kapstok/html/navigation/fo-menu.html',
+      link: function(scope, element, attrs) {
+        scope.appMenu = {
+            sref: attrs.sref,
+            logoSrc: attrs.logoSrc,
+        }
+      }
+  };
+});
+
+kapstok.directive('foMenuRow', function() {
+  return {
+      restrict: 'E',
+      replace: true,
+      transclude: true,
+      scope: true,
+      templateUrl: 'static/kapstok/html/navigation/fo-menu-row.html',
+      link: function(scope, element, attrs) {
+        scope.parent = attrs.parent;
+      }
+  }
+});
+
+// Check to see if the state associated with this link
+// is the exact current state. If so, return tru.
+// If not, return false.
+kapstok.filter('isState', ['$state', function($state){
+  var active = function(input){
+    return $state.current.name == input;
+  };
+  // This makes sure the filter gets re-triggered on 
+  // a state change.
+  active.$stateful = true;
+  return active;
+}]);
+
+// Check to see if the state associated with this link
+// is a substring of the current state. If so, return true.  
+// If not, return false.
+kapstok.filter('isActive', ['$state', function($state){
+  var active = function(input){
+    return $state.current.name.indexOf(input) != -1;
+  };
+  // This makes sure the filter gets re-triggered on 
+  // a state change.
+  active.$stateful = true;
+  return active;
+}]);
+
+
+kapstok.directive('foMenuItem', function($state) {
+  return {
+    restrict: 'E',
+    replace: true,
+    template: '<li ng-hide="item.parent | isState" ng-class="{\'active-tab\': (item.state | isActive)}" class="theme">{{item.parent|isState}}' +
+              '<a ng-href="{{item.sref | toHref}}">{{item.label}}</a></li>',
+    //template: '<li ng-class="{\'active-tab\': (item.sref | includedByState)}" class="theme">' +
+    //          '<a ng-href="{{item.sref | toHref}}">{{item.label}}</a></li>',
+    scope: true,
+    transclude: true,
+    link: function(scope, element, attrs) {
+      scope.item = {
+          label: attrs.label,
+          sref: attrs.sref,
+          state: attrs.state,
+          parent: attrs.parent
+      }
+    }
+  }
+})
+
+
+kapstok.directive('foGlobalNav', function() {
+  return {
+    restrict: 'E',
+    replace: true,
+    templateUrl: 'static/kapstok/html/navigation/fo-global-nav.html',
+  };
+});
+
+/**
+ * Implements the <logout> element, used for global nav and logging out.
+ * It retrieves its own user login data and can be used like this:
+ *
+ * <logout></logout> 
+ *
+ */
+kapstok.directive('foMenuLogout', function(){
+  return {
+    restrict: 'E',
+  templateUrl: 'static/kapstok/html/navigation/fo-menu-logout.html'
+  };
+});
+
+kapstok.factory('appAccessFactory', function($http){
+  var url = "/api/get_accessible_apps/";
+  var options = { responseType: 'json' }
+
+  return $http.get(url, options)
+});
+
+
+/**
+ * Close and execute the wrapper function
+ */
+
+})();

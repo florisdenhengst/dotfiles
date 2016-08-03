@@ -1,0 +1,20 @@
+<div id="global-nav" ng-show="globalNavIsVisible" ng-click="globalNavIsVisible=false;filter.disable();learn.disable()">
+  <a class="col-lg-2" ui-sref="home">
+    <ng-include src="'/static/kapstok/logos/wheel.svg'"></ng-include>
+  </a> 
+  <a ng-show="isAccessible('organisation')" class="col-lg-2" ui-sref="organisation">
+    <img src='/static/kapstok/logos/crunchrOrganisation.png'/>
+  </a>
+  <a ng-show="isAccessible('workforce')" class="col-lg-2" ui-sref="workforce">
+    <img src='/static/kapstok/logos/crunchrWorkforce.png'/>
+  </a>
+  <a ng-show="isAccessible('succession')" class="col-lg-2" ui-sref="succession">
+    <img src='/static/kapstok/logos/crunchrSuccession.png'/>
+  </a>
+  <a ng-show="isAccessible('talent')" class="col-lg-2" ui-sref="talent">
+    <img src='/static/kapstok/logos/crunchrTalent.png'/>
+  </a>
+  <a ng-show="isAccessible('preference')" class="col-lg-2" ui-sref="preference">
+    <img src='/static/kapstok/logos/crunchrPreference.png'/>
+  </a>
+</div>

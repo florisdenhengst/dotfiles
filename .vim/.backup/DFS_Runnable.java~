@@ -1,0 +1,143 @@
+package ndfs.mcndfs_1_naive;
+
+import java.lang.*;
+import java.lang.InterruptedException;
+import java.lang.Override;
+import java.lang.Runnable;
+import java.lang.Thread;
+import java.util.List;
+import java.util.Collections;
+
+import ndfs.mcndfs_1_naive.DFS_Interface;
+import graph.State;
+import ndfs.CycleFoundException;
+import ndfs.NoCycleFoundException;
+import ndfs.ResultException;
+import ndfs.mcndfs_1_naive.NNDFS;
+
+/**
+ * A DFS worker that explores the state space according to the Laarman et al. algorithm.
+ * It accesses a NNDFS parent for shared data, but also handles other colorings privately.
+ */
+public class DFS_Runnable extends Thread {
+    // setter for start state
+    public void setStartState(graph.State startState) {
+        this.startState = startState;
+    }
+    // the state the search should start at
+    private graph.State startState;
+    // parent access for shared data
+    private final NNDFS parent;
+    // colors map for private colors data
+    private final Colors colors = new Colors();
+
+    /**
+     * Constructs a thread with the given parent. On run()
+     * starts the actual search. Note that the start state should be set!
+     * @param parent parent object that holds the shared data and manages this thread
+     */
+    public DFS_Runnable(NNDFS parent) {
+        this.parent = parent;
+    }
+
+    /**
+     * Starts the DFS search.
+     * Start state should be set.
+     * Signals the parent if it finds a cycle, otherwise
+     * exits quietly.
+     */
+    @Override
+    public void run() {
+        if (startState == null)
+            throw new NullPointerException();
+
+        try {
+            dfsBlue(startState);
+        } catch (ResultException e) {
+            if (e instanceof CycleFoundException) {
+                parent.resultFound();
+            }
+        }
+    }
+
+    /**
+     * Follows the structure of dfs_red(s, i), with the only difference
+     * that it checks the parent for if the task has been completed, and
+     * thus if this thread should exit as well.
+     *
+     * @param s to search at
+     * @throws ResultException
+     */
+    public void dfsRed(graph.State s) throws ResultException {
+        if (parent.cycleFound) {
+            System.out.println("Thread is stopping.");
+            throw new NoCycleFoundException();
+        }
+        colors.setPink(s);
+
+        for (graph.State t : post(s)) {
+            if (colors.hasColor(t, Color.CYAN)) {
+                throw new CycleFoundException();
+            } else if (!colors.isPink(t) && !parent.isRed(t)) {
+                dfsRed(t);
+            }
+        }
+
+        if (s.isAccepting()) {
+            parent.decrementCount(s);
+            // here we synchronize on the state info
+            // the parent will wake us up if the counter reaches 0
+            StateInfo info = parent.getStateInfo(s);
+            synchronized(info) {
+                while (info.count != 0) {
+                    try {
+                        info.wait();
+                    } catch (InterruptedException e) { System.out.println("Something went wrong..."); }
+                }
+            }
+        }
+        parent.colorRed(s);
+        colors.removePink(s);
+    }
+
+    /**
+     * Follows the structure of dfs_blue(s, i), with the only difference
+     * that it checks the parent for if the task has been completed, and
+     * thus if this thread should exit as well.
+     *
+     * @param s to search at
+     * @throws ResultException
+     */
+    public void dfsBlue(graph.State s) throws ResultException {
+        if (parent.cycleFound) {
+            System.out.println("Thread is stopping.");
+            throw new NoCycleFoundException();
+        }
+
+        colors.color(s, Color.CYAN);
+        for (graph.State t : post(s)) {
+            if (colors.hasColor(t, Color.WHITE) && !parent.isRed(t)) {
+                dfsBlue(t);
+            }
+        }
+
+        if (s.isAccepting()) {
+            parent.incrementCount(s);
+            dfsRed(s);
+        }
+        colors.color(s, Color.BLUE);
+    }
+
+    /**
+     * Returns a randomly (locally) permuted list of states
+     * computed by the post function.
+     *
+     * @param s the state to calculate post
+     * @return shuffled list of post states
+     */
+    private List<graph.State> post(graph.State s) {
+        List<graph.State> states = parent.post(s);
+        Collections.shuffle(states);
+        return states;
+    }
+}

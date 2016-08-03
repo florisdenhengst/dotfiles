@@ -1,0 +1,20 @@
+<div class='search-box-wrapper'>
+  <div class="right" style="width: 100%">
+    <form>
+    <input class="search-box" ng-class="{opened: searchText.NAME}" type="search" placeholder="Search by name..."
+        ng-model="searchText.NAME" />
+    </form>
+  </div>
+  <!-- Search results -->
+  <div class="col-lg-12 right search-results" ng-show="searchText.NAME">
+    <div class="overlay search-result">
+      <ol class="right" style="width: 100%; padding: 0">
+        <li ng-click="$parent.searchText={};callFunction(p['positionId'].v, p['layer'].v)"
+            ng-repeat="p in positions | foPositionsFilter:searchText.NAME | limitTo:20 as
+            searchResult"> bla <span ng-bind-html="p['firstName'].v + ' ' + p['lastName'].v | highlight:
+              searchText.NAME"></span> </li>
+        <li class="no-result" ng-show="searchResult.length == 0">No results found</li>
+      </ol>
+    </div>
+  </div>
+</div>

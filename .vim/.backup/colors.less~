@@ -1,0 +1,20 @@
+/* Global color declarations */
+@crunchr-blue:      rgb(97, 217, 253);
+@highlight-orange:  rgb(253, 172, 54);
+@highlight-pink:    rgb(252, 49, 110);
+@background-black:  rgb(20, 33, 44);
+@text-color-white:  rgb(255, 255, 255);
+@crunchr-grey:      rgb(68, 86, 112);
+@crunchr-dark-grey: rgb(43, 53, 67);
+@highlight-grey:    rgb(68, 86, 112);
+
+/* App-specific colors */
+@organisation-green:rgb(144, 193, 66);
+@planning-purple:   rgb(154, 104, 252);
+@prefscan-pink:     rgb(236, 94, 186);
+@talent-orange:     rgb(252, 116, 50);
+@succession-teal:   rgb(82, 198, 192); 
+
+/* Custom colors */
+@errorColor: 		rgb(234, 19, 19);
+

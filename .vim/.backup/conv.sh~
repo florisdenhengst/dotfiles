@@ -1,0 +1,5 @@
+#!/bin/bash
+SAVEIFS=$IFS
+IFS=$(echo -en "\n\b")
+for i in *.m4a; do echo "Converting: ${i%.m4a}.mp3" faad -o - "$i" | lame - "${i%.m4a}.mp3" done
+IFS=$SAVEIFS

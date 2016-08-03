@@ -1,0 +1,33 @@
+library(e1071)
+library(caret)
+
+setwd("~/Documents/scriptie/datasets/kdd99")
+kdd = read.table('kddcup.data_10_percent_corrected', sep=",")
+
+kdd = kdd[:, -7]
+
+kdd$normal[kdd[42]=="normal."] <- "TRUE"
+kdd$normal[kdd[42]!="normal."] <- "FALSE"
+
+#trainingSize = nrow(trainPostive)
+trainingSize = 2000
+
+trainPositive<-subset(kdd, normal=="TRUE")
+inTrain<-createDataPartition(1:trainingSize, p=0.6, list=FALSE)
+trainpredictors<-kdd[inTrain,5:15]
+testpredictors<-kdd[,5:15]
+
+testLabels <- kdd$normal
+
+svm.model<-svm(trainpredictors,
+               y=NULL,
+               type='one-classification',
+               nu=0.05,
+               scale="FALSE",
+	       kernel="radial")
+
+svm.pred<-predict(svm.model,testpredictors)
+confusionMatrixTable<-table(Predicted=svm.pred,Reference=testLabels)
+confusionMatrix(confusionMatrixTable,positive='TRUE')
+
+

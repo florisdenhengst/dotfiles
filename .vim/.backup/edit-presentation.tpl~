@@ -1,0 +1,66 @@
+{extends "menu-page.tpl"}
+
+{block "title"}
+  Edit presentation {if $presentatoin.label == ""}{$presentation.id}{else}{$presentation.label}{/if}
+{/block}
+
+{block "content"}
+  <form class="form-horizontal"
+        method="POST">
+    <div class="form-group form-group-md">
+      {if isset($presentation.id)}
+        <input type='hidden' value="{$presentation.id}"> 
+      {/if}
+      <div class="row">
+        {include(file='forms/dropdown.tpl',
+                  label       = 'group',
+                  input_id    = 'group',
+                  input_name  = 'group',
+                  options     = $groups
+                  selected    = $presentation.group
+                  required    = TRUE,
+                  autofocus   = TRUE)
+        }
+      </div>
+      <div class="row">
+        {include(file='forms/text-input.tpl',
+                  label       = 'url',
+                  input_type  = 'url',
+                  input_name  = 'url',
+                  input_id    = 'url',
+                  placeholder = 'url',
+                  value       = $presentation.url,
+                  required    = TRUE,)
+        }
+      </div>
+      <div class="row">
+        {include(file='forms/dropdown.tpl',
+                  label       = 'timeslot',
+                  input_id    = 'timeslot',
+                  input_name  = 'timeslot',
+                  options     = $timeslots,
+                  selected    = $presentation.timeslot
+                  required    = TRUE,)
+        }
+      </div>
+      <div class="row">
+        {include(file='forms/text-input.tpl',
+                  label       = 'label',
+                  input_type  = 'text',
+                  input_id    = 'label',
+                  placeholder = 'description',
+                  value       = $group.label)
+        }
+      </div>
+      <div class="row">
+        {include(file='forms/back-submit.tpl',
+                  submit_button_id    = '',
+                  back_button_id      = '',
+                  back_url            = '/management/presentations')
+        }
+      </div>
+      <div class="row">
+    </div>
+
+  </form>
+{/block}

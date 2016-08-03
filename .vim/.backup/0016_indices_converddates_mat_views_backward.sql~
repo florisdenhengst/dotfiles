@@ -1,0 +1,10 @@
+DROP INDEX view_converteddatesperson_person;
+
+DROP INDEX view_converteddatesperson_age;
+
+DROP INDEX view_converteddatesperson_yearsofservice;
+
+
+DROP INDEX view_converteddatesjob_job;
+
+DROP INDEX view_converteddatesjob_yearsinposition;

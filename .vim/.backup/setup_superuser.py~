@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+from django.core.management.base import BaseCommand, CommandError
+from database.models import *
+from database.management.utils import *
+from django.core.management import call_command
+
+class Command(BaseCommand):
+  args = ''
+  help = """Creates a Group and corresponding Role for all superusers.
+            This Role gives access to all chunks by providing an empty set of 
+            rules, that excludes nothing."""
+  CONFIRM_MESSAGE = "Found a group containing all superusers (name='%s')" 
+  SUPER_GROUP_NAME = "super group"
+  SUPER_GROUP_DESCRIPTION = "auto generated group containing all superusers"
+  SUPER_ROLE_NAME = "super role"
+  SUPER_ROLE_DESCRIPTION = "auto generated role with access to everything"
+  CREATED_ROLE = "Successfully created or updated role for %s"
+
+  def create_role_for_group(self, group, force=False):
+    confirm_message = self.CONFIRM_MESSAGE + "\n It has no roles or rules yet.\n"
+    confirm_message = confirm_message + "Do you want to grant this group access to all chunks?"
+    if not force:
+      confirmed = confirm(confirm_message % group.name)
+
+    if(confirmed or force):
+      role = Role(group=group, 
+                  name=self.SUPER_ROLE_NAME,
+                  description=self.SUPER_ROLE_DESCRIPTION)
+      role.save()
+      role.update()
+      return True
+    return False
+
+  def update_role(self, group, role):
+    confirm_message = self.CONFIRM_MESSAGE + "\n It already has a role (name='%s').\n"
+    confirm_message = self.confirm_message + "Do you want to update this role so that it grants access to all chunks?"
+    confirmed = confirm(confirm_message % (group.name, role.name))
+    if(confirmed):
+      role.rules.all().delete()
+      role.update()
+      return True
+    return False
+
+  def create_super_group(self):
+    group = Group(name=SUPER_GROUP_NAME,
+                  description=SUPER_GROUP_DESCRIPTION)
+    group.save()
+    sus = User.objects.filter(is_superuser=True)
+    for su in sus:
+      su.groups.add(group)
+      su.save()
+    return group
+
+  def handle(self, *args, **kwargs):
+    # Define separate QuerySets containing superusers and non-superusers
+    sus = User.objects.filter(is_superuser=True)
+    non_sus = User.objects.filter(is_superuser=False)
+
+    # check if group exclusively for superusers exists
+    su_groups = Group.objects
+         .annotate(count=Count('user')) # add a count of the number of users in the group
+         .exclude(user__in=non_sus)     # make sure no non-super users in the group
+         .filter(user__in=sus,          # make sure super users are in the group 
+                 count=(sus.count()))   # make sure all super users are in the group
+
+   if su_groups.count() < 1:
+     # no groups containing all superusers exist
+     print("No groups containing all superusers exist.")
+     su_group = self.create_super_group()
+     create_role_for_group(su_group, force=True) 
+
+   else:
+     # a group containing all superusers exists
+     for su_group in su_groups:
+       created_new_role = False
+       try:
+         role = group.role
+         updated_role = self.update_role(group, role)
+       except RelatedObjectDoesNotExist:
+         created_new_role = self.create_role_for_group(su_group)
+       
+       if created_new_role or updated_role:
+         print(CREATED_ROLE % su_group.name)
+
+   

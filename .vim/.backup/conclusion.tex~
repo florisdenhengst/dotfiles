@@ -1,0 +1,44 @@
+\chapter{Conclusion}
+\label{ch:conclusion}
+% main goal: what does the paper add to the body of knowledge in your research
+% fied and what does it imply for future research or professional practice?
+
+% Implication of Dicussion-part
+% Suggestion for future research / of subsequent trends (maybe include
+% recommendation for Crunchr?)
+We have presented a framework for efficiently finding interesting outliers in
+data sets about which little prior knowledge. We specifically treat the scenario
+where an expert is available to provide labels as requested by the framework.
+The framework can be described as an active learning approach to anomaly
+detectoin and consists of an unsupervised and a supervised component with a
+query selection mechanism.
+
+In order to detect outliers efficiently without \emph{a priori} knowledge, an
+unsupervised method that makes little assumptions on the generating process or
+structure of the data is favourable. After examination of several models for
+outlier detection we deem the density-based model to be favourable for this use
+case: it poses little assumptions on the data and is robust against differences
+in local density. We found Local Outlier Factor to be the most suitable in this
+class of outlier detection methods.
+
+%TODO: more on how to separate noise and anomalies.
+The hypothesis that a semi-supervised model based on an unsupervised SVM-like
+model would outperform a more traditional supervised multi-class SVM was not
+supported by results. The traditional multi-class SVM outperformed the
+specialised SSAD method in all experiments.
+
+We have shown a way of effectively using expert input by querying labels in an
+informed way. The proposed selection mechanism alternates querying for points
+that are suspected by the unsupervised component with querying for points about
+which the actual classifier is uncertain. Final classification performance was
+increased by this method both when all data was available throughout training
+and when new data was introduced. This query mechanism even enables
+classification performance to exceed the performance when all labels are present
+present with roughly 20\% of the labels queried.
+
+Our proposed method has shown a performance gain when all off the data is
+accessible for labelling in the training phase. In such a scenario, roughly 75\%
+of all anomalies were found at a precision of 0.5. The necessity of an
+unsupervised method when applying data was shown from the detrimental
+performance on applying a trained model on wholly unseen data.
+

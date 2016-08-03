@@ -1,0 +1,207 @@
+import cvxopt as co
+from kernel import Kernel
+import numpy as np
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import pprint
+import sklearn as sk
+from sklearn import grid_search
+from svdd import SVDD
+from sklearn.utils.estimator_checks import check_estimator
+from sklearn.utils import check_array
+from sklearn.utils.validation import column_or_1d
+from sklearn.cross_validation import StratifiedKFold, StratifiedShuffleSplit
+import sys
+import json
+from optimals import optimals
+from midpoint_normalize import MidPointNormalize
+import os
+from ssad_wrapper import *
+
+K_TYPE = 'rbf'
+SKLEARN_CVTUPLE_MEAN = 1
+SKLEARN_CVTUPLE_STDEV = 2
+SKLEARN_CVTUPLE_PARAMS = 0
+
+BASE_DIR = os.path.dirname(os.path.realpath(__file__))
+DATASETS_DIR = BASE_DIR + '/../datasets'
+RESULTS_DIR =  BASE_DIR + '/../results'
+POS_LABEL = -1
+USG = 'usg'
+THYROID = 'thyroid'
+ABALONE = 'abalone'
+LOCI = 'loci_final.csv'
+LOF = 'lof_final.csv'
+CLASSES = 'simply_classes.csv'
+
+# 'trues' / Y
+CLASSES_ABALONE = '/'.join([DATASETS_DIR, ABALONE, CLASSES])
+CLASSES_THYROID = '/'.join([DATASETS_DIR, THYROID + '-own', CLASSES])
+CLASSES_USG = '/'.join([DATASETS_DIR, 'werknemers', CLASSES])
+
+# input data
+X_ABALONE = '/'.join([DATASETS_DIR, ABALONE, 'scaled0_1_no_rownames.csv'])
+X_THYROID = '/'.join([DATASETS_DIR, THYROID + '-own', 'scaled0_1.csv'])
+X_USG = '/'.join([DATASETS_DIR, 'werknemers', 'usg_scaled0_1_no_rownames.csv'])
+
+MARKER_SIZE = 8
+MARKER_EDGE_WIDTH = 1.5
+MARKER_SCALE = 0.5
+
+USG_COLOR = 'blue'
+THYROID_COLOR = 'red'
+ABALONE_COLOR = 'green'
+
+SVC_INDICATOR = 'dashed'
+SSAD_INDICATOR = 'solid'
+N_LABELS = 20
+
+USG_PLT = {
+    'color': USG_COLOR,
+    'marker': '+',
+    }
+THYROID_PLT = {
+    'color': THYROID_COLOR,
+    'marker': '.',
+    }
+ABALONE_PLT = {
+    'color': ABALONE_COLOR,
+    'marker': ',',
+    }
+
+try:
+  inter_intra = sys.argv[1]
+except Exception as e:
+  print('Usage: python svc_optimal.py <inter/intra> [output_dir]')
+  exit(1)
+
+co.solvers.options['show_progress'] = False
+k_folds = 5
+
+if k_folds > 5:
+  print('Using k_folds > 5')
+  exit()
+
+files = {
+    'SVC (domain data set)':
+      {
+        'opts': {
+           **optimals['usg']['svc'],
+          },
+        'trues': CLASSES_USG,
+        'X': X_USG,
+        'model': sk.svm.SVC
+      },
+    'SVC (thyroid dataset)':
+      {
+        'opts': {
+           **optimals['thyroid']['svc'],
+          },
+        'trues': CLASSES_THYROID,
+        'X': X_THYROID,
+        'model': sk.svm.SVC
+      },
+    'SVC (abalone dataset)':
+      {
+        'opts': {
+           **optimals['abalone']['svc'],
+          },
+        'trues': CLASSES_ABALONE,
+        'X': X_ABALONE,
+        'model': sk.svm.SVC
+      },
+#    'SSAD (domain data set)':
+#      {
+#        'opts': {
+#           **optimals['usg']['ssad'],
+#          },
+#        'trues': CLASSES_USG,
+#        'X': X_USG,
+#        'model': SSAD_WRAPPER
+#      },
+#    'SSAD (thyroid dataset)':
+#      {
+#        'opts': {
+#           **optimals['thyroid']['ssad'],
+#          },
+#        'trues': CLASSES_THYROID,
+#        'X': X_THYROID,
+#        'model': SSAD_WRAPPER
+#      },
+#    'SSAD (abalone dataset)':
+#      {
+#        'opts': {
+#           **optimals['abalone']['ssad'],
+#          },
+#        'trues': CLASSES_ABALONE,
+#        'X': X_ABALONE,
+#        'model': SSAD_WRAPPER
+#      },
+}
+
+
+def matthews_corrcoef(estimator, X, y_true):
+  predictions = estimator.predict(X)
+  score = sk.metrics.matthews_corrcoef(y_true, predictions)
+  return score
+
+def svc_f1(estimator, X, y_true):
+  predictions = estimator.predict(X)
+  f1 = sk.metrics.f1_score(y_true, predictions, pos_label=-1)
+  return f1
+
+def svc_auc_pr(estimator, X, y_true):
+  probas_pred = estimator.decision_function(X)
+  (precision, recall, _) = sk.metrics.precision_recall_curve(y_true,
+          probas_pred, pos_label=-1)
+  auc = sk.metrics.auc(recall, precision)
+  return auc
+
+datas = {}
+scorer = sk.metrics.f1_score
+
+indent = 0
+for fname, fobject in files.items():
+  with open(fobject['trues']) as ftrues:
+    print(fname)
+
+    X = np.loadtxt(fobject['X'], delimiter=',')
+    indent += 1
+    trues = np.loadtxt(ftrues, delimiter=",")
+    # create a stratified K fold split
+    #TODO - use StratifiedKFold
+#    folds = StratifiedShuffleSplit(trues, n_iter=1000, test_size=0.2)
+    folds = StratifiedKFold(trues, n_folds=k_folds)
+    model = fobject['model']()
+    model.set_params(**fobject['opts'])
+   
+    scores = []
+    for fold_c, (train_fold, test_fold) in enumerate(folds):
+      # TODO: for the intra-upload setting with SSAD, this should include the test data as well as
+      # the training data.
+      if 'SSAD' in fname:
+        # entire X may be used for fitting the model
+        # (it is accessible in this scenario, but not for validation)
+        X_train, X_test = X, X[test_fold]
+        Y_train, Y_test = trues, trues[test_fold]
+        Y_train[test_fold] = 0
+      else:
+        X_train, X_test = X[train_fold], X[test_fold]
+        Y_train, Y_test = trues[train_fold], trues[test_fold]
+
+      # fit it!
+      model.fit(X_train, Y_train)
+      # predict on unknown points
+      predictions = model.predict(X_test)
+      # save score to some output
+      score = scorer(Y_test, predictions, pos_label=POS_LABEL)
+      print(score)
+      scores.append(score)
+    datas[fname] = (np.mean(scores), np.std(scores))
+    indent -= 1
+    print()
+    # average outputs across all folds
+
+for fname, (mean, stdev) in datas.items():
+  print(fname, mean, stdev)
+

@@ -1,0 +1,167 @@
+from database.models.base import *
+from database.models.core import *
+
+class ConvertedDatesPerson(CrunchrViewModel, Protected):
+  person            = models.OneToOneField(Person, primary_key=True, on_delete=DO_NOTHING)
+  age               = models.FloatField()
+  years_of_service  = models.FloatField(db_column="yearsofservice")
+
+
+  def get_path_to_chunk():
+    return 'person__employee__job__chunk'
+
+  class Meta:
+    app_label= 'database'
+    managed = False
+    db_table = 'view_converteddatesperson'
+
+class ConvertedDatesJob(CrunchrViewModel, Protected):
+  job               = models.OneToOneField(Job, primary_key=True, on_delete=DO_NOTHING)
+  years_in_position = models.FloatField(db_column="yearsinposition")
+
+  def get_path_to_chunk():
+    return 'job__chunk'
+
+  class Meta:
+    app_label= 'database'
+    managed = False
+    db_table = 'view_converteddatesjob'
+
+
+class ShortTermSuccessors(CrunchrViewModel, Protected):
+  position                = models.OneToOneField(Position, db_column="position", primary_key=True, on_delete=DO_NOTHING)
+  title                   = models.CharField(max_length=200)
+  listed_successors       = models.FloatField()
+
+  def get_path_to_chunk():
+    return 'position__job__chunk'
+
+  class Meta:
+    app_label= 'database'
+    managed = False
+    db_table = 'view_shorttermsuccessors'
+
+
+class MidTermSuccessors(CrunchrViewModel, Protected):
+  position                = models.OneToOneField(Position, db_column="position", primary_key=True, on_delete=DO_NOTHING)
+  title                   = models.CharField(max_length=200)
+  listed_successors       = models.FloatField()
+
+  def get_path_to_chunk():
+    return 'position__job__chunk'
+
+  class Meta:
+    app_label= 'database'
+    managed = False
+    db_table = 'view_midtermsuccessors'
+
+
+class LongTermSuccessors(CrunchrViewModel, Protected):
+  position                = models.OneToOneField(Position, db_column="position", primary_key=True, on_delete=DO_NOTHING)
+  title                   = models.CharField(max_length=200)
+  listed_successors       = models.FloatField()
+
+  def get_path_to_chunk():
+    return 'position__job__chunk'
+
+  class Meta:
+    app_label= 'database'
+    managed = False
+    db_table = 'view_longtermsuccessors'
+
+
+class ShortTermAvailableSuccessors(CrunchrViewModel, Protected):
+  position        = models.OneToOneField(Position, db_column="position", primary_key=True, on_delete=DO_NOTHING)
+  title           = models.CharField(max_length=200)
+  effective       = models.FloatField()
+
+  def get_path_to_chunk():
+    return 'position__job__chunk'
+
+  class Meta:
+    app_label= 'database'
+    managed = False
+    db_table = 'view_shorttermavailablesuccessors'
+
+
+
+class MidTermAvailableSuccessors(CrunchrViewModel, Protected):
+  position        = models.OneToOneField(Position, db_column="position", primary_key=True, on_delete=DO_NOTHING)
+  title           = models.CharField(max_length=200)
+  effective       = models.FloatField()
+
+  def get_path_to_chunk():
+    return 'position__job__chunk'
+
+  class Meta:
+    app_label= 'database'
+    managed = False
+    db_table = 'view_midtermavailablesuccessors'
+
+
+class LongTermAvailableSuccessors(CrunchrViewModel, Protected):
+  position        = models.OneToOneField(Position, db_column="position", primary_key=True, on_delete=DO_NOTHING)
+  title           = models.CharField(max_length=200)
+  effective       = models.FloatField()
+
+  def get_path_to_chunk():
+    return 'position__job__chunk'
+
+  class Meta:
+    app_label= 'database'
+    managed = False
+    db_table = 'view_longtermavailablesuccessors'
+
+
+class ShortTermBench(CrunchrViewModel, Protected):
+  employee  = models.OneToOneField(Employee, db_column="employee", primary_key=True, on_delete=DO_NOTHING)
+  sucs      = models.IntegerField()
+
+  def get_path_to_chunk():
+    return 'employee__job__chunk'
+
+  class Meta:
+    app_label= 'database'
+    managed = False
+    db_table = 'view_shorttermbench'
+
+
+class MidTermBench(CrunchrViewModel, Protected):
+  employee   = models.OneToOneField(Employee, db_column="employee", primary_key=True, on_delete=DO_NOTHING)
+  sucs      = models.IntegerField()
+
+  def get_path_to_chunk():
+    return 'employee__job__chunk'
+
+  class Meta:
+    app_label= 'database'
+    managed = False
+    db_table = 'view_midtermbench'
+
+
+class LongTermBench(CrunchrViewModel, Protected):
+  employee    = models.OneToOneField(Employee, db_column="employee", primary_key=True, on_delete=DO_NOTHING)
+  sucs        = models.IntegerField()
+
+  def get_path_to_chunk():
+    return 'employee__job__chunk'
+
+  class Meta:
+    app_label= 'database'
+    managed = False
+    db_table = 'view_longtermbench'
+
+
+class TotalBench(CrunchrViewModel, Protected):
+  employee    = models.OneToOneField(Employee, db_column="employee", primary_key=True, on_delete=DO_NOTHING)
+  sucs        = models.IntegerField()
+
+  def get_path_to_chunk():
+    return 'employee__job__chunk'
+
+  class Meta:
+    app_label= 'database'
+    managed = False
+    db_table = 'view_totalbench'
+
+    

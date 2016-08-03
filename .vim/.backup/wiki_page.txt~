@@ -1,0 +1,49 @@
+{{Masterproject
+|Master name=Computational Intelligence and Selforganisation
+|Student name=Floris den Hengst
+|Project start date=2015/05/01
+|Project end date=2015/07/11
+|Supervisor=Mark Hoogendoorn
+|Second supervisor=Dirk Jonker
+|Company=Focus Orange
+|Thesis title=Detecting Interesting Outliers
+|Finished=No
+|Thesis=Thesis.pdf
+|Poster=Posternaam.pdf
+}}
+The primary use of analysing outliers has been to remove anomalous data points (e.g. measurement errors) to improve further statistical analysis. In more recent years, outlier detection has increasingly been utilized to achieve other goals as well, such as fraud detection [1], intrusion detection [2] and finding brain tumours from MRI scans [3]. This increased interest in outlier detection has spawned a range of novel outlier detection methods and paradigms.
+
+Recently, [http://www.focusorange.com/ Focus Orange] has launched [https://crunchrapps.com/ ‘Crunchr’]: an online HR analytics platform that brings self-service to the HR analytics domain. Organisations can upload data to the platform to obtain insights into the structure and effectiveness in various HR-related topics (e.g. talent management, succession planning and workforce planning).
+
+The data sets provided by the organisations, however, may be of insufficient quality. A manual validation step based on outlier analysis has been introduced to solve this issue. This validation step consists of a data scientist finding unlikely values and presenting them to the provider of the information (the 'expert') for verification. Some of the thus found outliers turn out to be errors in the data ('anomalies'), whereas others can be attributed to 'noise' and are harmless to further analyses.
+
+An Active Learning method that could find (possibly interesting) outliers, select some for labelling by the expert and incorporate feedback to find anomalies could aid in:
+
+#Reducing necessary human effort to remove anomalies
+#Increasing the number of detected anomalies
+#Improving reusability (i.e. finding similar anomalies in a subsequent data upload)
+#Aid in finding the distinction between normal and anomalous points
+
+The main research questions to find such a method are:
+*What methods are suitable for automatically detecting outliers in HR data?
+*How can we separate noise from anomalies?
+
+Related questions are:
+*What is the trade-off between Precision and Recall in such a method?
+*How does the number of labels provided by the expert (hints) affect the quality of the classifier?
+*How does the problem size (number of rows, number of features) influence the runtime of the interactive part of the method?
+
+Annotated real-life HR data and well-known data from the [https://archive.ics.uci.edu/ml/datasets.html UCI repository] will be used for main question (1). For main question (2) we will have to resort to real-life HR data as the distinction between anomalies and noise cannot be made on the well-known data set.
+
+[1] Clifton Phua, Vincent Lee, Kate Smith, and Ross Gayler. A comprehen-
+sive survey of data mining-based fraud detection research. arXiv preprint
+arXiv:1009.6119, 2010.
+
+[2] Leonid Portnoy, Eleazar Eskin, and Sal Stolfo. Intrusion detection with
+unlabeled data using clustering. In In Proceedings of ACM CSS Workshop
+on Data Mining Applied to Security (DMSA-2001. Citeseer, 2001.
+
+[3] Marcel Prastawa, Elizabeth Bullitt, Sean Ho, and Guido Gerig. A brain
+tumor segmentation framework based on outlier detection. Medical image
+analysis, 8(3):275–283, 2004.
+

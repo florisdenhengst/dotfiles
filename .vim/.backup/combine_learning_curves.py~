@@ -1,0 +1,73 @@
+import cvxopt as co
+from kernel import Kernel
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+import pprint
+import sklearn as sk
+from sklearn import grid_search
+from svdd import SVDD
+import sklearn
+from sklearn.cross_validation import StratifiedKFold
+from sklearn.utils.estimator_checks import check_estimator
+from sklearn.utils import check_array
+from sklearn.utils.validation import column_or_1d
+import sys
+from ssad_wrapper import *
+from midpoint_normalize import *
+import json
+import os
+import time
+from optimals import optimals
+
+# Different types require different aggreagtes
+# - intra -- no average
+# - inter -- N_FOLDS
+# - random intra - N_ITERATIONS
+# - random inter - N_FOLDS, N_ITERATIONS
+def dummy_aggr(data):
+    return data
+
+def single_aggr(data):
+    '''Performs aggregates on non-nested results (n_iterations OR folds)'''
+    aggregate_len = len(data)
+    data_len = len(data[0])
+    result = np.zeros(data_len)
+    for i in range(aggregate_len):
+        scores = [score[i] for score in data]
+        result[i] = sum(scores) / len(scores)
+    return result
+
+def double_aggr(data):
+    '''Performs aggregates on doubly-nested results (folds AND n_iterations).'''
+    outer_aggregate_len = len(data)
+    inner_aggregate_len = len(data[0])
+    data_len = len(data[0][0])
+    averaged_scores_inner = []
+    for i in range(inner_aggregate_len):
+        averaged_scores_inner .append([])
+        for j in range(outer_aggregate_len):
+            scores_inner = [score[i][j] for score in data]
+            total = sum(scores_inner)
+            averaged_scores_inner [i].append(total / len(scores_inner)
+
+    averaged_scores = []
+    for i in range(inner_aggregate_len):
+        scores_inner = [avg_scores_inner[i]
+                           for avg_scores_inner
+                           in averaged_scores_inner]
+        averaged_scores[i] = sum(scores_inner) / len(scores_inner)
+    return averaged_scores
+
+
+# define list of score-files
+
+# read scores from score files
+datas = {}
+for fname, f_object in files:
+    myfile = f_object['file']
+    process_f = f_object['process_f']
+    # aggregate correctly, i.e. average
+    data[fname] = process_f(json.load(myfile))
+
+# create plot

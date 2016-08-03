@@ -1,0 +1,13 @@
+Unsupervised:
+  - Mogelijk controleren van resultaten (welke outliers zijn niet te vinden?)
+
+Semi-supervised:
+  - Geen nested CV <- okay, maar in discussie
+  - Bespreken van F1 van 1.0 <- toevallige fit of iets speciaals?
+    - Blijkt toevallig te zijn geweest. Nu staat avg op 0.98~
+  - Hoe is de relatie dataset <-> parameter settings.
+
+Learning Curve
+  - Kan met parameters die vastgezet zijn n.a.v. resultaten bij 100% labelling
+  - Vergelijkbare methodes proberen
+

@@ -1,0 +1,65 @@
+{extends "menu-page.tpl"}
+
+{block "title"}
+Clients
+<a class="btn btn-primary"
+  href="/management/clients/new">
+  <span class='glyphicon glyphicon-plus'></span>
+</a>
+{/block}
+
+
+{block "content"}
+  <div class="row header">
+    <div class="col-xs-2">
+      &nbsp;
+    </div>
+    <div class="col-xs-1">
+      ID
+    </div>
+    <div class="col-xs-3">
+      Group 
+    </div>
+    <div class="col-xs-2">
+      Label
+    </div>
+    <div class="col-xs-3">
+      Last active
+    </div>
+    <div class="col-xs-1">
+      &nbsp;
+    </div>
+  </div>
+  {foreach $clients, index, client}
+  <div class="row 
+              {if $index mod 2 == 1}odd{else}even{/if}
+              {if $client.id == $highlight_id} bg-success my-fade-out{/if}">
+    <div class="col-xs-2">
+      <a class="btn btn-primary"
+        href="/management/clients/{$client.id}">
+        <span class='glyphicon glyphicon-edit'></span>
+      </a>
+    </div>
+    <div class="col-xs-1">
+      {$client.id}
+    </div>
+    <div class="col-xs-3">
+      <a href='/management/groups/{$client.group}'>
+        {$client.group_label}
+      </a>
+    </div>
+    <div class="col-xs-2">
+      {$client.label}
+    </div>
+    <div class="col-xs-3">
+      {$client.last_active}</a>
+    </div>
+    <div class="col-xs-1">
+      <a class="btn btn-danger"
+        href="/management/clients/delete/{$client.id}">
+        <span class='glyphicon glyphicon-remove'></span>
+      </a>
+    </div>
+  </div>
+  {/foreach}
+{/block}

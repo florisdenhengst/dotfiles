@@ -1,0 +1,40 @@
+
+<div ng-show="filter.showFilterBar()" class="row app-filter">
+  <div class="col-xs-3">
+    <div class="filter-toggle" ng-click="filter.toggle()">
+      <ng-include ng-hide="filter.isVisible()"
+          src="'/static/kapstok/logos/see filter.svg'"></ng-include>
+      <ng-include ng-show="filter.isVisible()"
+          src="'/static/kapstok/logos/hide filter.svg'"></ng-include> 
+      FILTER
+      <fo-include data="/api/filter_scope/">
+          ({{$parent.data.employees | number}} employees in selection)
+      </fo-include>
+    </div>
+  </div>
+  
+  <div class="col-xs-7">
+    <ul>
+      <li style="border: 0; ">
+      <li ng-show="!filter.showMultiPositions && filter.multiPositionsEnabled && filter.contents.multiPositions"
+          ng-click="filter.toggleMultiPositions()">
+        MULTIPOSITIONS EXCLUDED<img src="/static/kapstok/logos/reset filter.png">
+      </li>
+      <li ng-show="!filter.multiPositionsEnabled && filter.contents.multiPositions">
+        MULTIPOSITIONS DISABLED
+      </li>
+      <li ng-repeat="(filterName, filterSelection) in filter.selections"
+          ng-click="filter.reset(filterName)"
+          ng-show="filter.hasSelection(filterName)">
+        {{filter.filterLabelMapping[filterName] | uppercase}} <img src="/static/kapstok/logos/reset filter.png">
+      </li>
+    </ul>
+    <!--
+    <div>
+      <img style="float:right; margin-top: 10px; width: 20px"
+          src="/static/kapstok/logos/arrowRight.png">
+    </div>
+    -->
+  </div>
+</div> 
+

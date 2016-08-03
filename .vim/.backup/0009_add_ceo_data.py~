@@ -1,0 +1,15 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models, migrations
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('database', '0008_merge'),
+    ]
+
+    operations = [
+        migrations.RunSQL("UPDATE position SET solidline_id = 1528 WHERE id = 1528", "UPDATE position SET solidline_id = 3154 WHERE id = 1528"),
+    ]

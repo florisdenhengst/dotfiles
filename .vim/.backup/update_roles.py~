@@ -1,0 +1,24 @@
+#!/usr/bin/env python3
+from django.core.management.base import BaseCommand, CommandError
+from database.models import *
+from database.management.utils import * 
+
+class Command(BaseCommand):
+  args = ''
+  help = 'Updates the chunks for every Role. Should be called after `chunk`.'
+  CONFIRM_MESSAGE = """All Roles should be updated after the generation of new Chunks.\n Do you want to update all Roles now?"""
+
+
+  def handle(self, *args, **kwargs):
+    """
+    Updates the chunks for every role.
+    """
+    confirmed = confirm(self.CONFIRM_MESSAGE)
+    if(confirmed):
+      print('Updating Roles...')
+      Role.update_all()
+      print('Done!')
+      nr_of_roles = Role.objects.all().count()
+      print('Updated %d roles' % nr_of_roles)
+    else:
+      print('Roles not updated')

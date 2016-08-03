@@ -1,0 +1,632 @@
+\section{Unsupervised Scenario}
+\label{sec:unsupervised_scenario}
+When there are no labelled outliers available, the outlier detection task is of
+an exploratory nature. This \emph{unsupervised} scenario requires methods that
+can find outliers without human supervision. Because of the absence of exemplary
+outliers, an assumption has to be made on what separates outliers from normal
+points. Depending on the data, an appropriate definition of the term `outlier'
+should be used. These different definitions have resulted in a wide variety of
+fundamentally different ways to find outliers: these can be regarded as
+different \emph{models} of outlier detection.
+
+We will start by having a look at the probabilistic model, which is derived from
+statistical theory and treats points that are unlikely given an underlying
+distribution as outliers. A more basic model is treated next in which outliers
+lie at the edge of the data: the extreme value model. The subspace model is
+based on dependence between features and denotes points which cannot be
+represented in a lower-dimension space properly as outliers. The last model in
+this section is the proximity-based model. It treats points that are far away
+from other points as outliers.
+
+\subsection{Probabilistic Model}
+\label{subsec:probabilistic_model}
+% Aggarwal 2.4 - 2.5
+% historical intro, intro to distribution-based methods
+The field of outlier detection originates in statistics: it was originally
+associated with identifying observations which are unlikely to stem from an
+assumed underlying distribution. These deviations from the expected distribution
+may be attributable to measurement error and it might therefore be wise to
+exclude them from further analysis. These methods are also known as
+probabilistic, statistical or distribution-based \cite{aggarwal2013outlier}
+\cite{zhu2011outlier}.
+
+% Chauvenet's criterion
+One of the earliest known mentions of outlier detection, \emph{Chauvenets
+criterion}, can be applied to find outliers in a univariate set of observations
+drawn from normally distributed populations \cite{chavuenet1871manual}, for
+instance, these 10 observations: $\{-2, 6, 9, 9, 10, 11, 11, 13, 16, 18\}$.
+First, the observed mean $\mu$ and standard deviation $\sigma$ are calculated.
+In our example, $\mu = 10.1$ and $\sigma \approx 5.5$. The value $-2$ differs
+slightly more than $2 \sigma$ from the observed $\mu$. The probability of this
+happening is roughly $0.03$ given the theoretical normal distribution. The
+criterion states that we should reject every data point for which the
+probability of occurring given the observed mean and sigma is less than
+$\frac{1}{2n}$, so we should suspect all probabilities smaller than $0.05$ in
+our example. This means we would reject the suspected point according to this
+criterion. A general approach based on QQ-plots that supports non-normal
+underlying distributions can be found in \cite{van2010distribution}. First, the
+distribution of the data is approximated by regression of the observed values on
+their estimated QQ-plot positions. Next, a lower and upper threshold are
+determined between which a certain percentage of all points must lie (e.g.
+$5\%$). All points below and above the lower and upper threshold respectively
+are reported as outliers.
+
+% Single population -> multiple populations
+With the use of \emph{mixture models} this simple case can be extended to a more
+advanced one in which a single feature is observed in instances from multiple
+subpopulations. The subpopulations are assumed to stem from distributions with
+differing parameters. When we know the number of subpopulations and the
+underlying distribution of these subpopulations, we can estimate their
+parameters (e.g.  $\mu$, $\sigma$ or other parameters) by using the
+\emph{Expectation Maximization} (EM) algorithm \cite{moon1996expectation}. EM
+starts with randomly parameters for all subpopulations and proceeds in two steps
+for various rounds: in the E-step each point is assigned to the subpopulation it
+is expected to be part of based on membership probability. In the M-step, the
+parameters of the formed subpopulations are adjusted to describe their members
+best. The algorithm ends on convergence. The different subpopulations are
+generally known as the \emph{components} of the mixture.  Outliers are points
+that have low membership probabilities for the component they are assigned to
+(low likelihood) or points for which it is hard to decide to which component
+they belong (uncertainty) after convergence \cite{scott2004outlier}
+\cite{miller2003mixture}. Alternating both criteria (\emph{interleave}) yields
+the best results \cite{pelleg2004active}.
+
+This mixture model approach using EM also works for multivariate normally
+distributed data. Alternatively, plotting the Mahalanobis distances for each
+point to the mean in a $\chi^2$ QQ-plot visually indicates which points are
+outliers \cite{garrett1989chi}. We will not go into too much detail, but provide
+a brief description. The population mean can be estimated from the observed
+data, and is composed of the mean for each variable, i.e. it is the centre of
+the data. The Mahalanobis distances along each variable are calculated and
+summed. The Mahalanobis distance corrects for covariance, so that extremity in
+two correlated dimensions contributes only once. The distribution of the squares
+of these summed Mahalanobis distances to the data centre is expected to follow
+the $\chi^2$ distribution when the data follows a multivariate normal
+distribution. When plotting the resulting squared summed Mahalanobis distances
+against the theoretical $\chi^2$ distribution in a QQ-plot, outliers can be
+found by identifying points that to disturb a straight line. A related, yet
+automated approach is described in \cite{filzmoser2005multivariate}. All of
+these methods require the underlying distribution to be known.
+
+% limitations of distribution-based methods
+In conclusion: although they have a solid theoretical foundation, most of the
+methods based on the probabilistic model require the underlying distribution to
+be known. Finding the distribution (including correct parameters) is complex:
+efficient approaches exist \cite{larranaga2002estimation}, but bring their own
+complexity via the introduction of new parameters. All of these do not apply to
+many real-life scenarios. Because of these limitations, pure probabilistic-based
+methods are not often used for outlier detection on high-dimensional data in an
+automated setting.
+
+\subsection{Extreme Value Model}
+\label{subsec:extreme_value_model}
+% note on extreme value analysis
+% Depth-based approaches
+% Convex hull
+% Aggarwal Ch2.2 and Ch2.3
+
+% Intro to extreme value analysis and relation to probabilistic methods
+A theoretically more basic model for identifying outliers is by inspection of
+values in the outer range of a set of data points, commonly known as
+\emph{extreme value analysis} \cite{pickands1975statistical}. Extreme value
+analysis in the univariate case simply returns the top $n$ points furthest from
+the centre of the data, i.e. the highest and lowest values in the set.  When all
+samples stem from the same population, this model is very similar to the
+non-mixture probabilistic model in that the outliers always lie in the
+\emph{outskirts} of a data set. The difference between both models becomes clear
+when considering a probabilistic mixture model. A distinguishing example of can
+be found in
+\cite{aggarwal2013outlier}:
+\begin{displayquote}
+  For example, in the data set $\{1, 2, 2, 50, 98, 98, 99\}$ of 1-dimensional
+  values, the values 1 and 99, could very mildly, be considered extreme values.
+  $\lbrack\ldots\rbrack$ most probabilistic and density-based models would
+  classify the value 50 as the strongest outlier in the data, on the basis of
+  Hawkins’ definition of generative probabilities.
+\end{displayquote}
+A mixture model consisting of two components is expected to fit the three values
+on the left and right respectively to finally find that value $50$ is an outlier
+as it does not fit either of the components very well. Extreme value methods
+would not consider $50$ to be an outlier, as it resides at the centre of the
+set. Extreme value methods are expected to return values $1$ and $99$, as these
+are most distant to the centre of the data. 
+% multivariate extreme value analysis -> depth based
+Extreme value analysis can be extended to a multivariate setting in various
+ways. \emph{Depth-based} methods try to fit multiple convex hulls (or
+\emph{contours}) to the data \cite{ruts1996computing} \cite{johnson1998fast}.
+Outliers can then be found by `peeling' off the outer points until a
+pre-specified amount of data points at the edge of the set has been found.  When
+this pre-specified amount is not known, all points can be ranked based on the
+\emph{depth} (i.e. when the point was peeled off). This requires the method to
+compute depth of all data points, which is computationally expensive.  These
+methods are therefore generally not used for datasets with more than 4 features
+\cite{aggarwal2013outlier}. Although being amongst the first in multidimensional
+extreme value analysis, there are very little applications because of this
+restriction.
+
+\begin{figure*}
+  \centering
+  \begin{subfigure}[t]{0.45\textwidth}
+    \centering
+    \includegraphics[width=0.9\textwidth]{related_work/input_space.pdf}
+    \caption{Example dataset with a half-moon shape. Suspected outliers
+    lie in the centre of the data set.}
+    \label{fig:kernel_input}
+  \end{subfigure}
+  ~
+  \begin{subfigure}[t]{0.45\textwidth}
+    \centering
+    \includegraphics[width=0.9\textwidth]{related_work/mapped_space.pdf}
+    \caption{Mapping of Figure~\ref{fig:kernel_input} to higher-dimensional
+    space using a \emph{Radial Basis} function. The suspected outliers now
+    lie in an outskirt of the dataset.}
+    \label{fig:kernel_mapping}
+  \end{subfigure}
+  \caption{Applying a \emph{kernel} can move outliers to outskirts of the
+  dataset.}
+  \label{fig:kernel_mapping_example} 
+\end{figure*}
+
+An extreme-value method that can also detect outliers in the centre of a data
+set can be found in \cite{chen2009outlier}. It does so by employing a mapping of
+the original features in the so-called \emph{input space} to a
+higher-dimensional \emph{feature space}. The mapping should be designed to
+scatter the data such that formerly central data points move to the outskirts of
+the data. An example of such a mapping can be found in
+Figure~\ref{fig:kernel_mapping_example}, where in the original data the
+suspected outliers lie at the centre (making them impossible to detect using
+extreme value methods), whereas they lie in the outskirts after the mapping has
+been applied. The group of functions that can be used is generally known as
+\emph{kernel functions} or simply kernels. By looking for outliers in feature
+space rather than in input space, it is possible to find otherwise hidden
+outliers. When an outlier detection method can be expressed in terms of
+dot-products on vectors, the kernel does not have to be applied explicitly as it
+can be included in all dot-product calculations so that the mapping is performed
+implicitly. This generally does not add any computational complexity
+\cite{boser1992training}.
+
+\begin{figure}[tb]
+  \centering
+  \includegraphics[width=0.7\textwidth]{related_work/angle_based_outlier_detection.pdf}
+  \caption{Visualisation of the difference vectors used in \emph{Angle-Based
+  Outlier Detection}. The variance of angles between pairs of difference vectors
+  originating for suspected outliers (e.g. the instance in the lower left corner
+  denoted by the red colour) is smaller than the variance of angles between
+  pairs of difference vectors originating from a point in the centre of the data
+  (denoted in blue).}
+  \label{fig:abod}
+\end{figure}
+
+% outliers = points which influence variance most (i.e. variance drops when
+% removed) -> only applied for timeseries data:
+% - Outliers, Level Shifts, and Variance Changes in Time Series
+% - A Linear Method for Deviation Detection in Large Databases
+%Other techniques for finding outliers at the boundary of the data use the notion
+%of variance. It is to be expected that the removal of a point at the boundary of
+%the data would result in a lower variance. 
+
+A method suitable for extreme value analysis in high dimensional data can
+be found in \cite{kriegel2008angle}. The idea is that when we draw arrows from a
+point to its neighbouring points, the outgoing arrows for points with an extreme
+value are expected to point at a more similar direction than points nearer to
+the centre of the data set.
+
+This is implemented by calculating the angle of pairs of \emph{difference
+vectors} from each data point to pairs of neighbouring points. When we consider
+every point in the set as a vector, we can make a triple of vectors $(\vec{A},
+\vec{B}, \vec{C})$ for all combinations of points in the dataset (where $\vec{A}
+\neq \vec{B} \neq \vec{C}$). The difference vectors $\diffvec{AB} = \vec{B} -
+\vec{A}$ and $\diffvec{AC} = \vec{C} - \vec{A}$ now describe segments from
+$\vec{A}$ to $\vec{B}$ and from $\vec{A}$ to $\vec{C}$ respectively. See
+Figure~\ref{fig:abod} for a visual example, where difference vectors are denoted
+as dotted arrows. Angles formed by pairs of arrows originating from the leftmost
+point are all acute (note that reflex angles are not taken into account -- their
+acute counterpart is used instead), whereas the angles formed by pairs of arrows
+originating from a central point are both acute and obtuse. In order to let
+points close by be of more influence, the angle between these difference vectors
+is weighted by their length (i.e. the distance between the points). This
+weighted angle $\alpha$ is defined as:
+\begin{equation}
+\label{eq:diff_vec_alpha}
+\alpha = \frac{\langle \vec{AB},\vec{AC} \rangle}
+  {\norm{\vec{AB}}^2 \times \norm{\vec{AC}}^2}
+\end{equation}
+where $\langle \vec{AB},\vec{AC} \rangle$ denotes the dot product of $\vec{AB}$
+and $\vec{AC}$ and $\norm{\vec{X}}$ the \emph{norm} (or length) of $\vec{X}$.
+Note that the weighing is done by squaring the norm of the difference vectors in
+the denominator. The variance in the weighted angles for $\vec{A}$ to all other
+points $\vec{B}$ and $\vec{C}$ in the set is expected to be lower for points
+that lie at the boundaries of the data compared to points that lie closer to the
+centre. As a performance optimization, only \emph{k} nearest neighbours of
+$\vec{A}$ can be sampled for $\vec{B}$ and $\vec{C}$.
+
+The basic extreme value model is somewhat simple in the sense that it only
+identifies points at the boundary of the data as outlier. \emph{Kernels} can be
+used to adapt pure extreme value methods to also find outliers in the centre of
+a data set.  Extreme value methods can be computationally hard for
+high-dimensional data, as they require computation of the `outermost' points of
+the data. In some cases, sampling solves this issue at the cost of a loss of
+precision. Extreme value analysis on high-dimensional data does not only suffer
+from performance issues, however: when the amount of dimensions in a data set
+increases, the number of points at the edge of the data is expected to grow as
+well. Extreme value methods are therefore not often used on high-dimensional
+data. However, they often form a crucial final step for methods from other
+outlier detection models. Consider some method which assigns a score to each
+data point to express the degree of `being an outlier'. Extreme value analysis
+on the righter tail of these scores can aid in selecting data points which
+should be flagged as outlier.
+
+\subsection{Subspace Model}
+\label{subsec:subspace_model}
+% note on linear methods
+\begin{figure}[tbp]
+  \begin{floatrow}
+    \ffigbox{
+      \includegraphics[width=.45\textwidth]{related_work/outlier_dimensionality_reduction.pdf}}
+      {\caption{A subspace method in which a curve is fitted through a set of
+      data points. Applying extreme value analysis to the residues (dashed
+      lines) of this fitted model can detect outliers at a global scale.}
+      \label{fig:subspace_method_visual}}
+    
+    \ffigbox{
+      \includegraphics[width=.45\textwidth]{related_work/pca_axes.pdf}}
+      {\caption{PCA on a multivariate normally distributed data set. The arrow
+      pointing to the upper right corner (red) denotes the first principal
+      component. The other arrow (blue) denotes the second principal component.}
+      \label{fig:pca_example}}
+  \end{floatrow}
+\end{figure}
+
+An intuitively appealing method to handle the curse of dimensionality from which
+most probabilistic and extreme value approaches suffer is to reduce the number
+of dimensions. An appropriate way to do this whilst removing as little
+information from the data as possible, is by finding a way to express features
+in terms of a subset of the original set of features.
+
+Consider the two-dimensional dataset drawn from an exponential distribution
+presented in Figure~\ref{fig:subspace_method_visual}. The fitted line can be
+found by using an appropriate regression technique (e.g. Generalized Linear
+Model for arbitrarily distributed response variables, logistic regression for
+categorical data, etc.) and produces a per-point error known as the
+\emph{residue}. It is visually clear that the point marked as possible outlier
+has a relatively large residue. Applying an extreme value- or
+probabilistic-based outlier detection method can identify outlying points. This
+regression-based approach can be used to detect outliers in multivariate
+settings as well, but it can find outliers in only one feature at a time, since
+regression takes only one response variable.
+
+The basic idea described above can be extended to a truly multivariate case by
+using Principal Component Analysis (PCA). Whereas regression techniques map the
+data from dimensionality $d$ to dimensionality $d-1$ (i.e. remove 1 feature),
+PCA can reduce the dimensionality to any $d-k$ whilst accounting for
+a large deal of variance in the data. Although a complete description is outside of
+the scope of this research, we will give a short description of PCA for outlier
+detection: in PCA, a covariance matrix $\sum$ describing the covariances between
+all features is computed. This covariance matrix is symmetric by the symmetry of
+covariance and positive semi-definite (i.e.  non-negative). Because of these
+properties, it is possible to decompose this covariance matrix into an
+orthonormal matrix of eigenvectors $P$ and a diagonal matrix of eigenvalues $D$:
+\begin{equation}
+\label{eq:pca_decomposition}
+\sum = P \cdot D \cdot P^T
+\end{equation}
+
+As the eigenvectors are orthonormal (i.e. mutually orthogonal), the data set can
+be rotated so that these eigenvectors form a new coordinate system. The
+eigenvalues corresponding to the eigenvectors are related to the variance along
+their eigenvector. By taking the $k$ eigenvectors with the highest eigenvalues
+and rotating the points so that they are aligned along these eigenvectors, the
+dimensionality can be reduced by $d - k$ whereby the eigenvectors are the axes
+of the new coordinate system. For example, in Figure~\ref{fig:pca_example} most
+variance would be captured along the red arrow (pointing to the top right). It
+would be possible to rotate the entire dataset so that this red arrow forms the
+new x-axis and drop the new y-axis (blue arrow) altogether. Extreme value-
+or probabilistic-based methods can then be applied on the distances between the
+points in the reduced-dimensional space and the input space to find points that
+do not follow global patterns. This distance from projected space to input
+space can be regarded as a measure of `error' of the mapping for a specific
+point, which is comparable to taking the residues in regression as described
+above.
+
+% shortcomings:
+%   - overfitting with small number of observations (relative to number of 
+%   features) ?? cite? why?
+Methods from the subspace model are only suitable when there are globally
+consistent correlations in the data. When there are no correlations, the mapping
+will have a large error for all points, making it impossible to detect outliers.
+When correlations are present, but not globally consistent as in
+Figure~\ref{fig:clustered_data_local}, the methods will (possibly falsely)
+report outliers in sections of the data that do not follow globally dominant
+correlations. When the data contains non-linear correlations, some preprocessing
+has to be applied or a more intricate model has to be used (such as the GLM for
+regression).
+
+\subsection{Proximity-based Model}
+\label{subsec:proximity_model}
+% note on proximity based methods
+% - cluster
+% - proximity
+% - nearest neighbour
+When the data contains patterns that are not globally consistent, the
+\emph{proximity based} model is more appropriate. This model relies on the
+notion of \emph{distance} to define outliers: if a point is located far away
+from other data points, it might be an outlier. The intuition is that
+neighbouring points can be expected to be alike and that it is unlikely that
+points behave differently from neighbouring points. The proximity-based model is
+appropriate when points are clustered, for example as in
+Figure~\ref{fig:clustered_data_local}.
+
+Proximity-based methods were first proposed in \cite{knox1998algorithms}, since
+which a wide variety of variants has been proposed. Proximity-based methods are
+popular because of high interpretability and ease of implementation
+\cite{aggarwal2013outlier}.  There are different ways to define `proximity' of
+points and multiple ways to flag points based on proximity in comparison to
+other points. Some exemplary methods are discussed next.
+
+% distance-based (k-NN or simply all distances)
+\begin{figure*}
+  \centering
+
+  \begin{subfigure}[t]{0.45\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{related_work/clustered_data_knn1.pdf}
+    \caption{$k=5$: the points in the centre are correctly detected, along with
+    some erroneously reported points in the lower left cluster.}
+  \end{subfigure}
+  ~
+  \begin{subfigure}[t]{0.45\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{related_work/clustered_data_knn2.pdf}
+    \caption{$k=10$: the points in the centre are correctly detected. The
+    remainder of detected outliers is primarily located at the outskirts of the
+    lower left cluster.}
+  \end{subfigure}
+
+  \begin{subfigure}[t]{0.45\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{related_work/clustered_data_knn3.pdf}
+    \caption{$k=25$: the points in the centre are correctly detected, however
+    they do not have the highest outlier scores. The remainder of detected
+    outliers are all located at the outskirts of the lower left cluster.}
+  \end{subfigure}
+  ~
+  \begin{subfigure}[t]{0.45\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{related_work/clustered_data_knn4.pdf}
+    \caption{$k=70$: the points in the centre are no longer in the top $1\%$ of
+    outlier scores. The detected points are all in the lower left corner.}
+  \end{subfigure}
+  \caption{Results of the distance-based $k$-nearest neighbour method on a
+    clustered data set containing some outliers. The top $1\%$ of outlier scores
+    is denoted by triangles. Outlier detection is performed at a global scale
+    (compare: Figure~\ref{fig:clustered_data_lof}).}
+  \label{fig:clustered_data_local}
+\end{figure*}
+
+A first example of a proximity-based method is called \emph{Distance-based
+Outlier} and was proposed in \cite{knox1998algorithms}:
+\begin{displayquote}
+  An object $O$ in a dataset $T$ is a $DB(p, D)$-outlier if at least fraction
+  $p$ of the objects in $T$ lies greater than distance $D$ from $O$. 
+\end{displayquote}
+An easier, but similar formulation is often preferred over this original
+formulation and is generally known as the \emph{$k$-nearest neighbour approach}.
+In this formulation, an outlier score is constructed based on the distance to
+the \emph{k}th-nearest neighbour. The distance can be used directly as an
+outlier score, or some transformation (e.g. nonlinear scaling) can be applied.
+Alternatively, the average distance to the \emph{k}-nearest neighbours can be
+used. The distance $D$ in the original formulation can be seen as a threshold
+value which can also be used in the new formulation, i.e. by discarding all
+points that have an outlier score below this $D$. The new formulation ranks all
+points instead of providing a binary label and thus also allows for reporting a
+fraction (i.e. top $n\%$) of all points.
+
+$K$-nearest neighbour methods regard all outliers at a \emph{global} scale, that
+is: the outlier score of neighbouring points is not taken into account. This
+makes them not robust to differences in \emph{local density}: when the data is
+distributed unevenly, the points in the sparse regions are reported more often
+than desirable. Consider Figure~\ref{fig:clustered_data_local}: here we find
+three clusters and some suspected outliers in the centre. The cluster in the
+bottom left, however, contains points that also have few other points close-by,
+which makes them outliers when viewed at a global scale.  However, they will
+generally be viewed as non-outliers by humans because of the general sparsity in
+this section of the data. Methods that take local density into account will be
+discussed next.
+
+% density-based (simple example=???  more intricate example)
+\emph{Density-based} methods share the notion of proximity with distance-based
+methods, but include the `outlieriness' of points in a region around the point
+before assigning a final outlier score. The intuition is that when the
+outlieriness of points in a region is equally low, this is probably just a
+sparse region -- which would indicate that these points do not behave
+unexpectedly and should not be reported as outliers.  Density-based methods thus
+partition the space, in contrast to the distance-based methods that
+partition individual points. The main goals are dealing with the differences in
+local density and lowering computational complexity. The two most popular
+methods are discussed.
+
+\begin{figure*}
+  \centering
+  \begin{subfigure}[t]{.45\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{related_work/clustered_data_lof1.pdf}
+    \caption{$k = 10$}
+  \end{subfigure}
+  ~
+  \begin{subfigure}[t]{.45\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{related_work/clustered_data_lof2.pdf}
+    \caption{$k = 15$}
+  \end{subfigure}
+
+  \begin{subfigure}[t]{.45\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{related_work/clustered_data_lof3.pdf}
+    \caption{$k = 20$}
+  \end{subfigure}
+  ~
+  \begin{subfigure}[t]{.45\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{related_work/clustered_data_lof4.pdf}
+    \caption{$k = 50$}
+  \end{subfigure}
+
+  \begin{subfigure}[t]{.45\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{related_work/clustered_data_lof5.pdf}
+    \caption{$k =100$}
+    \label{fig:lof_k_bigger}
+  \end{subfigure}
+  ~
+  \begin{subfigure}[t]{.45\textwidth}
+    \centering
+    \includegraphics[width=1\textwidth]{related_work/clustered_data_lof6.pdf}
+    \caption{$k = 120$}
+    \label{fig:lof_k_biggest}
+  \end{subfigure}
+
+  \caption{Outlier scores for LOF for differing values of parameter $k$. The top
+    1\% of scores is denoted by a triangle. LOF proves robust against
+    differences in local density. When $k$ is bigger than the size of a
+    non-outlier cluster, performance degrades (subfigures
+    \subref{fig:lof_k_bigger} and \subref{fig:lof_k_biggest}).}
+  \label{fig:clustered_data_lof}
+\end{figure*}
+
+\emph{Local-Outlier Factor} (LOF) was introduced as a first density-based method
+in \cite{breunig2000lof} and has met some popularity. It uses the notion of
+\emph{reachability distance} of a point $i$ from another point $j$ in order to
+define a per-point outlier score. The reachability distance is defined as:
+\begin{equation}
+\label{eq:lof_reach_dist}
+R^k(i, j) = \text{max}(\text{dist}(i, j), D^k_j)
+\end{equation}
+where $D^k_j$ is the distance from point $j$ to its $k$th nearest neighbour.
+This can be interpreted as follows: the reachability distance of $i$ from $j$ is
+the distance between these points \emph{unless} $i$ is closer to $j$ than $j$'s
+\emph{k}-nearest neighbour. All points close to $j$ thus get the same
+reachability distance. Note that by the above definition, $R^k(i, j)$ is not
+necessarily the same as $R^k(j, i)$. The points close to $j$ (i.e. closer to $j$
+than its $k$th nearest neighbour) form the \emph{locality} $L^k_{i}$ of $i$.
+The presence of $j$ in $i$'s locality does not necessitate the
+presence of $i$ in $j$'s locality. The \emph{local reachability distance} is
+defined as:
+\begin{equation}
+\label{eq:lof_lrd}
+\text{lrd}(i) = 1 / \bigg( \frac{ \sum_{\ell \in L^k_{i}}{R^k(i,\ell)}}{|L^k_{i}|} \bigg) 
+\end{equation}
+so, as one divided by the average reachability distance of $i$ from all $\ell$
+within $i$'s locality. This $lrd$ is used to define the local outlier factor as
+follows:
+\begin{equation}
+\label{eq:LOF}
+\text{LOF}_k(i) = \frac{\sum_{\ell \in L^k_{i}}
+\frac{\text{lrd}(\ell)}{\text{lrd}(i)}}{|L^k_i|}
+\end{equation}
+
+The reachability distances of points in $i$'s locality thus contribute to $i$'s
+outlier score: when $i$'s local reachability distance is low relative to the
+reachability distance of points in its locality, then that $i$ is relatively far
+away from a dense cluster. This happens when the reachability distance of $i$
+from some $\ell$s is not the same as the reachability distance of these $\ell$s
+from $i$ and/or when some $\ell$s are in $i$'s locality without $i$ being in
+these $\ell$'s locality.
+
+Rather than selecting a single value for the only parameter $k$, the authors
+recommend to compute the LOF for a range of values for $k$. The final outlier
+score can then be found by selecting the maximum LOF for the $k$s in this range.
+The lower limit for the range can be regarded as the minimum amount of points
+necessary to constitute a cluster. The upper limit for the range can be viewed
+as the maximum number of points that may be in a cluster whilst still being
+regarded as outliers. An example of the result for different values of $k$ on
+the same dataset can be found in Figure~\ref{fig:clustered_data_lof}. Outlier
+scores are denoted by colour. For lower values of $k$, the points in the centre
+are consistently reported as most outlying, along with some points at the
+outskirts of the clusters. Performance degrades as inappropriate values for $k$
+are used ($k \geq 100$).
+
+% Influence outlierness
+
+% LOCI
+A similar method, called \emph{local correlation integral} (LOCI) is presented
+in \cite{papadimitriou2003loci}. The method is presented as superior to LOF due
+to the elimination of choice for the range of parameter $k$, but its performance
+is not guaranteed to be better \cite{janssens2009one}. LOCI does not require any
+selection of parameters and the notion of neighbourhood is used more directly in
+LOCI when compared to LOF.
+
+% TODO: Check layout finally
+LOCI uses two notions of neighbourhood: the \emph{sampling neighbourhood} \\
+$\mathcal{N}_{sampling}(i, r)$ and the \emph{counting neighbourhood}
+$\mathcal{N}_{counting}(i, \alpha, r)$.  $\mathcal{N}_{sampling}(i, r)$ contains
+all points within radius $r$ around point $i$ and $\mathcal{N}_{counting}(i,
+\alpha, r)$ contains all points within radius $\alpha r$ around $i$. The authors
+advise to take $0 < \alpha < 1$ so that the radius used for
+$\mathcal{N}_{sampling}$ is always larger than the radius used for
+$\mathcal{N}_{counting}$. Let $n_{counting}(i, \alpha, r)$ denote the number of
+points in $\mathcal{N}_{counting}(i, \alpha, r)$ (including $i$ itself) and
+$n_{sampling}(i, r)$ denote the number of points in $\mathcal{N}_{sampling}(i,
+r)$ (again including $i$ itself).
+
+The \emph{average counting neighbourhood size} for all points within
+$\mathcal{N}_{sampling}(i, r)$ is then defined as:
+\begin{equation}
+  \label{eq:loci_avg_counting_neighbourhood}
+  \hat{n}(i, \alpha, r) = \frac{
+                                \sum_{j \in \mathcal{N}_{sampling}(i, r)}
+                                     {n_{counting}(i, \alpha, r)}
+                               }{
+                                n_{sampling}(i, r)
+                               }
+\end{equation}
+This average counting neighbourhood size is used to define the multi-granularity
+deviation factor (MDEF):
+\begin{equation}
+  \label{eq:loci_mdef}
+  \text{MDEF}(i, \alpha, r) = 1 - \frac{n_{counting}(i, \alpha, r)}
+                                {\hat{n}(i, \alpha, r)}
+\end{equation}
+The MDEF can be seen as a measure of local density compared to the local
+densities of points in an extended neighbourhood. The normalized standard
+deviation for this MDEF is defined as follows:
+\begin{equation}
+  \label{eq:loci_mdef_sigma}
+  \sigma_{\text{MDEF}(i, \alpha, r)} = \frac{ \sigma_{\hat{n}(i, \alpha, r)}}
+                                     { \hat{n}(i, \alpha, r)}
+\end{equation}
+where $\sigma_{\hat{n}(i, \alpha, r)}$ denotes the standard deviation of 
+$n_{counting}(j, \alpha, r)$ for all $j \in \mathcal{N}_{sampling}(i, r)$.
+
+These MDEF and $\sigma_{\text{MDEF}}$ are computed over a range of relevant
+radii $r$, so that the outlier factor on multiple scales can be found. The
+suggested range of relevant radii $[r_{\text{min}}, r_{\text{max}}]$ is found by
+taking an $r_{\text{min}}$ so that $\text{min}(\hat{n}(i, \alpha,
+r_{\text{min}})) \approx 20$ and $r_{\text{max}}$ corresponds to the maximum
+$\mathcal{N}_{counting}$ possible in the data set, i.e. by using the distance of
+the two points with the highest pairwise distance. The rationale for $r_{\text{min}}$
+is that this number of observations is required to get a statistically large
+enough sample when comparing neighbourhood counts, whereas the choice for
+$r_{\text{max}}$ is dictated by the data: a larger $r_{\text{max}}$ would not
+lead to new MDEF values. For parameter $\alpha$, the authors propose two values:
+$\alpha = \sfrac{1}{2}$ for exact computations and $\alpha = \sfrac{1}{16}$ for
+approximations.
+
+Outliers are defined as points for which $\text{MDEF}(i, \alpha, r) > k
+\sigma_{\text{MDEF}(i, \alpha, r)}$ for any $r$ and with $k = 3$, so for all
+data points for which the MDEF is more than three times the standard deviation
+within any $r$. As noted by the authors, the choice of $k=3$ theoretically
+bounds the number of reported points to $10\%$ of the data set, regardless of
+the distributions in the sampling neighbourhoods, by Chebyshev's inequality.
+
+Proximity-based methods are suitable when applied to clustered data.
+Distance-based methods have a high granularity, but come with a worst-case
+complexity of $\mathcal{O}(n^2)$ in a naive implementation. This can be improved
+in practice through pruning (i.e. stop calculation of distances for points once
+they are known be a normal point) and through the usage of spatial indexing
+\cite{knox1998algorithms}. Density-based methods partition space rather than
+individual points: they have a more coarse granularity and are more suitable for
+data with varying densities. Both types of methods suffer from the curse of
+dimensionality in the quality of the reported outliers: when the number of
+dimensions is large, points start to lie at a similar distance making it hard to
+detect true outliers \cite{aggarwal2001surprising}.
+

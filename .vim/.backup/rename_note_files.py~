@@ -1,0 +1,38 @@
+#! /usr/bin/env python
+import os
+import re
+import tarfile
+import shutil
+
+CHECK_DIRS = ('Bachelor', 'Master')
+EMAIL_REGEX = re.compile('[^@]+@[^@]+[^@]+')
+NOTES_FILE = 'notes.txt'
+TAR_OUTPUT = 'feedback_floris.tar.gz'
+
+
+for rootdir in CHECK_DIRS:
+    all_dirs = os.listdir(rootdir)
+    group_dirs = filter(EMAIL_REGEX.match, all_dirs)
+    for group_dir in group_dirs:
+        file_path = rootdir + '/' + group_dir + '/' + NOTES_FILE
+        if os.access(file_path, os.W_OK):
+            new_filename = rootdir + '/' + group_dir + '/' + group_dir + '.txt'
+            print(file_path)
+            print(new_filename)
+            print()
+            shutil.copy(file_path, new_filename)
+            to_zip.append(new_filename)
+
+to_zip = []
+for rootdir in CHECK_DIRS:
+    all_dirs = os.listdir(rootdir)
+    group_dirs = filter(EMAIL_REGEX.match, all_dirs)
+    for group_dir in group_dirs:
+        file_path = rootdir + '/' + group_dir + '/' + group_dir + '.txt'
+        to_zip.append(file_path)
+
+with tarfile.open(TAR_OUTPUT, 'w:gz') as tar:
+    for file_name in to_zip:
+        if os.path.isfile(file_name):
+            tar.add(file_name, arcname=os.path.basename(file_name))
+

@@ -1,0 +1,146 @@
+import cvxopt as co
+from kernel import Kernel
+import numpy as np
+import matplotlib.pyplot as plt
+import sklearn as sk
+from sklearn import grid_search
+from svdd import SVDD
+from sklearn.utils.estimator_checks import check_estimator
+from sklearn.utils import check_array
+from sklearn.utils.validation import column_or_1d
+
+class SVDD_WRAPPER(sk.base.BaseEstimator,
+                   sk.base.ClassifierMixin):
+  C = None
+  model = None
+  k_type = None
+  k_param = None
+  fitting_data = None
+
+  def __init__(self, k_type='rbf', k_param=1.0, C=.9):
+    self.k_type = k_type
+    self.k_param = k_param
+    self.C = C
+
+  def fit(self, X, y=None):
+    X = check_array(X)
+    if y is not None:
+      y = column_or_1d(y)
+      #if len(np.unique(y)) < 2:
+      #  msg = "Classifier can't train when only one class is present."
+      #  raise ValueError(msg)
+    if y is not None and any([X.shape[0] == 0,
+            X.shape[1] == 0,
+            len(y) != X.shape[0]]):
+      msg = '0 feature(s) (shape=(3, 0)) while a minimum of 1 is required.'
+      raise ValueError(msg)
+    _X = co.matrix(np.transpose(X.astype(float)))
+    self.training_dim = len(_X[:,0])
+    kernel = Kernel.get_kernel(_X, _X, type=self.k_type, param=self.k_param)
+    assert kernel.size[0] > 0
+    self.model = SVDD(kernel, self.C)
+    result = self.model.train_dual()
+    assert result == SVDD.MSG_OK
+    self.threshold = self.model.get_threshold()[0]
+    assert self.threshold is not None
+    assert self.model.get_support_dual() is not None
+    kernel = Kernel.get_kernel(_X,
+                               _X[:,self.model.get_support_dual()],
+                               self.k_type,
+                               param=self.k_param)
+    assert self.model.get_support_dual() is not None
+    self.fitting_data = _X
+    return self
+
+  def predict_proba(self, X):
+    """gives probabilities for positive (i.e. anomalous class)."""
+    X = check_array(X)
+    _X = co.matrix(np.transpose(X.astype(float)))
+    assert self.fitting_data is not None
+    Y = self.fitting_data[:, self.get_support_dual()]
+    kernel = Kernel.get_kernel(
+        _X,
+        Y,
+        self.k_type,
+        self.k_param)
+    assert self.training_dim == len(Y[:,0])
+    assert self.training_dim == len(_X[:,0])
+    norms = Kernel.get_diag_kernel(_X, self.k_type, self.k_param)
+    (pred, msg) = self.model.apply_dual(kernel, norms)
+    assert msg == SVDD.MSG_OK
+    assert len(pred) == len(X[:,0])
+    pred = np.array(pred)
+    return pred
+
+  def predict(self, X):
+    probs = self.predict_proba(X)[:,0]
+    booleans = [p > self.threshold - SVDD.PRECISION for p in probs]
+    return booleans
+    # only have to loop 1 array, all predicts are
+
+  def get_support_dual(self):
+    return self.model.get_support_dual()
+
+if False:#(check_estimator(SVDD_WRAPPER)):
+  print('jaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+else:
+  print('njop')
+
+K_TYPE = 'rbf'
+co.solvers.options['show_progress'] = False
+
+filename = 'input.csv'
+filename = '~/masterthesis/results/usg_scaled0-1.csv'
+data = np.loadtxt(open('input.csv' ,'rb'),
+                  delimiter=',')
+
+original_data = data
+ds_size = len(data[:,0])
+
+Dtrain = data[:,0:2]
+
+c = float('inf')
+k_param = .3
+param_grid = {
+    'k_param': [0.1, 0.05, 0.02, 0.01, 0.005],
+    'C': [10, 12],
+    }
+
+def svdd_auc_pr(estimator, X, y_true):
+  print()
+  probas_pred = estimator.predict_proba(X)
+  print(probas_pred)
+  (precision, recall, _) = sk.metrics.precision_recall_curve(y_true, probas_pred)
+  print(precision, recall)
+  return sk.metrics.auc(recall, precision)
+
+grid = grid_search.GridSearchCV(estimator=SVDD_WRAPPER(),
+                                param_grid=param_grid,
+                                scoring=svdd_auc_pr)
+fit = grid.fit(Dtrain, data[:,-1])
+print(fit.grid_scores_)
+exit()
+for k_param in [0.1, 0.05, 0.02, 0.01, 0.005]:
+  svdd = SVDD_WRAPPER(k_param=5, C=1.0)
+  Ys = ds_size * [None]
+  fitted = svdd.fit(Dtrain)
+  assert fitted.get_support_dual() is not None
+  score = fitted.score(Dtrain)
+  pred = np.array(score)
+  thres = fitted.threshold
+  outliers = list()
+  counter = 0
+  for p in pred:
+    if p > thres - SVDD.PRECISION:
+      row = counter + 1
+      outliers.append((row, p[0]))
+    counter += 1
+
+  print('treshold:', thres)
+  print('C:', c, 'K:', k_param)
+  print(len(outliers), '/', ds_size, 'outliers:')
+  print(outliers)
+#  plt.scatter(Dtrain[0, fitted.get_support_dual()], Dtrain[1, fitted.get_support_dual()])
+#  plt.show()
+
+print('=================DONE=================')

@@ -1,0 +1,60 @@
+<div class="container-fluid header">
+  <div class="logo crunchr">
+    <img src='/static/kapstok/logos/crunchr.png'></img>
+  </div>
+</div>
+
+<div class="main container">
+  <h1>Welcome to <span>Crunchr</span></h1>
+  <h2> Your gateway to people data analytics </h2>
+  
+  <div ui-view></div>
+  
+  <div class="row">
+    <div class="col-xs-4 col-xs-offset-4">
+      <h4 class='login-error-message' ng-bind="auth.statusMessage"></h4>
+    </div>
+  </div>
+  <form id="login-form">
+    <table>
+      <tr>
+        <td>LOGIN</td>
+      </tr>
+      <tr>
+        <td><input type="text" ng-model="userName"></td>
+      </tr>
+      <tr>
+        <td>PASSWORD</td>
+      </tr>
+      <tr>
+        <td><input type="password" ng-model="password"></td>
+      </tr>
+      <tr>
+        <td align='center'>
+          <input
+              class="button"
+              type="submit"
+              value="LOGIN"
+              ng-click="attemptLogin()">
+        </td>
+      </tr>
+    </table>
+  </form>
+
+  <div class="row">
+    <a class="col-xs-2 col-xs-offset-5 password-reset" ng-click="resetPassword()">Reset password</a>
+  </div>
+  <div style="display: none;" id='request-new-password'>
+    <div class="row">
+      <h4>Please enter your e-mail address to request a new password</h4>
+    </div>
+    <form>
+      <div class="row">
+        <input id='email-box' type='text' placeholder='e-mail' ng-model='email'>
+      </div>
+      <div class="row">
+        <input type='submit' value='REQUEST NEW PASSWORD' ng-click='requestNewPassword()'>
+      </div>
+    </form>
+  </div>
+</div>

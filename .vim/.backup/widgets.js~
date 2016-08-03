@@ -1,0 +1,1325 @@
+/**
+ * Wrap everything inside a self-executing function to prevent creating globals
+ */
+
+(function)(){
+
+/**
+ * Load the kapstok module, to add our directives
+ */
+
+var kapstok = angular.module('kapstok');
+
+/**
+ * DataTable model object for charts. The data structure is deliberately the same as the Google
+ * Charts DataTable. Not complete. If you need functionality beyond this, use
+ * google.visualization.DataTable and notify me about the missing functionality.
+ * 
+ * See Also: https://developers.google.com/chart/interactive/docs/reference#DataTable
+ * See Also: https://developers.google.com/chart/interactive/docs/reference#dataparam
+ */
+
+kapstok.factory('DataTable', function() {
+  function DataTable(data) {
+    if(data) {
+      this.cols = data.cols;
+      for(var i in this.cols){
+        if(this.cols[i]['show'] === undefined){
+          this.cols[i]['show'] = true;
+        }
+      }
+      this.rows = data.rows;
+      this.version = 0;
+    }
+    else {
+      this.cols = [];
+      this.rows = [];
+      this.version = 0;
+    }
+  }
+  
+  /**
+   * Adds a new column. If there are any rows, they will get a new column with null.
+   *
+   * @return {Number} index of the new column
+   */
+  
+  DataTable.prototype.addColumn = function(type, label, id) {
+    // add column definition
+    this.cols.push({
+      type: type,
+      label: label,
+      id: (typeof id === "string" ? id : ""),
+      show: true
+    });
+    
+    // add empty column data to each existing row
+    this.rows.forEach(function(row) {
+      row.c.push({ v: null });
+    });
+    
+    this.version++;
+    return this.cols.length - 1;
+  }
+  
+  /**
+   * Adds a new row with values. You may provide fewer values than required; they will be padded
+   * with null.
+   * 
+   * @param {Array} values An array of values for each cell in that row with types as described
+   *                       by the column descriptors.
+   * @return {Number} index of the new row
+   */
+  
+  DataTable.prototype.addRow = function(values) {
+    var objectified = values.map(function(value) {
+      return { v: value };
+    })
+    
+    // support adding rows with fewer elements than the number of columns: pad with null
+    while(objectified.length < this.cols.length) {
+      objectified.push({ v: null });
+    }
+  
+    this.rows.push({ c: objectified });
+    
+    this.version++;
+    return this.rows.length - 1;
+  }
+  
+  /**
+   * Sets a cell to a new value, or to null.
+   *
+   * @param {Number} rowIndex
+   * @param {Number} columnIndex
+   * @param {Object} value
+   */
+  
+  DataTable.prototype.setCell = function(rowIndex, columnIndex, value) {
+    if(rowIndex >= this.rows.length || rowIndex < 0) {
+      console.warn("DataTable:", this);
+      throw new Error("DataTable.setCell rowIndex out of bounds: " + rowIndex);
+    }
+    
+    if(columnIndex >= this.cols.length || columnIndex < 0) {
+      console.warn("DataTable:", this);
+      throw new Error("DataTable.setCell columnIndex out of bounds: " + columnIndex);
+    }
+    
+    // leave .v alone if value === undefined; but .v may be assigned null
+    if(value !== undefined) {
+        this.rows[rowIndex].c[columnIndex].v = value;
+        this.version++;
+    }
+  }
+  
+  /**
+   * Gets the value of a cell.
+   *
+   * @param {Number} rowIndex
+   * @param {Number} columnIndex
+   *
+   * @return {Object} value of the cell
+   */
+  
+  DataTable.prototype.getValue = function(rowIndex, columnIndex) {
+    if(rowIndex >= this.rows.length || rowIndex < 0) {
+      throw new Error("DataTable.getValue rowIndex out of bounds: " + rowIndex);
+    }
+    
+    if(columnIndex >= this.cols.length || columnIndex < 0) {
+      throw new Error("DataTable.getValue columnIndex out of bounds: " + columnIndex);
+    }
+    
+    return this.rows[rowIndex].c[columnIndex].v;
+  }
+  
+  /**
+   * Gets the number of rows
+   *
+   * @return {Number} number of rows
+   */
+  
+  DataTable.prototype.getNumberOfRows = function() {
+    return this.rows.length;
+  }
+  
+  /**
+   * Gets the number of columns
+   *
+   * @return {Number} number of columns
+   */
+   
+  DataTable.prototype.getNumberOfColumns = function() {
+    return this.cols.length;
+  }
+
+  /** 
+   * Gets the number of VISIBLE columns
+   *
+   * @return {Number} number of columns with attribute show == true
+   */
+
+  DataTable.prototype.getNumberOfVisibleColumns = function(){
+    var counter = 0;
+    for(var i=0;i<this.cols.length;i++){
+      if(this.cols[i].show){ counter++; }
+    }
+    return counter;
+  }
+
+  /**
+   * Set a columns 'show' property to true, making sure it's displayed in the graph
+   *
+   * @param {Number=} columnId The index of the column to show
+   */
+
+  DataTable.prototype.showColumn = function(columnIndex){
+    this.cols[columnIndex].show = true;
+    this.version++;
+    console.log(this.cols[columnIndex]);
+  }
+
+  /**
+   * Set a columns 'show' property to false, making sure it's NOT shown in the graph
+   *
+   * @param {Number=} columnIndex The index of the column to hide
+   */
+
+  DataTable.prototype.hideColumn = function(columnIndex){
+    this.cols[columnIndex].show = false;
+    this.version++;
+  }
+
+  /**
+   * return whether or not a column should be drawn in a graph
+   *
+   * @param {Number=} columnIndex The index of the column 
+   * @return {Number} Boolean Whether or not to show the column
+   */
+
+  DataTable.prototype.isColumnVisible = function(columnIndex){
+    return this.cols[columnIndex].show;
+  }
+
+  /*
+   * Get the label for a colum
+   * @param {Number=} columnId The column from which to get the label
+   * @return {String} The label of the requested column
+   */
+
+  DataTable.prototype.getColumnLabel = function(columnId){
+    return this.cols[columnId]['label'];
+  }
+
+  
+  /**
+   * Removes row rowIndex
+   * @param {Number=} rowIndex the index of the row to be removed
+   */
+  
+  DataTable.prototype.removeRow = function(rowIndex) {
+    if(rowIndex === undefined) {
+      this.rows.pop();
+      return;
+    }
+  
+    if(rowIndex >= this.rows.length || rowIndex < 0) {
+      throw new Error("DataTable.removeRow rowIndex out of bounds: " + rowIndex);
+    }
+    
+    this.rows.splice(rowIndex, 1);
+    this.version++;
+  }
+  
+  /**
+   * Removes column columnIndex
+   * @param {Number} columnIndex the index of the column to be removed
+   */
+  
+  DataTable.prototype.removeColumn = function(columnIndex) {
+    if(columnIndex >= this.cols.length || columnIndex < 0) {
+      throw new Error("DataTable.removeColumn columnIndex out of bounds: " + columnIndex);
+    }
+    
+    this.cols.splice(columnIndex, 1);
+    
+    this.rows.forEach(function(row) {
+      row.c.splice(columnIndex, 1);
+    });
+    this.version++;
+  }
+
+  /**
+   *  Returns the minimal and maximal values of values in a specified column. The returned object
+   *  has properties min and max. If the range has no values, min and max will contain null. 
+   * @param {Number} columnIndex the index of the column of which to get the range.
+   */
+
+  DataTable.prototype.getColumnRange = function(columnIndex) {
+    if(columnIndex >= this.cols.length || columnIndex < 0){
+      throw new Error("DataTable.getColumnRange columnIndex out of bounds: " + columnIndex);
+    }
+
+    var max, min;
+    if(this.getNumberOfRows() <= 0){
+      max = min = null;
+    }else{
+      max = this.getValue(0, columnIndex);
+      min = this.getValue(0, columnIndex);
+      for(var row=1;row<this.rows.length; row++){
+        var value = this.getValue(row, columnIndex);
+        if(value > max){
+          max = value;
+        }
+        if(value < min){
+          min = value;
+        }
+      }
+    }
+    return {'max' : max, 'min': min};
+  }
+
+  DataTable.prototype.getVersion = function(){
+    return this.version;
+  }
+
+  /**
+   *  Returns the unique values in a certain column, in ascending order.
+   *  The type of the returned objects is the same as that returned by the getValue method.
+   * @param {Number} columnIndex the index of the column of which to get the values;
+   */
+
+  DataTable.prototype.getDistinctValues = function(columnIndex){
+    if(columnIndex >= this.cols.length || columnIndex < 0){
+      throw new Error("DataTable.getDistinctValues columnIndex out of bounds: " + columnIndex);
+    }
+
+    var result = [];
+    for(var i=0;i<this.getNumberOfRows();i++){
+      var value = this.getValue(i, columnIndex);
+      if(result.indexOf(value) == -1){
+        result.push(value);
+      }
+    }
+
+    return result.sort();
+  }
+
+  /**
+   *  Returns the values in a certain column.
+   *  The type of the returned objects is the same as that returned by the getValue method.
+   * @param {Number} columnIndex the index of the column of which to get the values;
+   */
+
+  DataTable.prototype.getColumnValues = function(columnIndex){
+    if(columnIndex >= this.cols.length || columnIndex < 0){
+      throw new Error("DataTable.getColumnValues columnIndex out of bounds: " + columnIndex);
+    }
+
+    var result = [];
+    for(var i=0;i<this.getNumberOfRows();i++){
+      result.push(this.getValue(i, columnIndex));
+    }
+
+    return result;
+  }
+
+
+
+
+
+  
+  /**
+   * Turn DataTable into a 2D array of { x, y } coordinates. This is the
+   * format that a default d3.layout.stack expects. Note that the values are transposed: input is
+   * an array of rows (y-values) containing an array of columns (data series), while the output is
+   * an array of data series containing an array of y-values for one series (column).
+   * 
+   * Example output:
+   *
+
+   * [
+   *   [ { x: 0, y: 42 }, { x: 1, y: 41 }, { x: 2, y: 40 } ],
+   *   [ { x: 0, y:  7 }, { x: 1, y:  9 }, { x: 2, y:  5 } ],
+   *   [ { x: 0, y: 33 }, { x: 1, y: 18 }, { x: 2, y: 11 } ],
+   * ]
+   * 
+   * @return {Array} data series as a 2D array of { x, y } coordinates
+   */
+  
+  DataTable.prototype.toArray = function() {
+    var self = this;
+    var colDefs = self.cols.slice(1);
+    return colDefs.map(function(colDef, i) {
+      // this return must produce column i
+      return self.rows.map(function(row, j) {
+        // this return must produce a cell of column i
+        var y = row.c[i + 1].v || 0;
+        return { x: j, y: y };
+      });
+    });
+  }
+  
+  return DataTable;
+});
+
+
+/**
+ * Slider directive using jquery-ui slider
+ *
+ * You can use it like this: <fo-range-slider ng-model="myData" />. The data bound should be two
+ * values indicating the currently selected range. Example:
+ * <pre>
+ * $scope.myData = { low: 18, high: 100 }
+ * </pre>
+ */
+
+kapstok.directive('foRangeSlider', function($timeout) {
+  function renderFunction(scope, element, model) {
+    var sliderElement = $('.slider-container', element);
+    var sliderLabelLow = $('.slider-label-low', element);
+    var sliderLabelHigh = $('.slider-label-high', element);
+    var timeout;
+    
+    function slideChange(e, ui) {
+      function toOffset(val) {
+        var normX = val - model.min;
+        var normHigh = model.max - model.min;
+        var offset = (normX / normHigh * 203) - 10;
+        return Math.max(0, Math.min(183, offset));
+      }
+      
+      sliderLabelLow.html(ui.values[0]);
+      sliderLabelLow.css('left', Math.min(Math.max(0, toOffset(ui.values[1]) - 40), toOffset(ui.values[0])));
+      sliderLabelHigh.html(ui.values[1]);
+      sliderLabelHigh.css('left', Math.max(40, toOffset(ui.values[1])));
+      
+      /*
+       * Updates are calculated on the UI thread in Javascript, so long calculations freeze the
+       * slider. To reduce annoyance, we delay updates for 50 ms and clear that timeout each
+       * time the slider is moved. This way, the user can slide without interruption.
+       *
+       * TODO Implement WebWorkers multithreading for platforms that support it
+       */
+    
+      window.clearTimeout(timeout);
+      timeout = window.setTimeout(function() {
+        scope.$apply(function() {
+          scope.scopedModel.low = ui.values[0];
+          scope.scopedModel.high = ui.values[1];
+        });
+      }, 50);
+    }
+    
+    if(!sliderElement.slider('instance')) {
+      sliderLabelLow.html(model.low);
+      sliderLabelLow.css('left', 0);
+      sliderLabelHigh.html(model.high);
+      sliderLabelHigh.css('left', 183);
+      
+      sliderElement.slider({
+        range: true,
+        min: model.min,
+        max: model.max,
+        values: [model.low, model.high],
+        change: slideChange,
+        slide: slideChange
+      });
+    }
+    
+    sliderElement.slider("option", "min", model.min);
+    sliderElement.slider("option", "max", model.max);
+    sliderElement.slider("option", "values", [model.low, model.high]);
+  }
+  
+  return {
+    restrict: 'E',
+    template: '<div class="slider-container"></div><div class="slider-label-container"><div class="slider-label-low"></div><div class="slider-label-high"></div></div>',
+    link: function(scope, element, attrs) {
+      var model = { min: 0, low: 0, high: 120, max: 120 };
+      
+      scope.$watch(attrs.domain, function(domain) {
+        model.min = domain.min;
+        model.max = domain.max;
+        renderFunction(scope, element, model);
+      }, true);
+      
+      scope.$watch(attrs.ngModel, function(ngModel) {
+        scope.scopedModel = ngModel;
+        model.low = ngModel.low;
+        model.high = ngModel.high;
+        renderFunction(scope, element, model);
+      }, true);
+    }
+  };
+});
+
+/**
+ * Chart directive drawn with D3js and using Google Charts data format
+ *
+ * You can use it like this: <svg fo-chart="myData" />. The chart will automatically
+ * determine the number of data series and their ranges, and it will automatically update when the
+ * data changes. The data bound should be an object with members: type, options and data. Data
+ * should be a DataTable, or have the same format.
+ *
+ * New data format example:
+ *
+ * <pre>
+ *  $scope.myData = {
+ *    type: "AreaChart",
+ *    options: {
+ *      isStacked: true
+ *      vAxis: { title: 'Number of employees', gridlines: { count: 10 } },
+ *      hAxis: { title: 'Year' },
+ *      tooltip: { isHtml: true }
+ *    },
+ *    data: new DataTable({
+ *      cols: [
+ *        { label: "Year", type: "number" },
+ *        { label: "Active", type: "number" },
+ *        { label: "Temporarily Inactive", type: "number"},
+ *        { label: "Voluntary Turnover", type: "number" },
+ *        { role: "tooltip", type: "string", p: { role: "tooltip", html: true } }
+ *      ],
+ *      rows: [
+ *        { c: [ { v: 0 }, { v: 0 }, { v: 10 }, { v: 0 }, ] },
+ *        { c: [ { v: 1 }, { v: 1 }, { v: 15 }, { v: 1 }, ] },
+ *        { c: [ { v: 2 }, { v: 2 }, { v: 20 }, { v: 2 }, ] },
+ *        { c: [ { v: 3 }, { v: 3 }, { v: 25 }, { v: 4 }, ] },
+ *        { c: [ { v: 4 }, { v: 4 }, { v: 30 }, { v: 8 }, ] },
+ *        { c: [ { v: 5 }, { v: 5 }, { v: 35 }, { v: 16 }, ] },
+ *        { c: [ { v: 6 }, { v: 6 }, { v: 40 }, { v: 32 }, ] },
+ *        { c: [ { v: 7 }, { v: 7 }, { v: 45 }, { v: 64 }, ] },
+ *        { c: [ { v: 8 }, { v: 8 }, { v: 50 }, { v: 128 }, ] },
+ *        { c: [ { v: 9 }, { v: 9 }, { v: 55 }, { v: 256 }, ] },
+ *      ]
+ *    })
+ *  };
+ * </pre>
+ */
+kapstok.directive('foChart', function($log) {
+  function Chart(svg) {
+    var margin = 100;
+    var chartWidth = $(svg).parent().width();
+    var chartHeight = $(svg).parent().height();
+    var numValues = 0;
+    
+    var stack = d3.layout.stack();
+    var stackZero = d3.layout.stack().out(function(d, y0, y) {
+      d.y0 = 0;
+      d.y = y;
+    });
+    
+    var chart = d3.select(svg);
+    
+    chart.attr('width', chartWidth);
+    chart.attr('height', chartHeight);
+    chart.attr('preserveAspectRatio', 'none');
+    chart.attr('viewBox', '0 0 ' + chartWidth + ' ' + chartHeight);
+    chart.classed('chart', true);
+    chart.append('g')
+      .classed('series', true);
+    chart.append('g')
+      .attr('transform', translateStr(0, chartHeight - margin))
+      .classed('xaxis', true);
+    chart.append('g')
+      .attr('transform', translateStr(margin, 0))
+      .classed('yaxis', true);
+    chart.append('g')
+      .attr('transform', translateStr(chartWidth / 2, chartHeight - margin / 2.5))
+      .append('text')
+      .attr('text-anchor', 'middle')
+      .classed('xtitle', true);
+    chart.append('g')
+      .attr('transform', translateStr(margin / 3, chartHeight / 2) + 'rotate(-90)')
+      .append('text')
+      .attr('text-anchor', 'middle')
+      .classed('ytitle', true);
+    chart.append('g')
+      .attr('transform', translateStr(chartWidth - margin, margin))
+      .classed('legend', true);
+    
+    /**
+     * Returns an SVG transform string that translates by x and y
+     */
+    
+    function translateStr(x, y) {
+      return 'translate(' + x + ',' + y + ')';
+    }
+    
+    /**
+     * Gets max value of matrix
+     * TODO find out whether D3js has this functionality
+     */
+    
+    function getMaxValue(stackedValues) {
+      var maxValue = Number.NEGATIVE_INFINITY;
+      
+      for(var i = 0; i < stackedValues.length; i++) {
+        for(var j = 0; j < stackedValues[i].length; j++) {
+          if(maxValue < stackedValues[i][j].y + stackedValues[i][j].y0) {
+            maxValue = stackedValues[i][j].y + stackedValues[i][j].y0;
+          }
+        }
+      }
+      
+      return maxValue;
+    }
+    
+    function getScales(stackedValues) {
+      /* calculate maximum value */
+      var maxValue = getMaxValue(stackedValues);
+      
+      /* calculate new x scale based on the number of values in a data series */
+      var x = d3.scale.linear()
+        .domain([0, stackedValues[0].length - 1])
+        .range([margin, chartWidth - margin / 2]);
+      
+      /* calculate new y scale based on the maximum value in each data series */
+      var y = d3.scale.linear()
+        .domain([maxValue, 0])
+        .range([margin / 2, chartHeight - margin]);
+        
+      return { x: x, y: y };
+    }
+    
+    /**
+     * Data update function for chart. Intended to be a callback of an Angular watch. The new value
+     * of the watched variable is passed as 'data'.
+     *
+     * @param {Object} data
+     * @param {Object} oldData
+     */
+    
+    this.update = function(data, oldData) {
+      if(!data) {
+        $log.log("Chart.update: data is undefined");
+        return;
+      }
+      
+      // for now, keep supporting our custom data format
+      if(data.series) {
+        updateOld(data, oldData);
+        return;
+      }
+      
+      if(data.data.getNumberOfColumns() == 0) {
+        return;
+      }
+      
+      $log.log('this.update data:', data.data)
+      
+      var transitionDuration = 1000;
+      
+      var preStackedValues = data.data.toArray();
+      
+      if(data.options.isStacked) {
+        var stackedValues = stack(preStackedValues);
+      }
+      else {
+        // dummy stacking, sets each y0 to 0
+        var stackedValues = stackZero(preStackedValues);
+      }
+      
+      var scales = getScales(stackedValues);
+      
+      var numValuesChanged = numValues != data.data.rows.length;
+      var numSeriesChanged = data.data.cols.length != oldData.data.cols.length;
+      
+      numValues = data.data.rows.length
+      
+      var xAxis = d3.svg.axis()
+        .orient("bottom")
+        .outerTickSize(1)
+        .scale(scales.x);
+      
+      var yAxis = d3.svg.axis()
+        .orient("left")
+        .outerTickSize(1)
+        .scale(scales.y);
+      
+      /* define an area chart generator with accessor functions tailored to our data structure */
+      var createAreaPath = d3.svg.area()
+        .x(function(d) { return scales.x(d.x); })
+        .y0(function (d) { return scales.y(d.y0); })
+        .y1(function(d) { return scales.y(d.y0 + d.y); });
+      
+      var createAreaPathZero = d3.svg.area()
+        .x(function(d) { return scales.x(d.x); })
+        .y0(function (d) { return margin / 2; })
+        .y1(function(d) { return margin / 2; });
+      
+      chart.select('.series').selectAll('path')
+        .data(stackedValues)
+        .enter()
+        .append('path')
+        .attr('title', function(d, i) { return data.options.series[i].name })
+        .attr('style', function(d, i) { return 'fill: ' + data.options.series[i].color })
+        .attr('d', function(d) { return createAreaPathZero(d) });
+      
+      // TODO animate removing series
+      chart.selectAll('.series path')
+        .data(stackedValues)
+        .exit()
+        .remove();
+      
+      var easingStr = 'cubic-in-out';
+      if(numSeriesChanged) {
+        easingStr = 'cubic-out';
+      }
+      
+      // TODO animate adding and removing values of a path
+      if(numValuesChanged) {
+        chart.selectAll('.series path')
+          .data(stackedValues)
+          .attr('title', function(d, i) { return data.options.series[i].name })
+          .attr('style', function(d, i) { return 'fill: ' + data.options.series[i].color })
+          .attr('d', function(d) { return createAreaPath(d) });
+      }
+      else {
+        chart.selectAll('.series path')
+          .data(stackedValues)
+          .transition().duration(transitionDuration).ease(easingStr)
+          .attr('title', function(d, i) { return data.options.series[i].name })
+          .attr('style', function(d, i) { return 'fill: ' + data.options.series[i].color })
+          .attr('d', function(d) { return createAreaPath(d) });
+      }
+      
+      chart.select('.xaxis')
+        .transition().duration(transitionDuration)
+        .call(xAxis);
+      
+      chart.select('.yaxis')
+        .transition().duration(transitionDuration)
+        .call(yAxis);
+      
+      chart.select('.xtitle')
+        .text(data.options.hAxis.title);
+      
+      chart.select('.ytitle')
+        .text(data.options.vAxis.title);
+      
+      chart.select('.legend').selectAll('g')
+        .data(data.options.series.map(function(d, i, a) { return a[a.length - i - 1]}))
+        .enter()
+        .append('g')
+        .attr('transform', function(d, i) { return translateStr(0, i * 50) })
+        .append('text')
+        .attr('text-anchor', 'end')
+        .text(function(d) { return d.name; });
+    }
+  }
+
+  return {
+    restrict: 'A',
+    link: function(scope, element, attrs) {
+      var chart = new Chart(element[0]);
+      scope.$watch(attrs.foChart, chart.update, true);
+    } // link
+  }; // return
+});
+
+/**
+ * Google Line directive using Google Chart
+ *
+ * You can use it like this: <div google-line="myData" />. The chart will automatically determine the number of
+ * data series and their ranges, and it will automatically update when the data changes. The data bound should be an
+ * object with an xTitle, yTitle and an array of data series. Each data series is an array of values. Example:
+ * <pre>
+ * $scope.myData = {
+ *   xTitle: "Time (years)",
+ *   yTitle: "Number of employees",
+ *   values: []
+ * };
+ * </pre>
+ */
+kapstok.directive('googleLine', function() {
+  function lineChart(div) {
+  
+    var defaultOptions = {
+        width: 654,
+        height: 333,  
+        animation: {
+            duration: 1000,
+            easing: 'out',
+        },
+        backgroundColor: {
+          fill: '14212C'
+        },
+        legend: {
+          position: 'none',
+          textStyle: {
+            color: 'white'
+          }
+        },
+        pointSize: 6,
+        tooltip: {isHtml: true}
+    };
+    
+    var chart;
+    
+    google.load('visualization', '1', {
+        packages: ['corechart'], 
+        callback: function() { chart = new google.visualization.LineChart(div); },
+    });
+
+    this.update = function(data) {
+        if( data == null || 
+            data.series == undefined || 
+            data.series.length == 0 ||
+            data.series[0].values == undefined ||
+            data.series[0].values.length == 0) return;
+        
+        google.load('visualization', '1', {
+            packages:['corechart'], 
+            callback: draw
+        });
+            
+        function draw() {
+            var chartData = new google.visualization.DataTable(); 
+            chartData.addColumn('string', data.xTitle);
+            
+            for(var i = 0; i < data.series.length; i++) {
+              chartData.addColumn('number', data.series[i].label);
+            }
+
+            for(var i = 0; i < data.series[0].values.length; i++) {
+              //if it has custom horizontal values, show these
+              var row = ['' + (data.series[0].values[i][0] ? data.series[0].values[i][0] : (i + 1))];
+              
+              for(var serie = 0; serie < data.series.length; serie++) {
+                row.push(
+                  //if it has custom horizontal values, the y-values are at position [1]
+                  data.series[serie].values[i][1] ? data.series[serie].values[i][1] : data.series[serie].values[i]
+                );
+              }
+
+              chartData.addRow(row);
+            }
+    
+            var options = {
+              vAxis: {
+                'title': data.yTitle,
+                'titleTextStyle': {
+                  'color': 'white'
+                },
+                textStyle: {
+                  'color': 'white'
+                },
+                gridlines: {
+                  'color': '#2d3d50'
+                },
+                baselineColor: 'white',
+              },
+              hAxis: {
+                title: data.xTitle,
+                titleTextStyle: {
+                  'color': 'white'
+                },
+                textStyle: {
+                  'color': 'white'
+                },
+                baselineColor: 'white'
+              }
+            }
+            
+            if(data.series.length > 1) {
+              defaultOptions.legend.position = 'right';
+              
+              if(data.series.length == 2) {
+                defaultOptions.colors = ['90c142', '61d9fd'];
+              } else if (data.series.length == 3) {
+                defaultOptions.colors = ['43670b', '90c142', 'd2f39c'];
+              } else {
+                defaultOptions.colors = ['2b4307', '43670b', '90c142', 'd2f39c'];
+              }
+            } else {
+              defaultOptions.legend.position = 'none';
+              defaultOptions.colors = ['90c142'];
+            }
+        
+                
+            chart.draw(chartData, $.extend(options, defaultOptions));
+        }
+    }
+  }
+
+  return {
+    restrict: 'A',
+    link: function(scope, element, attrs) {
+      var chart = new lineChart(element[0]);
+
+      scope.$watch(attrs.googleLine, chart.update, true);
+    } 
+  }; 
+});
+
+/**
+ * Google Bar directive using Google Chart
+ *
+ * You can use it like this: <div google-bar="myData" />. The chart will automatically determine the number of
+ * data series and their ranges, and it will automatically update when the data changes. The data bound should be an
+ * object with an xTitle, yTitle and an array of data series. Each data series is an array of values. Example:
+ * <pre>
+ * $scope.myData = {
+ *   xTitle: "Time (years)",
+ *   yTitle: "Number of employees",
+ *   series: [
+ *     { name: 'Series A', color: 'red', values: [ { x: 0, y:  4 }, { x: 1, y:  8 }, { x: 2, y: 15 } ] },
+ *     { name: 'Series B', color: '#0f0', values: [ { x: 0, y: 16 }, { x: 1, y: 23 }, { x: 2, y: 42 } ] },
+ *     { name: 'Series C', color: 'rgb(0, 0, 255)', values: [ { x: 0, y:  1 }, { x: 1, y:  3 }, { x: 2, y:  3 } ] }
+ *   ]
+ * };
+ * </pre>
+ */
+kapstok.directive('googleBar', function() {
+  function barChart(div) {
+    var defaultOptions = {
+        orientation: 'horizontal',
+        isStacked: false,
+        width: 654,
+        height: 333,  
+        animation: {
+            duration: 1000,
+            easing: 'out',
+        },
+        backgroundColor: {
+          fill: '14212C'
+        },
+        legend: {
+          position: 'none',
+          textStyle: {
+            color: 'white'
+          }
+        },
+        tooltip: {isHtml: true}
+    };
+    
+    var chart;
+    
+    google.load('visualization', '1', {
+        packages: ['corechart'], 
+        callback: function() { chart = new google.visualization.BarChart(div); }
+    });
+    
+    this.update = function(data) {
+        if( data == null || 
+            data.series == undefined || 
+            data.series.length == 0 ||
+            data.series[0].values == undefined ||
+            data.series[0].values.length == 0) return;
+        
+        google.load('visualization', '1', {
+            packages:['corechart'], 
+            callback: draw
+        });
+            
+        function draw() {
+            var chartData = new google.visualization.DataTable(); 
+            chartData.addColumn('string', data.xTitle);
+            
+            for(var i = 0; i < data.series.length; i++) {
+              chartData.addColumn('number', data.series[i].label);
+            }
+
+            for(var i = 0; i < data.series[0].values.length; i++) {
+              //if it has custom horizontal values, show these
+              var row = ['' + (data.series[0].values[i][0] ? data.series[0].values[i][0] : (i + 1))];
+              
+              for(var serie = 0; serie < data.series.length; serie++) {
+                row.push(
+                  //if it has custom horizontal values, the y-values are at position [1]
+                  data.series[serie].values[i][1] ? data.series[serie].values[i][1] : data.series[serie].values[i]
+                );
+              }
+
+              chartData.addRow(row);
+            }
+                
+            var options = {
+              vAxis: {
+                'title': data.yTitle,
+                'titleTextStyle': {
+                  'color': 'white'
+                },
+                textStyle: {
+                  'color': 'white'
+                },
+                gridlines: {
+                  'color': '#2d3d50'
+                },
+                baselineColor: 'white',
+              },
+              hAxis: {
+                title: data.xTitle,
+                titleTextStyle: {
+                  'color': 'white'
+                },
+                textStyle: {
+                  'color': 'white'
+                },
+                baselineColor: 'white'
+              }
+            }
+            
+            if(data.series.length > 1) {
+              defaultOptions.legend.position = 'right';
+              
+              if(data.series.length == 2) {
+                defaultOptions.colors = ['90c142', '61d9fd'];
+              } else if (data.series.length == 3) {
+                defaultOptions.colors = ['43670b', '90c142', 'd2f39c'];
+              } else {
+                defaultOptions.colors = ['2b4307', '43670b', '90c142', 'd2f39c'];
+              }
+            } else {
+              defaultOptions.legend.position = 'none';
+              defaultOptions.colors = ['90c142'];
+            }
+        
+
+            chart.draw(chartData, $.extend(options, defaultOptions));
+        }
+    }
+  }
+
+  return {
+    restrict: 'A',
+    link: function(scope, element, attrs) {
+        var chart = new barChart(element[0]);
+
+        scope.$watch(attrs.googleBar, chart.update, true);
+    } 
+  }; 
+});
+
+
+kapstok.directive('googleAreaChart', function() {
+  function areaChart(div) {
+    var defaultOptions = {
+      width: 654,
+      height: 333,  
+      animation: {
+          duration: 1000,
+          easing: 'out',
+      },
+      backgroundColor: {
+        fill: '14212C'
+      },
+      legend: {
+        position: 'none',
+        textStyle: {
+          color: 'white'
+        }
+      },
+      pointSize: 6,
+      tooltip: {isHtml: true}
+    };
+    
+    var chart;
+    
+    google.load('visualization', '1', {
+        packages: ['corechart'], 
+        callback: function() { chart = new google.visualization.AreaChart(div); },
+    });
+
+    this.update = function(data) {
+        if( data == null || 
+            data.series == undefined || 
+            data.series.length == 0 ||
+            data.series[0].values == undefined ||
+            data.series[0].values.length == 0) return;
+      
+      google.load('visualization', '1', {
+          packages:['corechart'], 
+          callback: draw
+      });
+          
+      function draw() {
+        var chartData = new google.visualization.DataTable(); 
+        chartData.addColumn('string', data.xTitle);
+        
+        for(var i = 0; i < data.series.length; i++) {
+          chartData.addColumn('number', data.series[i].label);
+        }
+
+        for(var i = 0; i < data.series[0].values.length; i++) {
+          //if it has custom horizontal values, show these
+          var row = ['' + (data.series[0].values[i][0] ? data.series[0].values[i][0] : (i + 1))];
+          
+          for(var serie = 0; serie < data.series.length; serie++) {
+            row.push(
+              //if it has custom horizontal values, the y-values are at position [1]
+              data.series[serie].values[i][1] ? data.series[serie].values[i][1] : data.series[serie].values[i]
+            );
+          }
+
+          chartData.addRow(row);
+        }
+
+
+        var options = {
+          vAxis: {
+            'title': data.yTitle,
+            'titleTextStyle': {
+              'color': 'white'
+            },
+            textStyle: {
+              'color': 'white'
+            },
+            gridlines: {
+              'color': '#2d3d50'
+            },
+            baselineColor: 'white',
+          },
+          hAxis: {
+            title: data.xTitle,
+            titleTextStyle: {
+              'color': 'white'
+            },
+            textStyle: {
+              'color': 'white'
+            },
+            baselineColor: 'white',
+          }
+        }
+        
+        if(data.series.length > 1) {
+          defaultOptions.legend.position = 'right';
+          defaultOptions.isStacked = data.isStacked;
+          
+          if(data.series.length == 2) {
+            defaultOptions.colors = ['90c142', '61d9fd'];
+          } else if (data.series.length == 3) {
+            defaultOptions.colors = ['43670b', '90c142', 'd2f39c'];
+          } else {
+            defaultOptions.colors = ['2b4307', '43670b', '90c142', 'd2f39c'];
+          }
+        } else {
+          defaultOptions.legend.position = 'none';
+          defaultOptions.colors = ['90c142'];
+        }
+            
+        chart.draw(chartData, $.extend(options, defaultOptions));
+      } 
+    }
+  }
+
+  return {
+    restrict: 'A',
+    link: function(scope, element, attrs) {
+      var chart = new areaChart(element[0]);
+
+      scope.$watch(attrs.googleAreaChart, chart.update, true);
+    } 
+  }; 
+});
+
+
+kapstok.directive('googleLayerTable', function() {
+  function layerTable(div) {
+    var defaultOptions = {
+        showRowNumber: false,
+        width: 450,
+    }
+  
+    var table;
+    google.load('visualization', '1', {
+        packages: ['table'],
+        callback: function() { table = new google.visualization.Table(div) }
+    });
+            
+    this.update = function(data, scope) {
+        if(data.length == 0 ) return;
+
+        google.load('visualization', '1', {
+            packages: ['table'],
+            callback: draw
+        });
+
+        function draw() {
+            var chartData = new google.visualization.DataTable();
+
+            for(var column in data[0]){
+                if(data[0].AGE == 'Unknown') data[0].AGE = -1;
+                if(data[0].LAYER == 'Unknown') data[0].LAYER = 0;
+                
+                if(typeof data[0][column] == 'number') {
+                    chartData.addColumn('number', column);
+                } else if (typeof data[0][column] == 'string') {
+                    chartData.addColumn('string', column);
+                } else {
+                    chartData.addColumn('boolean', column);
+                }
+            }
+
+            for(var i in data) {
+                var row = data[i];
+                if(row.AGE == 'Unknown') row.AGE = -1;
+                if(row.LAYER == 'Unknown') row.LAYER = 0;
+                
+                var toAdd = [];
+                for(var column in row) {
+                    toAdd[toAdd.length] = row[column];
+                }
+                
+                chartData.addRow(toAdd);
+                
+            }
+
+            var view = new google.visualization.DataView(chartData);
+            view.setColumns([1,0,6,3]);
+
+            table.draw(view, defaultOptions);  
+            
+            google.visualization.events.addListener(table, 'select',  function() {
+                if(table.getSelection().length == 0) return;
+                var row = table.getSelection()[table.getSelection().length -1].row;
+                
+                scope.$apply(function() {
+                    for(var column = 0; column < chartData.getNumberOfColumns(); column++) {
+                        scope.selection[chartData.getColumnLabel(column)] = chartData.getValue(row, column);
+                    }
+                
+                    scope.updateSelectedPos(scope.selection);
+                });
+            });
+        }
+    }
+  }
+
+  return {
+    restrict: 'A',
+    link: function(scope, element, attrs) {
+      var chart = new layerTable(element[0]);
+      scope.$watch(attrs.googleLayerTable, function(data) { chart.update(data, scope); }, true);
+    } 
+  }; 
+});
+
+
+kapstok.directive('googlePie', function($timeout, $log) {
+  function pieChart(div) {
+    var defaultOptions = {
+        pieSliceText: 'none',
+        tooltip: {
+            text: 'value',
+            showColorCode: true,
+        },
+        pieHole: 0.5,
+        width: 800,
+        height: 500,
+        legend: {
+                position: 'labeled',
+        },
+    }
+    
+    /*
+    var chart;
+    google.load('visualization', '1', {
+        packages: ['corechart'],
+        callback: function() { chart = new google.visualization.PieChart(div) }
+    });         
+        */    
+    this.update = function(data, scope) {
+        if(data == undefined || data.series == undefined || data.series.length ==0 ) return;
+          
+        google.load('visualization', '1', {
+            packages: ['corechart'], 
+            callback: draw
+        });
+
+        function draw() {
+            var chartData = new google.visualization.DataTable();
+            
+            chartData.addColumn('string', data.label);
+            chartData.addColumn('number', data.value);
+            
+            var color = [];
+            
+            for(var i = 0; i < data.series.length; i++) {
+                chartData.addRow([data.series[i].label, data.series[i].value]);
+                color[i] = '#' +data.series[i].color;
+            }
+            
+            var options = {
+                colors: color
+            }
+            
+            var chart = new google.visualization.PieChart(div);
+            chart.draw(chartData, $.extend(options, defaultOptions));
+            
+            //google.visualization.events.addListener(chart, 'ready', selectListener);
+        
+           // function selectListener() {
+               // $log.log('ready ' + data.title);
+                
+                google.visualization.events.addListener(chart, 'select',  function() {    
+                    if(chart.getSelection().length == 0) return;
+                    //$log.log(JSON.stringify(data.series[chart.getSelection()[0].row]));
+                    var selectedLabel = data.series[chart.getSelection()[0].row].label;
+                    
+                    scope.$apply(function() {
+                        scope.piePath.push(selectedLabel.substring(0, selectedLabel.indexOf(':')));
+                        scope.updateHealthData();
+                    });
+                });
+            //}
+        }
+    }
+  }
+
+  return {
+    restrict: 'A',
+    link: function(scope, element, attrs) {
+      var chart = new pieChart(element[0]);
+      scope.$watch(attrs.googlePie, function(data) { chart.update(data, scope); }, true);
+    } 
+  }; 
+});
+
+
+kapstok.directive('focusMe', function($timeout) {
+  return {
+    restrict: 'A',
+    link: function(scope, element, attrs) {
+        scope.$watch(attrs.focusMe, function(value) { 
+            if(value) {
+                $timeout(function() {
+                    element[0].focus();
+                });
+            }
+        });
+    }
+  };
+});
+
+kapstok.directive('pivottable', function($parse) {
+  return {
+    restrict: 'A',
+    link: function(scope, element, attrs) {
+      scope.$watch(attrs.tableData, function(data) {
+        if(data) {
+          $(element).pivotUI(data);
+        }
+      });
+    }
+  };
+});
+
+kapstok.factory('$getData', ['$http', function($http){
+  return function(url, filter){
+    if(filter){
+      url += jQuery.param(filter);
+    }
+    return $http({method: 'GET', url: url});
+  };
+}]);
+
+
+/**
+ * Close and execute the wrapper function
+ */
+
+})();

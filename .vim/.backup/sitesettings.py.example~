@@ -1,0 +1,133 @@
+# Django settings override for particular webserver
+
+DEBUG = True
+PIPELINE_ENABLED = True # set to False to disable any compression
+TEMPLATE_DEBUG = DEBUG
+IPBLOCKER_ENABLED = True
+MAINTENANCE_MODE = False
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': 'crunchr', 
+        'USER': 'postgres',                      
+        'PASSWORD': '',                  
+        'HOST': '',                    
+        'PORT': '',                    
+    },
+    'crunchr_migration_test': {
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': 'crunchr_migration_test', 
+        'USER': 'fofloris',                      
+        'PASSWORD': '',                  
+        'HOST': 'localhost',                    
+        'PORT': '5432',                    
+    },
+}
+
+CLOSURE_DEBUG = True
+
+STATIC_ROOT = 'compressed/'
+DEMO_MAIL_SENDER = 'info@crunchr_deployment_host.com'
+
+# Directory to which logfiles will be written! (with trailing slash)
+LOG_DIRECTORY='logs/'
+
+# Logfiles will be written per module. Each one can have it's own loglevel
+# It can be DEBUG, INFO, WARNING, ERROR or CRITICAL
+LOGLEVEL_KAPSTOK='INFO'
+LOGLEVEL_ORGANISATION='INFO'
+LOGLEVEL_PREFERENCE='INFO'
+LOGLEVEL_WORKFORCE='INFO'
+LOGLEVEL_SUCCESSION='INFO'
+LOGLEVEL_DATABASE='INFO'
+LOGLEVEL_OTHER='INFO'
+
+# We will be logging to a file (DEBUG level)
+LOGGING = {
+  'version': 1,
+  'disable_existing_loggers': False,
+  'formatters': {
+    'simple': {
+      'format': '%(asctime)s\t%(levelname)s\t=== %(message)s'      
+    },
+    'other': {
+      'format': '%(asctime)s\t%(levelname)s\t%(filename)s\t=== %(message)s'
+    },
+  },
+  'handlers': {
+    'crunchr_kapstok.log': {
+      'class': 'logging.FileHandler',
+      'filename': LOG_DIRECTORY+'crunchr_kapstok.log',
+      'formatter': 'simple'
+    },
+    'crunchr_organisation.log': {
+      'class': 'logging.FileHandler',
+      'filename': LOG_DIRECTORY+'crunchr_organisation.log',
+      'formatter': 'simple'
+    },
+    'crunchr_preference.log': {
+      'class': 'logging.FileHandler',
+      'filename': LOG_DIRECTORY+'crunchr_preference.log',
+      'formatter': 'simple'
+    },
+    'crunchr_workforce.log': {
+      'class': 'logging.FileHandler',
+      'filename': LOG_DIRECTORY+'crunchr_workforce.log',
+      'formatter': 'simple'
+    },
+    'crunchr_succession.log': {
+      'class': 'logging.FileHandler',
+      'filename': LOG_DIRECTORY+'crunchr_succession.log',
+      'formatter': 'simple'
+    },
+    'crunchr_talent.log': {
+      'class': 'logging.FileHandler',
+      'filename': LOG_DIRECTORY+'crunchr_talent.log',
+      'formatter': 'simple'
+    },
+    'crunchr_database.log': {
+      'class': 'logging.FileHandler',
+      'filename': LOG_DIRECTORY+'crunchr_database.log',
+      'formatter': 'simple'
+    },
+    'crunchr_other.log': {
+      'class': 'logging.FileHandler',
+      'filename': LOG_DIRECTORY+'crunchr_other.log',
+      'formatter': 'other'
+    },
+  },
+  'loggers': {
+    'kapstok': {
+      'handlers': ['crunchr_kapstok.log'],
+      'level': LOGLEVEL_KAPSTOK,
+    },
+    'organisation': {
+      'handlers': ['crunchr_organisation.log'],
+      'level': LOGLEVEL_ORGANISATION,
+    },
+    'preference': {
+      'handlers': ['crunchr_preference.log'],
+      'level': LOGLEVEL_PREFERENCE,
+    },
+    'workforce': {
+      'handlers': ['crunchr_workforce.log'],
+      'level': LOGLEVEL_WORKFORCE,
+    },
+    'succession': {
+      'handlers': ['crunchr_succession.log'],
+      'level': LOGLEVEL_SUCCESSION,
+    },
+    'talent': {
+      'handlers': ['crunchr_talent.log'],
+      'level': LOGLEVEL_SUCCESSION,
+    },
+    'database': {
+      'handlers': ['crunchr_database.log'],
+      'level': LOGLEVEL_DATABASE,
+    },
+    '': {
+      'handlers': ['crunchr_other.log'],
+      'level': LOGLEVEL_OTHER,
+    },
+  }
+}

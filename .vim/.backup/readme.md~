@@ -1,0 +1,5 @@
+# Bash coloring
+For correct coloring of `ls`:
+```
+$ eval `dircolors`
+```

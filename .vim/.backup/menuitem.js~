@@ -1,0 +1,25 @@
+(function(){
+  /**
+   * Load the kapstok module, to add our directives
+   */
+
+  var kapstok = angular.module('kapstok');
+
+
+  kapstok.directive('item', function(){
+    return {
+      restrict: 'E',
+      replace: true,
+      transclude: true,
+      scope: {
+        selectedPage  : '@',
+        url           : '=url',
+        title         : '=title',
+      },
+      templateUrl: '/menu/item.html'
+    };
+  });
+
+
+
+})();

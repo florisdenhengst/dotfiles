@@ -1,0 +1,31 @@
+Report
+  - Are rationales provided for important design decisions?
+    - Termination of program / Returning of results
+    - Shared variables (Graph, Colors, 'red', 'count')
+    - Used data structures
+    - Expected performance (per optimization / per graph)
+  - Improvements
+    - Do the proposed improvements make sense?
+  - Evaluation
+    - Multiple input sizes
+    - Comprehensive presentation of results
+    - In-depth reasoning about performance.
+    
+
+Implementation
+  - Thread-safety of 'Colors' object when shared.
+  - How is Graph generation parallelized?
+  - How is the 'red' variable implemented?
+    How is it shared safely?
+    Is it declared volatile when necessary?
+  - How is the 'count' variable implemented?
+    Hos is it shared safely?
+    Is it declared volatile when necessary?
+  - How is the 'await' implemented? Busy wait?
+    Is it synchronized correctly?
+    Are awaits wrapped by a spin lock to guard against spurious wakeups
+    (while > 0)?
+  - Is it ensured that all threads have returned a NoCycleFoundException
+    before termination of the program?
+
+

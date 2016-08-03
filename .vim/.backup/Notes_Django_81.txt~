@@ -1,0 +1,14 @@
+Django 8.1 include some PostgreSQL specific stuff which we might be able to
+use:
+  ArrayField
+  https://docs.djangoproject.com/en/dev/ref/contrib/postgres/fields/#django.contrib.postgres.fields.ArrayField
+    A field containing an array. Possibly interesting for typing as we can
+    simply create an array of types, which can be ever expanding:
+    type = [major_type, minor_type, ooh_we_have_another_type].
+  
+  RangeField
+  https://docs.djangoproject.com/en/dev/ref/contrib/postgres/fields/#range-fields
+    A field that describes a range.
+    Useful for a bunch of things, most importantly: EnumTableModel.score
+
+

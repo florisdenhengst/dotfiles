@@ -1,0 +1,258 @@
+import cvxopt as co
+from kernel import Kernel
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+import pprint
+import sklearn as sk
+from sklearn import grid_search
+from svdd import SVDD
+import sklearn
+from sklearn.cross_validation import StratifiedKFold
+from sklearn.utils.estimator_checks import check_estimator
+from sklearn.utils import check_array
+from sklearn.utils.validation import column_or_1d
+import sys
+from ssad_wrapper import *
+from midpoint_normalize import *
+import json
+import os
+import time
+from optimals import optimals
+import random
+
+
+POS_LABEL = -1
+K_TYPE = 'rbf'
+N_FOLDS = 5
+N_ITERATIONS = 25
+USAGE = '''Usage: python learning_curve_inter_random.py 
+  <method>
+  <scaled_data_file>
+  <classes_file>
+  <json_output_prefix>
+  <?imgs_to_dir>
+  <?n_jobs>
+  <?n_folds>
+  '''
+co.solvers.options['show_progress'] = False
+co.cvxprog.options['show_progress'] = False
+co.coneprog.options['show_progress'] = False
+
+def rank_based_disagreement(ranks1, ranks2, ignore = None):
+  '''Feed in JUST THE RANKS (i.e. not the indices).
+  Returns index of element which has the highest rank-based difference.'''
+  assert ranks1.shape == ranks2.shape
+  rank_diffs = np.abs(ranks1 - ranks2)
+  if ignore is not None:
+    # disable everything in selection
+    rank_diffs[ignore] = float('-inf')
+  return np.argmax(rank_diffs)
+
+def ranked_indices(scores_to_rank):
+  # append indices column-wise
+  scores_to_rank = np.transpose(np.vstack((scores_to_rank, np.arange(0,scores_to_rank.shape[0]))))
+  # now sort them
+  scores_to_rank = scores_to_rank[scores_to_rank[:,0].argsort(axis=0)]
+  # append new indices to denote ranks
+  scores_to_rank = np.transpose(np.vstack((scores_to_rank[:,0],
+                                         scores_to_rank[:,1],
+                                         np.arange(0,scores_to_rank.shape[0]))))
+  # reorder to get original ordering
+  ranks = scores_to_rank[scores_to_rank[:,1].argsort(axis=0)][:,2:3]
+  return ranks
+
+def assign_optional_arg(index, argname):
+  try:
+    globals()[argname] = sys.argv[index]
+  except IndexError:
+    print('No arg {} provided.'.format(argname))
+
+
+try:
+  method = sys.argv[1]
+  data_file = sys.argv[2]
+  classes_file = sys.argv[3]
+  output_file = sys.argv[4]
+except IndexError:
+  print(USAGE)
+  exit(1)
+
+for i, arg in enumerate(['img_to_dir', 'n_jobs', 'n_folds']):
+  assign_optional_arg(i+5, arg)
+
+
+# read input file 
+data = np.loadtxt(open(data_file,'rb'), delimiter=',')
+
+# read unscaled input file
+
+settings = None
+datasets = ['usg', 'abalone', 'thyroid']
+for dataset in datasets:
+  if dataset in data_file:
+    print("Detected '{}' as dataset.".format(dataset))
+    settings = optimals[dataset]
+    break
+
+# read classes file
+trues = np.loadtxt(open(classes_file, 'rb'), delimiter=',')[:,1]
+y_true = trues
+assert np.min(y_true) == -1
+assert np.max(y_true) == 1
+assert len(np.unique(y_true)) == 2
+
+# validate json output
+with open(output_file, 'w+') as f:
+  print('output file validated')
+
+# set optimal parameters
+if settings is None:
+  settings = {
+      'ssad': {
+        'C_base': 0.0005,
+        'k_param': 0.0003,
+        },
+      'svc': {
+        'C': 35.6225,
+        'gamma': 0.1374,
+        'probability': True,
+        }
+      }
+  print('Using default settings')
+if method == 'svc':
+  model_t = sk.svm.SVC
+elif method == 'ssad':
+  model_t = SSAD_WRAPPER
+else:
+  print("Unknown method '{}'!".format(method))
+  exit(1)
+
+scorer = sk.metrics.f1_score
+
+ns_hints = []
+scores = []
+
+# fire up an R instance and inject the method into it
+with open('LOFscore.R') as lof_score_file:
+  method_definition = lof_score_file.read()
+
+# Five fold-cross validation 
+folds = StratifiedKFold(trues, N_FOLDS)
+
+for iteration in range(N_ITERATIONS):
+    scores.append([])
+    ns_hints.append([])
+    #TODO: have to do this for multiple test runs and then combine the results.
+    for fold_c, (train_fold, test_fold) in enumerate(folds):
+      ns_hints[iteration].append([])
+      scores[iteration].append([])
+      x_train = data[train_fold]
+      x_test = data[test_fold]
+      y_train = trues[train_fold]
+      y_test = trues[test_fold]
+      y_working = np.zeros(len(y_train))
+
+      hints_range = range(len(y_train))
+      print('hints range len', len(hints_range))
+      for i, n_hints in enumerate(hints_range):
+        assert y_working.shape == y_train.shape
+        # build model
+        model = model_t(**settings[method])
+
+        # remove all entries for which no label is present and store in separate object for SVC
+        labelled = y_working != 0
+        unlabelled = np.logical_not(labelled)
+
+        assert sum(y_working == -1) + sum(y_working == 1) == n_hints
+        assert sum(y_working == 0) + n_hints == len(y_train)
+        assert sum(labelled) == n_hints
+
+
+        # set up training data
+        if method == 'ssad':
+          # ssad can use all instances, but not all y_true
+          training_set = x_train
+          # deep copy to solve heisenbug?
+          y_train_working = np.empty_like(y_working)
+          y_train_working[:] = y_working
+        else:
+          # svc can only use labelled instances
+          x_train_working = x_train[labelled,:]
+          y_train_working = y_working[labelled]
+
+        # query a random unlabelled point.
+        possible_query_indices = np.where( y_working == 0 )[0]
+        random_index = random.randint(0, len(possible_query_indices) - 1)
+        query_index = possible_query_indices[random_index]
+
+        # add label of hinting point to known labels
+        assert query_index <= len(x_train[:,0])
+        assert y_working[query_index] == 0
+        y_working[query_index] = y_train[query_index]
+        assert y_working[query_index] != 0
+
+        # measure performances (F1 score)
+        try:
+          sklearn.utils.validation.check_is_fitted(model, 'support_')
+          # predict on all points
+          predictions = model.predict(x_test)
+          score = scorer(y_test, predictions, pos_label=POS_LABEL)
+        except sklearn.utils.validation.NotFittedError:
+          score = 0
+
+        # store result
+        scores[iteration][fold_c].append(score)
+        ns_hints[iteration][fold_c].append(n_hints)
+
+ns_hints = ns_hints[0]
+# output json for ssad to file
+dump = json.dumps({'ns_hints': ns_hints, 'scores': scores, 'scorer': scorer.__name__},
+                  indent=2,
+                  sort_keys=True)
+
+averaged_scores_iteration = []
+for i in range(N_FOLDS):
+  averaged_scores_iteration.append([])
+  for j in range(len(scores[0][0])):
+    # now take the average across iterations
+    scores_iterations = [score[i][j] for score in scores]
+    assert len(scores_iterations) == N_ITERATIONS
+    averaged_scores_iteration[i].append(sum(scores_iterations) / len(scores_iterations))
+
+averaged_scores = np.zeros(len(ns_hints[0]))
+assert len(averaged_scores_iteration) == N_FOLDS
+for i in range(len(ns_hints[0])):
+  scores_folds = [averaged_scores_fold[i]
+                           for averaged_scores_fold
+                           in averaged_scores_iteration]
+  print(scores_folds)
+  averaged_scores[i] = sum(scores_folds) / len(scores_folds)
+
+percentage_labelled = np.divide(ns_hints[0], len(ns_hints[0]))
+if img_to_dir is not None:
+  img_out = img_to_dir + '/inter_output_random_query_' + method + '.pdf'
+
+plt.figure()
+plt.title('learning curve')
+plt.xlabel('% queried')
+plt.ylabel('F1 score')
+plt.plot(percentage_labelled, averaged_scores)
+plt.ylim(0, 1)
+if img_to_dir is not None:
+  plt.savefig(img_out, format='pdf')
+else:
+  plt.show(img_to)
+
+
+# output json for svc to file
+with open(output_file, 'w+') as f:
+  print(dump, file=f)
+
+# create learning plots
+
+
+
+# output learning plot for ssad to file / show
+
+# output learning plot for svc to file / show

@@ -1,0 +1,76 @@
+<fo-message>
+  The numbers below show the FTE numbers per region. Crunchr includes the relevant regional areas
+  for your organisation. The region and country structure is based on the provided people data,
+  these are listed in the table below. In the column next to that, you will find the actual FTE
+  number per region, followed by the percentage of your total FTE. You can use the filter to zoom in
+  on any part of your business.
+</fo-message>
+  
+<div class="row">
+  <div class="col-lg-12">
+    <h1>Location</h1>               
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-12">
+    <div class="content-divider" />
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-12">
+    <h2>FTE per Location</h2>       
+  </div>
+</div>  
+
+
+<fo-distribution data="organisation/headcount/location" fo-loading="!ready"/>
+   
+<!--
+<div class="row">
+  <div class="col-lg-offset-3 col-lg-6">
+    <table class="datatable" ng-init="geoOrder={orderBy: 'REGION'}">
+      <thead>
+        <tr>
+          <th ng-class="{'sort': geoOrder.orderBy == 'REGION'}" 
+              ng-click="geoOrder={orderBy: 'REGION', reverse:!geoOrder.reverse}">
+            Location
+            <img ng-class="{'flip': geoOrder.reverse}" src="/static/kapstok/logos/arrowDown.png">
+          </th>
+          <th ng-class="{'sort': geoOrder.orderBy == 'fte'}" 
+              ng-click="geoOrder={orderBy: 'fte', reverse:!geoOrder.reverse}">
+            FTE
+            <img ng-class="{'flip': geoOrder.reverse}" src="/static/kapstok/logos/arrowDown.png">
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="uppercase" ng-repeat="r in hc.geo | orderBy:geoOrder.orderBy:geoOrder.reverse">
+          <td>{{r.REGION}}</td>
+          <td>{{r.fte}} <span class="right">{{r.perc}} %</span></td>
+        </tr>
+        <tr class="table-line">
+          <td></td>
+          <td>{{summary.fte}}</td>
+        </tr>
+      </tbody>
+    </table> 
+  </div>
+ 
+  <div class="col-lg-1 col-lg-push-1">
+    <div class="graph-options">
+      <ul>
+        <li ng-click="learn.toggle()" class="dividerLine">
+            <ng-include src="'/static/kapstok/logos/learn.svg'"></ng-include>LEARN
+        </li>
+        <li><ng-include src="'/static/kapstok/logos/export.svg'"></ng-include>EXPORT</li>
+        <li><a href="#/organisation?page=powerreport">
+            <ng-include src="'/static/kapstok/logos/power report.svg'"></ng-include>POWER REPORT
+        </a></li>
+      </ul>
+    </div>
+  </div>    
+</div>
+--> 
+

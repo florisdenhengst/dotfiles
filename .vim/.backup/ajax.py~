@@ -1,0 +1,215 @@
+# -------------------------------------------------------------------------------------------------
+# AJAX call decorators
+#
+# These decorators automatically add the @login_required and @transaction.atomic
+# decorators, so that the update/add functions are really only called when a user is logged in,
+# and the functions are protected from messing up through transactions.
+# -------------------------------------------------------------------------------------------------
+
+
+import sys
+from django.conf import settings
+import traceback
+import json
+import traceback
+import xml.etree.ElementTree as ET
+
+from django.db import transaction
+
+from django.http import HttpResponse, HttpResponseBadRequest
+from django.contrib.auth.decorators import login_required
+
+
+PRINT_EXCEPTIONS=True
+
+def print_exception(E):
+    if settings.DEBUG and PRINT_EXCEPTIONS:
+        try:
+            print(('>>> %s: %s <<<' % (E.__class__.__name__, E.message)))
+            traceback.print_exc()
+            print('>>> end of exception <<<')
+        except Exception:
+            pass
+
+
+""" This function determines whether an object is an ElementTree 
+    Xml element. Unfortunately, the implementation depends on the version of 
+    Python being used. """
+def isXmlElement(obj):
+    if sys.version_info >= (2, 7):
+        return isinstance(obj, ET.Element)
+    else:
+        return obj.__class__.__name__ == '_ElementInterface'
+
+def ajax_call(f):
+
+    @login_required
+    @transaction.atomic
+    def wrapper(*args, **kwargs):
+        try:
+            if len(args) == 0:
+                raise Exception("Expected at least one argument.")
+                
+            request = args[0]
+            if not settings.DEBUG:
+                if not request.method == 'POST':
+                    raise Exception("This Ajax call should be done through a POST.")
+
+            if request.method == 'POST':
+                kwargs['values'] = request.POST
+            else:
+                kwargs['values'] = request.GET
+                
+            response = f(*args, **kwargs)
+                
+        except Exception as E:    
+            if settings.DEBUG:
+                print_exception(E)
+                raise
+            else:
+                return HttpResponseBadRequest((E.__class__.__name__ + ": " + E.message) if settings.DEBUG else "Internal error")
+
+        if response is None:
+            return HttpResponse("OK", content_type="text/plain")
+        elif isinstance(response, str):
+            return HttpResponse(response, content_type="text/plain")
+        elif isXmlElement(response):
+            return HttpResponse(ET.tostring(response), content_type="text/xml")
+        else:
+            return HttpResponse(json.dumps(response), content_type="application/json")
+            
+    return wrapper
+
+# -------------------------------------------------------------------------------------------------
+# AJAX call decorators for Jquery Editable Datatables
+#
+# These decorators automatically add the @login_required and @transaction.atomic
+# decorators, so that the update/add functions are really only called when a user is logged in,
+# and the functions are protected from messing up through transactions.
+# -------------------------------------------------------------------------------------------------
+def ajax_datatables_update_call(f):
+
+    @login_required
+    @transaction.atomic
+    def wrapper(*args, **kwargs):
+        try:
+            if len(args) == 0:
+                raise Exception("Expected at least one argument.")
+            
+            request = args[0]
+            if not request.method == 'POST':
+                raise Exception("This Ajax call should be done through a POST.")
+
+            kwargs['id']     = request.POST['id']
+            kwargs['value']  = request.POST['value']
+            kwargs['column'] = request.POST['columnName']
+            
+            value = kwargs['value']
+            
+            f(*args, **kwargs)
+        except Exception as E:    
+            if settings.DEBUG:
+                print_exception(E)
+                raise
+            else:
+                return HttpResponse(E.message if settings.DEBUG else "Internal error", content_type="text/plain")
+            
+        return HttpResponse(value, content_type="text/plain")
+
+    return wrapper
+
+
+def ajax_datatables_add_call(f):
+
+    @login_required
+    @transaction.atomic
+    def wrapper(*args, **kwargs):
+        try:
+            if len(args) == 0:
+                raise Exception("Expected at least one argument.")
+            
+            request = args[0]
+            if not request.method == 'POST':
+                raise Exception("This Ajax call should be done through a POST.")
+
+            kwargs['values'] = request.POST
+            
+            value = f(*args, **kwargs)
+        except Exception as E:    
+            if settings.DEBUG:
+                print_exception(E)
+                raise
+            else:
+                return HttpResponseBadRequest(E.message if settings.DEBUG else "Internal error", content_type="text/plain", )
+            
+        return HttpResponse(value, content_type="text/plain")
+
+    return wrapper
+
+
+def ajax_datatables_delete_call(f):
+
+    @login_required
+    @transaction.atomic
+    def wrapper(*args, **kwargs):
+        try:
+            if len(args) == 0:
+                raise Exception("Expected at least one argument.")
+            
+            request = args[0]
+            if not request.method == 'POST':
+                raise Exception("This Ajax call should be done through a POST.")
+                
+            if not 'id' in request.POST:
+                raise Exception("Invalid Ajax call.")
+                
+            kwargs['id'] = int(request.POST['id'])
+            
+            value = "ok"
+            
+            f(*args, **kwargs)
+        except AjaxClientDisplayError as E:
+            if E.message == "ok": E.message = "Okay"
+            return HttpResponse(E.message, content_type="text/plain")
+        except Exception as E:    
+            if settings.DEBUG:
+                print_exception(E)
+                raise
+            else:
+                return HttpResponse(E.message if settings.DEBUG else "Internal error", content_type="text/plain")
+            
+        return HttpResponse(value, content_type="text/plain")
+
+    return wrapper
+
+
+def ajax_jeditable_update_call(f):
+
+    @login_required
+    @transaction.atomic
+    @ajax_call
+    def wrapper(*args, **kwargs):
+        values = kwargs['values']
+        kwargs['column'] = values['id']
+        kwargs['value']  = values['value']
+        del kwargs['values']
+        
+        return f(*args, **kwargs)
+
+    return wrapper
+
+
+
+
+
+class UnknownColumnError(Exception):
+    def __init__(self, column_name):
+        Exception.__init__(self, "Unknown column: '%s'" % column_name)
+
+
+class AjaxClientDisplayError(Exception):                # this is an error that is supposed to be seen by the web user
+    def __init__(self, message):
+        self.message = message
+    def __str__(self):
+        return repr(self.message)
+        

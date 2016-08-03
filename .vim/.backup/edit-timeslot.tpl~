@@ -1,0 +1,45 @@
+{extends "menu-page.tpl"}
+
+{block "title"}
+  Edit time slot {if $timeslot.label == ""}{$timeslot.id}{else}{$timeslot.label}{/if}
+{/block}
+
+{block "content"}
+  <form class=""
+        method="POST">
+    <div class="form-group form-group-md">
+      {if isset($timeslot.id)}
+        <input type='hidden' value="{$timeslot.id}"> 
+      {/if}
+      <div class="row">
+        {include(file='forms/text-input.tpl',
+                  label       = 'label',
+                  input_type  = 'text',
+                  input_id    = 'label',
+                  placeholder = 'description',
+                  value       = $timeslot.label,
+                  autofocus   = TRUE)
+        }
+      </div>
+      {include(file='forms/linked-datetime-picker.tpl',
+                start_label       = 'start',
+                start_name        = 'start',
+                end_label         = 'end',
+                end_name          = 'end',
+                id                = 'datetime',
+                value_start       = $timeslot.start_time,
+                value_end         = $timeslot.end_time,
+                required          = TRUE)
+      }
+      </div>
+      <div class="row">
+        {include(file='forms/back-submit.tpl',
+                  submit_button_id    = '',
+                  back_button_id      = '',
+                  back_url            = '/management/timeslots')
+        }
+      </div>
+    </div>
+
+  </form>
+{/block}

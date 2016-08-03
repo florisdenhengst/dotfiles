@@ -1,0 +1,534 @@
+\chapter{Experimental setup}
+\label{ch:method}
+% 1- Pose the question in the context of existing knowledge (theory
+%    & observations). It can be a new question that old theories are
+%    capable of answering (usually the case), or the question that
+%    calls for formulation of a new theory.
+% 2- Formulate a hypothesis as a tentative answer
+% 3- Deduce consequences and make predictions
+% 4- Test the hypothesis
+%    - how to test?
+% 5- Conclusion
+This chapter contains a description of the data sets and evaluation metrics
+used.  The latter are derived from the problem statement in
+Section~\ref{sec:problem_statement} and the requirements in
+Chapter~\ref{ch:contributions}.
+
+We want to validate our method for the HR data use case, but still want to be
+able to compare it with other methods. We therefore include results on data sets
+that are well known in the anomaly detection literature. We first describe the
+data sets and how a ground truth has been established. We proceed with an
+extensive comparison on suitable metrics for determining the quality of anomaly
+detection methods. Next, we list the hyperparameters used and describe how their
+values were chosen. The chapter is closed by detailed descriptions of the
+experiments: the way generalisation was measured, how learning abilities and
+reusability were measured and which implementations were used.
+
+\section{Description of Data}
+\label{sec:data_description}
+% Thyroid
+% - contains 1946 total rows
+% - 3 classes
+%   - 50 of class '1'   (.025693%) (primary hypothyroid)
+%   - 106 of class '2'  (.054470%) (compensated hypothyroid)
+%   - 1790 of class '3' (.919835%) (negative)
+% - 1 record of class "secondary hypothyroid" was removed.
+% - rows containing missing values were removed
+% - ....?
+%
+% Abalone
+% - contains 2675 instances
+% - 27 classes:
+%   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16  17  18  19  20  21  22  23  25  26  27  29 
+%   1   1  11  36  81 174 270 345 425 384 268 181 132  91  76  45  47  30  24  21  12   6   9   1   1   2   1 
+% - Conversion to:
+%		[1-4]:   49 / 2675 =  1.83177%
+% 	[5-29]: 2626/ 2675 = 98.16822%
+%		Anomalies are the lower bound, normals & noise (upper top) are the negative class
+
+Since we want to solve a real problem we want to measure performance on real
+data. We have access to an annotated relevant data set in the HR domain. We will
+denote this data set as the \emph{domain data set}.  This real-life data is not
+available for publishing as it contains confidential information.We therefore
+include modified versions of the \emph{Abalone} and \emph{Allhypo Thyroid} data
+sets.\footnote{\url{https://archive.ics.uci.edu/ml/datasets.html}} These
+benchmark data sets are often used to reflect situations where a strong class
+imbalance is incorporated in the problem description. They are both
+characterised by the presence of multiple minority classes and are often used to
+simulate unbalanced classification tasks. Note that we introduce the assumption
+of different `classes' to be present given our the problem definition: it
+originally only mentions anomalies, noise and normal points.  This
+`transformation' of classification data to data for our problem statement is
+necessary, as there are no benchmark data sets tailored for our problem
+statement as far as we know. An exact description of this transformation can be
+found in Section~\ref{sec:ground_truth}. We continue to describe the background
+of the benchmark data.
+
+The \emph{Abalone} data set originates from an original biological study
+\cite{nash1994population}. The data was gathered with the goal of predicting the
+number of rings for specimen of a family of sea snails based on physiological
+measurements such as sex, length, height, weight, etc.
+
+The \emph{Allhypo Thyroid} data set was constructed as part of a study in the
+Machine Learning domain \cite{quinlan1987inductive}. It describes patients
+suspected of having \emph{Hypothyroidism}, a common disorder of the endoctrine
+system in which the thyroid gland does not produce enough thyroid hormone. The
+data was gathered with the goal of predicting the presence and type of
+hypothyroidism based on attributes such as age, sex, and medical details such as
+the administered medicine, various measurements of hormone levels and (part of)
+the medical history of the patient.  The data set contains individuals without
+hypothyroidism (`negative' class), individuals with hypothyroidism caused by a
+malfunctioning of the thyroid gland (`primary' class), individuals in an
+early stage of hypothyroidism in which the severity and completeness of symptoms
+is lower than for primary hypothyroidism (`compensated' class) and individuals
+with hypothyroidism with a specific cause (`secondary' class).
+
+Categorical features were transformed into numerical features as `dummy
+variables' for all data sets.  For the supervised components all data was
+scaled to $[0, 1]$. The same scaling was used for training and test samples.
+No other normalisation was applied.
+
+
+\section{Establishing Ground Truth}
+\label{sec:ground_truth}
+% Solving a real use case, so we are going to use real data.
+% 
+%
+% Also interested in some other properties, so also using some `artificial
+% data`. Will be used for runtime experiments.
+% - how is this data generated
+%   -> use known datasets and separate outliers between `anomaly` and `non-anomaly`
+%   -> sample from data to generate different 'dataset sizes'
+%   -> sample / duplicate features to generate different 'no of dimensions'
+% -
+The labels for the real life data set were obtained from a domain expert.
+Ideally, all entries would have been labelled, but this turned out to be too
+time consuming.  Thus, all anomalies found in the original pre processing of the
+data as described in Section~\ref{sec:motivation} wer used the starter anomaly
+entries. In order to avoid misclassifying anomalies that were not found by the
+original pre processing, the labels for entries in the 10\% of outlier scores
+for the LOF, LOCI and SSAD method were obtained in addition. This yields a total
+of $2.30\%$ anomalies out of $1262$ instances.
+
+Making a distinction between anomalies and noise on the publicly available
+(Abalone and Allhypo Thyroid) data sets is problematic as no domain expert is
+available for this data. A common strategy to solve this problem is to use a
+data set with multiple minority classes and select one (or multiple) of these as
+anomalies. The Abalone data set is generally used for validation for
+classification and regression methods . The Allhypo Thyroid
+data set is generally
+used as a validation set for classification in We proceed by describing how this
+differentiation was made in this research.
+
+The Abalone data set originally consists of 27 classes, which denote the number
+of rings found in observed abalone (no specimen with 28 rings in the sample).
+These were transformed into two classes as depicted in
+Figure~\ref{fig:abalone_classes}: all entries from classes one up to five
+($1.83\%$ of 2675 instances) were selected to form an artificial anomaly class.
+The remaining classes ($98.17\%$) form the non-anomalous cases.  This latter set
+contains minority classes 20 to 29 with roughly the same number of instances as
+the anomalous class with $1.98\%$ of the total data.
+
+For the Allhypo Thyroid data set, all entries containing missing data were
+removed. The remaining `primary hypothyroid' (individuals with hypothyroidism
+caused by inadequate functioning of the thryoid gland itself, $2.57\%$ of
+$1946$) instances represent the anomalous class. The `negative' class
+(individuals without hypothyroidism, $91.98\%$) represents the normal cases and
+the `compensated hypothyroid' cases (individuals in which hypothyroidism is in a
+starting phase characterised by some of the symptoms of primary hypothyroidism,
+$5.45\%$) represent the noise. The only instance with the `secondary
+hypothyroid' was removed, resulting in a distribution that is visualised in
+Figure~\ref{fig:thyroid_classes}.
+
+\begin{figure*}
+  \centering
+  \includegraphics[width=0.6\textwidth]{method/abalone_classes.pdf}
+  \caption{Histogram of occurrences of classes in the original Abalone data set.
+    The four leftmost bars (black) form an artificial `anomaly' class.  All
+    other classes are regarded as `normal'. The data set contains minority
+    classes at the rightmost tail as well (white), which can be regarded as the
+    `noise'.}
+  \label{fig:abalone_classes}
+\end{figure*}
+
+\begin{figure*}
+  \centering
+  \includegraphics[width=0.6\textwidth]{method/thyroid_classes.pdf}
+  \caption{Histogram of occurrences of classes in the Allhypo Thyroid data set.  The
+  `compensated hypothyroid' class (leftmost, white bar) forms the `noise' class.
+  The `negative' class represents all `normal' individuals. The `primary
+  hypothyroid' class (rightmost, black bar) forms the anomalous class.}
+  \label{fig:thyroid_classes}
+\end{figure*}
+
+\section{Quality of Classifier}
+\label{sec:quality_metric}
+% How is this influenced by different methods.
+%
+% Which data is used?
+% - real data!!!
+% - artificial data -- arbitrarily separate anomalies from noise?
+%
+% Description of why this is an interesting feature
+We have seen how the `ground truth' of the class labels was established in
+Section~\ref{sec:ground_truth}. In this section, a way to compare the outputs of
+a classifier with this ground truth is described.  As we have seen in
+Section~\ref{sec:contrib_overview}, all components of the proposed approach
+output a per-instance anomaly score. Such a score can be converted into a binary
+classification by choosing a decision threshold $\theta$: all instances with an
+anomaly score $> \theta$ are classified as outlier, all instances with an
+anomaly score $< \theta$ as normal. By varying the $\theta$ the performance
+metrics error rates can be influenced, as described into further detail below.
+We proceed by considering some classifier performance metrics for our anomaly
+detection task. For each method we note shortly how varying $\theta$ affects the
+result as measured by that metric. Finally, we argue that a metric called
+\emph{AUC-PR} seems most suitable for comparing classifiers in the anomaly
+detection domain and that another metric named \emph{F1 score} seems the most
+useful for assessing the performance of a combination of classifier and
+$\theta$.
+
+\begin{table}[t]
+\centering
+\caption{Example confusion matrix. Positive predictions and actuals are denoted
+by a +, negatives by a $-$.}
+\label{tab:confusion_matrix}
+\begin{tabular}{@{}ccccc@{}}
+                           &                & \multicolumn{2}{c}{actual}    &              \\ \cmidrule(rl){3-4}
+                           &                & positive (+) & negative ($-$) &              \\ \midrule[1pt]
+\multirow{2}{*}{predicted} & positive (+)   & \emph{TP}    & \emph{FP}      & \emph{PP}    \\ \cmidrule(l){2-5} 
+                           & negative ($-$) & \emph{FN}    & \emph{TN}      & \emph{PN}    \\ \midrule[1pt]
+                           &                & \emph{AP}    & \emph{AN}      & \emph{Total} \\ 
+\end{tabular}
+\end{table}
+
+The (arguably) most simple evaluation metric for classifiers is \emph{accuracy}:
+\begin{equation}
+\label{eq:accuracy}
+Accuracy = \frac{ TP + TN}{Total}
+\end{equation}
+where $TP$, $TN$ and $Total$ are defined in Table~\ref{tab:confusion_matrix}.
+The number of $TP$ and $TN$ can be influenced by adjusting the decision
+threshold $\theta$: a more conservative $\theta$ is expected to increase $TP$
+whilst decreasing $TN$ and vice versa. This metric is not very informative for
+classifying outliers or anomalies, as the number of correct predictions might be
+very high if \emph{every} point is classified as a normal point. Outliers and
+anomalies are rare by definition, which might lead to seemingly high accuracy
+when little anomalies are present.
+
+Metrics that are able to take class imbalance into account should express the
+relation between the concepts in the confusion matrix in
+Table~\ref{tab:confusion_matrix} better. Consider the following definitions:
+\setlength{\multicolsep}{0pt}
+\begin{multicols}{2}
+  \begin{equation}
+  \label{eq:precision}
+  Precision = \frac{ TP }{ PP }
+  \end{equation}
+\break
+  \begin{equation}
+  \label{eq:recall}
+  Recall = \frac{ TP }{ AP }
+  \end{equation} 
+\end{multicols}
+\begin{equation}
+\label{eq:fpr}
+False\;Positive\;Rate = FPR = \frac{ FP }{ AN }
+\end{equation}
+which are more suitable in the case of class imbalance. They are used to
+construct two curves that visualise effects of adjusting $\theta$: the
+\emph{Receiver Operator Characteristics} curve (ROC curve) and the
+\emph{Precision-Recall} curve (PR curve) which will be described next. 
+
+The ROC curve plots Recall (also known as True Positive Rate or TPR) against
+False Positive Rate (FPR). By doing so, a monotonic ascending curve towards
+$(1,1)$ is formed. This facilitates comparisons between classifiers: the method
+or hyperparameter setting corresponding to the curve that dominates all other
+curves can be said to have superior overall performance. In addition, ROC curves
+aid in finding the right hyperparameter setting to achieve the desired Recall
+and FPR scores: since the ROC curve contains the full range of possible TPR and
+FPR scores, the trade off between these metrics by varying $\theta$ can be
+assessed at a glance. Generally, a liberal decision threshold $\theta$ leads to
+a high TPR at the cost of an increasing FPR.
+
+\begin{table}[bh]
+  \centering
+  \caption{Example confusion matrices for hypothetical methods \emph{A} and
+  \emph{B} on an imbalanced data set. Positive predictions and actuals are
+denoted by a +, negatives by a $-$.}
+  \label{tab:confusion_comparison}
+  \begin{tabular}{@{}ccccccccc@{}}
+                              &     & \multicolumn{2}{c}{actual} &       &  & \multicolumn{2}{c}{actual} &          \\ \cmidrule(lr){3-4} \cmidrule(lr){7-8}
+                              &     & +     & $-$                &       &  & +     & $-$                &          \\ \midrule[0.75pt]
+  \multirow{2}{*}{prediction} & +   & 40    & 160                & 200   &  & 40    & 10                 & 50       \\ \cmidrule(l){2-9} 
+                              & $-$ & 10    & 4790               & 4800  &  & 10    & 4950               & 4950     \\ \midrule[0.75pt]
+                              &     & 50    & 4950               & 5000  &  & 50    & 4950               & 5000     \\ \cmidrule[1pt](l){3-9} 
+                              &     & \multicolumn{3}{c}{\emph{Method A}}&  & \multicolumn{3}{c}{\emph{Method B}} 
+  \end{tabular}
+\end{table}
+
+As pointed out in \cite{davis2006relationship}, however, ROC curves are not
+useful in the presence of a strong class imbalance or when the types of errors
+should be weighted differently. Consider the hypothetical confusion matrices for
+two separate methods in Table~\ref{tab:confusion_comparison}.  Next compare the
+derived scores for Precision, Recall and FPR:
+\begin{table}[H]
+  \centering
+  \begin{tabular}{@{}lrcrc@{}}
+                  &                       &             &                    &                 \\ \toprule
+                  & \multicolumn{2}{c}{\emph{Method A}} & \multicolumn{2}{c}{\emph{Method B}}  \\ \midrule
+    Precision     & $40 / 200  =$         & $0.2$       & $40 / 50 = $       & $0.8$           \\ \midrule
+    Recall        & $40 / 50   =$         & $0.8$       & $40 / 50 = $       & $0.8$           \\ \midrule
+    FPR           & $160 / 4950 \approx$  & $0.032323$  & $10 / 4950 \approx$& $0.002020$      \\ \bottomrule
+  \end{tabular}
+\end{table}
+
+The difference in performance of the methods is poorly represented in the FPR
+scores, as they are so small that any subtleties get lost. Comparing PR curves
+will better reflect differences between methods than comparing ROC curves when
+the number of false positives is expected to be relatively high. Making a
+distinction between a small set of entries and a large one is the goal in
+anomaly detection tasks, so we can expect this situation to be present often.
+Precision and Recall and their interaction are therefore more suitable for
+comparing classifiers in the anomaly detection domain. For Precision and Recall,
+a more liberal decision threshold $\theta$ is expected to result in a higher
+Recall at the cost of a lower Precision.
+
+The method or hyperparameter setting that yields a PR curve that dominates the
+other curves can be viewed as having the best performance as it provides a more
+favourable trade-off between Precision and Recall. In order to convert PR curves
+into single-point scores, a measure of the area under the PR curve can be used
+(AUC-PR). We will therefore use AUC-PR when comparing classifier performance.
+
+In order to determine how well a classifier ultimately performs the task of
+anomaly detection, however, the AUC-PR is not very useful as it describes
+performance of a classifier over an entire range of $\theta$, whereas actual
+classifications can only be made after a specific decision threshold $\theta$
+has been chosen. In order to select the optimal setting on the PR curve, a
+harmonic mean of Precision and Recall known as the \emph{F1 score} can be used:
+\begin{equation}
+\label{eq:f1_score}
+F1~score = 2 * \frac{Precision * Recall}{Precision + Recall}
+\end{equation}
+In the following section we will describe how the AUC-PR and F1 score are used
+for hyperparameter selection.
+
+\section{Combining Component Outputs}
+\label{sec:combining_component_outputs}
+The outputs of the unsupervised and supervised components can be turned into a
+final classification by various strategies. Example strategies are averaging,
+fixed weighted averaging and adaptive weighted averaging. In fixed weighted
+averaging, outputs are averaged using preset weights, whereas in adaptive
+weighted averaging the weights can be set as a function of e.g. the number of
+labelled training examples or based on hypothetical performance given the
+available labels. Weighted and adaptive weighted averaging prove promising, as
+the supervised component might outperform the unsupervised component when a
+sufficiently large labelled training set is present, whereas the unsupervised
+method can be expected to outperform the supervised method when there are
+insufficient labelled training examples.  In order to limit the scope of this
+research, however, we select a weighted average with weights set to $0$ and $1$
+for the unsupervised and supervised components respectively, i.e. we let the
+supervised component be the sole contributor to the classification into
+\{anomaly, non-anomaly\}.
+
+\section{Hyperparameter Selection}
+The unsupervised LOF and LOCI and the supervised SSAD and C-SVC components all
+require some hyperparameters to be set. In order to evaluate the methods in a
+fair manner, the optimal hyperparameters have to be selected. This section
+describes how different hyperparameters affect classifier performance, how
+different hyperparameters were tested and lists the final selection of
+hyperparameter settings. We elaborate on the validity of using \emph{optimal}
+hyperparameter settings and analyse the sensitivity of the methods involved in
+order to get an intuition on performance in the general case.  We include some
+pointers on how parameters can be selected when the optimal settings are
+unknown.
+
+\subsection{Unsupervised Component}
+The unsupervised component never outputs an actual classification in our setting
+(see Section~\ref{sec:combining_component_outputs}), but only ranks instances
+according to an outlier score that is used as input for the query selection
+mechanism. AUC-PR is sufficient in this situation and F1-score provides no
+relevant information since no actual classification decisions are made (see the
+previous section for details on these metrics). We are therefore only interested
+in AUC-PR scores for the unsupervised component.  We will continue to describe
+which hyperparameters are required for LOF and LOCI and how the final
+hyperparameter setting was determined.
+
+The original authors of the LOF method advise to calculate the $\text{LOF}_k(i)$
+for a range of $k$ for each instance $i$ and select the highest outcome to
+determine an outlier score for $i$. The LOF method thus has two parameters
+$k_{min}$ and $k_{max}$ that denote the range of $k$. The lowest number of
+points to constitute a cluster should be represented by $k_{min}$. The upper
+limit $k_{max}$ represents the number of points that may be in a cluster whilst
+still being regarded as outliers. The values for these hyperparameters can
+easily be set by the expert in some sensible way, e.g. as a percentage of the
+total number of instances in the data set. In this research, $k_{min}, k_{max}$
+yielding the best results according to a grid search in $[1,200]$ for both
+$k_{min}$ and $k_{max}$ for each data set were used in further experiments. See
+Figure~\ref{fig:lof_top_5} in Appendix~\ref{ch:unsup_param_selection} for a
+visualisation.
+
+Judging from Figures~\ref{fig:lof_top_5} and \ref{fig:lof_top_1000} from
+Appendix~\ref{ch:unsup_param_selection}, the LOF method is not very sensitive to
+the $k_{min}$ and $k_{max}$ settings. The top-5 value pairs show PR-curves that
+are almost identical for all data sets and even considering the PR-curves for
+the top-1000 we see mostly equal curves. Although all further performance
+analyses in which the LOF method is included should be viewed as upper limits to
+performance, actual performance is not expected to degrade much when optimal
+$k_{min}$ and $k_{max}$ are unknown throughout this section.
+
+For the LOCI method, a parameter $r_{max}$ is used to denote the maximum range
+of instances to be in each other's counting neighbourhood
+$\mathcal{N}_{counting}$. The authors advise to set the value so that all points
+are always in each others $\mathcal{N}_{counting}$ for a precise result, i.e. by
+using the distance of the two points with the highest pairwise distance. As can
+be seen in Figures~\ref{fig:loci_top_5} and \ref{fig:loci_top_1000} in
+Appendix~\ref{ch:unsup_param_selection}, however, this value for $r_{max}$ does
+not achieve the best results. The $r_{max}$ yielding the best result was
+selected in order to make sure all methods are compared with equally `optimized'
+hyperparameters.
+
+Judging from Figures~\ref{fig:loci_top_5} and \ref{fig:loci_top_1000} from
+Appendix~\ref{ch:unsup_param_selection}, the LOCI method is somewhat sensitive
+to the $r_{max}$ hyperparameter value. The top-5 values show PR-curves that are
+almost identical for all data sets, however, when considering the top-1000 we
+see strongly varying shapes. Performance analyses mentioned further below should
+therefore be interpreted as an upper limit on performance when LOCI is involved.
+Performance is expected to degrade in the typical case when the optimal
+$r_{max}$ value is unknown.
+
+\subsection{Supervised Component}
+\label{subsec:supervised_param_selection}
+Both of the supervised components SSAD and C-SVC require two hyperparameters to
+be selected. Parameter $C$ is a weight for penalizing slack variables. It thus
+represents the trade-off between complexity of the decision surface and the
+number of misclassified instances. A less liberal (i.e. higher valued) $C$ leads
+to less errors on training data, a tighter fit of the enclosing hypersphere to
+the training data for SSAD and of the separating hyperplane between the classes
+for C-SVC. This can generally only be accomplished by a more `complex' shape. A
+more liberal (i.e.  lower valued) $C$ allows for more errors on training data
+and thus a looser fit to the training data. The parameter $C$ can thus be seen
+as a way to control over- and underfitting on the training data.
+
+The second parameter is the kernel used. As SSAD poses a restriction on the used
+kernel due to the required convexity of the optimization problem we only use the
+\emph{Radial Basis Function} (RBF) kernel. The RBF kernel has a parameter
+$\gamma$ which denotes the peakiness of the feature space. A lower $\gamma$
+leads to a more smooth surface, whereas a higher $\gamma$ leads to a more peaky
+surface. This parameter can thus be interpreted as an inverse of the `influence'
+that a data point has (i.e. in being an anomaly or non-anomaly) and thus also
+influences the models' capability to `generalise' from given input: a higher
+$\gamma$ leads to a tighter fit to the training data and thus to more accuracy
+on the training set, whereas a lower $\gamma$ leads to a looser fit and thus to
+less accuracy on the training set.
+
+The optimal combination of hyperparameters was determined on a per-data set
+basis for both methods in the supervised component. The results can be found in
+Appendix~\ref{ch:sup_param_selection} in Figures~\ref{fig:ssad_grid_search} and
+\ref{fig:c_svc_grid_search}. Judging from the former, SSAD is rather sensitive
+to hyperparameter settings and no clear pattern can be identified.  Generally,
+lower $\gamma$s yield better performance than those in the higher ranges. The
+exception to this is the \emph{Allhypo Thyroid} data set, which contains a lot
+of binary attributes that are converted to $0$ and $1$ during data
+transformation. It can be understood that this leads to lower distances than
+numerical attributes with higher ranges. The grid search for C-SVC in
+Figure~\ref{fig:c_svc_grid_search} shows a more clear pattern: the interplay
+between $\gamma$ and $C$ can be seen from the diagonal shape in the plots. The
+difference in optimal hyperparameter values over different data sets is clear
+here as well. The optimal values for hyperparameters $\gamma$ and $C$ are hard
+to determine as their interpretation is not straight-forward.  All further
+performance analyses should thus be viewed as upper limits on performance. The
+performance for both methods is likely to be less in the case the optimal
+hyperparameter settings is unknown.
+ 
+\subsection{Parameter Settings}
+\label{subsec:optimal_params}
+The hyperparameter settings in Table~\ref{tab:parameter-settings} were
+determined as described in the previous subsections as optimal on not-normalised
+data sets. They were used throughout further experiments. Please refer to the
+previous subsections for details and suggestions on determining these values.
+
+\begin{table}[h]
+  \centering
+  \caption{Optimal hyperparameter settings per data set.}
+  \label{tab:parameter-settings}
+  \begin{tabular}{l|c|c|c|c|c|c|c}
+                & \multicolumn{2}{c|}{LOF} & LOCI & \multicolumn{2}{c|}{SSAD} & \multicolumn{2}{c}{C-SVC} \\
+                & $k_{min}$  & $k_{max}$   & $r_{max}$ & $C$          & $\gamma$   & $C$      & $\gamma$  \\ \hline
+Domain data set  & 26         & 29          & 3900      &  1.08e-04    & 2.59e-02   & 7.28     & 2.40e-01  \\ \hline
+Abalone         & 91         & 91          &  0.8      &  5.74e-03    & 4.89e-03   & 1.27e-02 & 1.49      \\ \hline
+Allhypo Thyroid & 198        & 199         &   33      & 78.80        & 7.88e-03
+& 3.04e-01 & 853.17 \\ \hline
+\end{tabular}
+\end{table}
+
+\section{Generalisability}
+% nothing for unsupervised component
+% 5 fold-cross validation for supervised component
+Generalisability is the capability of a Machine Learning (M.L.) method when
+applied to a data set other than the set it was trained on (the \emph{training
+set}). The other set is generally known as the \emph{test set}. When an M.L.
+method performs well on unseen data, this indicates that it has captured
+patterns from the training set that are useful in the real world, rather than
+capturing incidental patterns, which is known as overfitting. Generalisability
+is an interesting metric in our use case, as it quantifies requirements 3 and 4
+from Chapter~\ref{ch:contributions}: it expresses how well a previously trained
+model can be `reused' without any input by the expert.
+
+Regarding generalisability, we differentiate between two scenarios: the scenario
+where all data is available from the onset and the scenario where a previously
+trained model is applied to unseen data. The first scenario represents discovery
+of anomalies in a novel yet completely available data set, whereas the second
+scenario represents detection of anomalies for data sets that may change after a
+model has been trained. This latter scenario is interesting as all anomalies
+found in this scenario require no additional effort from the expert. We are
+interested in the capabilities of such a method to fully autonomously detect
+anomalies in new data sets, i.e. its \emph{generalisability}.
+
+In the first scenario, the method is trained and applied to the same data set.
+No cross-validation or other generalisability-measuring techniques are applied.
+In the second scenario, separate training and test sets represent the initial
+and new data sets respectively. Only the performance on the test set is relevant
+here. Five-fold cross validation was applied in these situations to measure the
+generalisability capabilities.A nested cross-validation was considered, however
+it was considered inappropriate due to too little positive (i.e. anomalous)
+validation instances in the inner cross-validation.
+
+The unsupervised component typically has access to \emph{all} data. Splitting
+data into `train' and `test' sets is therefore not necessary when only the
+unsupervised component is involved. For all runs in which only the supervised
+component is involved (i.e.  hyperparameter selection, component performance
+analyses) a five-fold cross-validation was used to measure generalisation
+capabilities. To test the entire framework -- e.g. a combination of supervised
+and unsupervised components, query and output combination mechanisms --
+performance metrics on both the test and training data were obtained.
+
+\section{Learning Abilities}
+\label{sec:learning_curve}
+% plot the number of hints vs. some metric
+% -> which metric to use?
+% -> use both precision and recall?
+% -> show both the number of incorrect and correct classifications?
+In order to measure how our method performs with respect to limited availability
+of the domain expert, we want to compare the number of points labelled by the
+expert (the number of hints) with some performance metric. We will use
+the F1 score introduced in Section~\ref{sec:quality_metric} and see how it is
+influenced by the number of labelled points by plotting it against the number of
+labelled points. This kind of plot is generally known as the \emph{learning
+curve}.
+
+When assessing the learning ability, we are interested in the learning abilities
+in the scenarios of a single and multiple data uploads. In the former, all data
+is present initially and the goal is to acquire all labels with as little
+queries to the expert as possible. For the learning abilities that span across
+data uploads we hold out part of the data set and use this only for validation.
+
+\section{Used Implementations}
+For the LOF method, an implementation from the `DMwR' package of the statistical
+package \emph{R} was used \cite{dmwr} \cite{r-statistical-package}.  An
+implementation from the `ELKI' software package was used for the LOCI scores
+\cite{elki}. Scaling was performed using the `LIBSVM' package \cite{svmlib}. The
+original implementation of the author was used for
+SSAD.\footnote{\url{https://github.com/nicococo/tilitools}} The C-SVC
+implementation from Scikit-learn was used \cite{scikit-learn}. Scikit-learn was
+also used for cross validation, parameter grid search, calculation of results
+(AUC-PR, F1 score, etc.) and the creation of plots.

@@ -1,0 +1,113 @@
+/**
+ * Wrap everything inside a self-executing function to prevent creating globals
+ */
+
+(function() {
+
+/**
+ * Load the kapstok module, to add our directives
+ */
+
+var kapstok = angular.module('kapstok');
+
+/**
+ * Directive to retrieve data from a given url. Optionally, a template can be loaded
+ * using the 'template' attribute. Usage:
+ *
+ *    <fo-include data="/url/with/data" [template="/url/with/template"]> ... </fo-include>
+ * 
+ * The downloaded data is in child directives accessible by $parent.data;
+ */
+kapstok.directive('foInclude', function($compile, $http, $timeout, $log, HttpPostService) {  
+  return {
+      restrict: 'E',
+      transclude: true,
+      replace: true,
+      scope: {},
+      template: "<ng-transclude></ng-transclude>",
+      controller: function($rootScope, $scope, $attrs, FilterData) {
+        function getData() {          
+          // Send POST request to retrieve data that is to be used by children of this directive
+          HttpPostService($attrs.data).success(function(data) {
+            $scope.data = data;
+            $log.info("fo-include: " + data.title + " data retrieved")
+          }).error(function() {
+            $log.error("fo-include: Could not retrieve data at: " + $attrs.data);
+          }).then(function() {
+            $scope.$parent.ready = true;
+          });
+        }
+        
+        // Get initial data, and start listening for incoming 'filterChanged' events which are
+        // broadcast by the filter directive, so that this directive is able to update its data
+        getData();
+        
+        $scope.$on("filterChanged", function(event, data) {
+          $timeout(function() {
+            $log.info("fo-include: Retrieving filtered data");
+            getData();
+          });
+        });
+        
+        //Should be moved to other location?
+        $scope.range = function(number) {
+          if (!number) {
+            return new Array(0);
+          }
+        
+          return new Array(Math.ceil(number));
+        };
+      },
+      link: function($scope, $element, $attrs) {
+        // If a template url is supplied, a template will be loaded
+        if($attrs.template) {
+          $http.get($attrs.template, {responseType: 'text'}).success(function(templateHTML) {
+            $log.info("fo-include: Retrieved template from " + $attrs.template);
+            $element.html(templateHTML);
+            $element.replaceWith($compile($element.html())($scope));
+          }).error(function(templateHTML) {
+            $log.error("fo-include: Template " + $attrs.template + " could not be retrieved");
+          });
+        }
+      }
+  };
+});
+
+
+kapstok.service('HttpPostService', ['$http', 'FilterData', function($http, FilterData) {
+  return function(dataURL, parms) {
+      // Just in case, check if the url ends in a slash, if not, add it
+      if(dataURL.slice(-1) != "/")
+        dataURL += "/";    
+        
+      var postData = {
+          multipos: FilterData.showMultiPositions,
+          filter_state: JSON.stringify(FilterData.processedSelections),
+      }
+        
+      for (var key in parms) {
+        postData[key] = parms[key];
+      }
+
+      return $http({
+            method: "POST",
+            url: dataURL,
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            transformRequest: function(obj) {
+              var str = [];
+              for(var p in obj)
+              str.push(encodeURIComponent(p) + "=" + encodeURIComponent(obj[p]));
+              return str.join("&");
+            },
+            data: postData            
+          }, { responseType: 'json' }
+          )
+  }
+}]);
+  
+/**
+ * Close and execute the wrapper function
+ */
+
+})();
+

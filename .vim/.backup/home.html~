@@ -1,0 +1,594 @@
+<div class="container-fluid header">
+  <fo-menu-logout></fo-menu-logout>
+  <div class="logo crunchr">
+      <img src='/static/kapstok/logos/crunchr.png'></img>
+  </div>
+</div>
+<div class="container welcome-page">
+  <div class="row" />
+  <div id="intro" class="row">
+    <div class="col-md-8 col-md-offset-2">
+      <h1>Your Crunchr Apps</h1>
+    </div>
+  </div>
+  <div id="menu" class="row">
+    <div class="col-md-12">
+      <a class="button">organisation</a>
+      <a class="button">workforce</a>
+      <a class="button">succession</a>
+      <a class="button">talent</a>
+      <a class="button">preference</a>
+      <a class="button">reward</a>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-5 col-lg-4">
+      <div id="wheel"
+        data-parts="6"
+        data-width="1000"
+        data-height="1000"
+        data-image-inactive="/static/kapstok/ui/wheelInactive.png"
+        data-image-inactive-highlight="/static/kapstok/ui/wheelInactiveHighlight.png"
+        data-image-active="/static/kapstok/ui/wheelActive.png"
+        data-image-active-highlight="/static/kapstok/ui/wheelActiveHighlight.png"
+        data-active="{{auth.apps.toString()}}">
+      </div>
+    </div>
+    <div class="col-md-7 col-lg-8 info-holder">
+
+
+
+      <div class="info organisation">
+        <div class="row header">
+          <div class="col-sm-7">
+            <div class="logo organisation"></div>
+          </div>
+          <div class="col-sm-5 align-right">
+            <a class="button purchase"  href="#">More information</a>
+            <a class="button go" ui-sref="organisation">Start App</a>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="row">
+          <div class="col-md-12">
+            <p class="intro">
+              Provides insights in the headcount, characteristics and structure of the organisation.
+              The features allow you to quickly determine annual report statistics, observe
+              headcount over time, perform overhead analyses and explore restructuring or
+              improvement opportunities.
+            </p>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-lg-6">
+          <a ng-click='goIfAuthorized("organisation.summary")'>
+            <div class="feature">
+              <b>Summary</b>
+              <p>
+                View headcount and diversity metrics in one page. Distinguish direct and indirect
+                work force.
+              </p>
+            </div>
+          </a>
+          </div>
+          <div class="col-lg-6">
+          <a ng-click='goIfAuthorized("organisation.headcount.overview")'>
+            <div class="feature">
+              <b>Headcount</b>
+              <p>
+                Observe time trends in headcount and view distributions of the current headcount.
+              </p>
+            </div>
+          </a>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-lg-6">
+          <a ng-click='goIfAuthorized("organisation.structure.overview")'>
+            <div class="feature">
+              <b>Structure</b>
+              <p>
+                Explore the organisation structure and metrics such as reporting layers and span of
+                control.
+              </p>
+            </div>
+          </a>
+          </div>
+          <!--
+          <div class="col-lg-6">
+          <a ng-click="goIfAuthorized('organisation.powerreport')">
+            <div class="feature">
+              <b>Power Report</b>
+              <p>
+                Build any customised report on headcount, diversity and organisation metrics.
+              </p>
+            </div>
+          </a>
+          </div>
+          -->
+        </div>
+        <div class="row">
+          <div class="col-md-12">
+            <p>
+              With <a class="link" ng-click='goIfAuthorized("workforce")'>Crunchr workforce</a>, you can forecast and
+              plan headcount and competencies. Adding <a class="link" ng-click="goIfAuthorized('reward')">Crunchr
+              reward</a> allows you to calculate workforce budgets.
+            </p>
+          </div>
+        </div>
+      </div>
+
+
+
+
+
+
+
+
+
+      <div class="info workforce">
+        <div class="row header">
+          <div class="col-sm-7">
+            <div class="logo workforce"></div>
+          </div>
+          <div class="col-sm-5 align-right">
+            <a class="button purchase" ng-click="requestApp('workforce')" href="#">More information</a>
+            <a class="button go" ui-sref="workforce">Start App</a>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="row">
+          <div class="col-md-12">
+            <p class="intro">
+              Predict workforce supply and demand based on your own data and business scenarios.
+              Identify competency gaps and build action plans for sourcing and development.
+            </p>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-lg-6">
+            <a ng-click='goIfAuthorized("workforce.summary")'>
+              <div class="feature">
+                <b>Summary</b>
+                <p>
+                  Predict your available workforce in the future and contrast this with the business
+                  needs.
+                </p>
+              </div>
+            </a>
+          </div>
+          <div class="col-lg-6">
+            <a ng-click='goIfAuthorized("workforce.supply")'>
+              <div class="feature">
+                <b>Supply</b>
+                <p>
+                  Explore the workforce supply in detailed segments, such as turnover, retirement and
+                  redeployment.
+                </p>
+              </div>
+            </a>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-lg-6">
+            <a ng-click='goIfAuthorized("workforce.demand")'>
+              <div class="feature">
+                <b>Demand</b>
+                <p>
+                  Build multiple workforce demand scenarios, based on the business needs. Aggregate
+                  these to organisation level.
+                </p>
+              </div>
+            </a>
+          </div>
+          <div class="col-lg-6">
+            <a ng-click='goIfAuthorized("workforce.interventions")'>
+              <div class="feature">
+                <b>Interventions</b>
+                <p>
+                  Algorithms calculate interventions to close the gap between supply and demand.
+                </p>
+              </div>
+            </a>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-12">
+            <p>
+              Improve your workforce flow by understanding and optimising succession planning, with
+              <a class="link" ng-click="goIfAuthorized('succession')">Crunchr succession</a>.
+            </p>
+          </div>
+        </div>
+      </div>
+
+
+
+
+
+
+
+
+
+      <div class="info succession">
+        <div class="row header">
+          <div class="col-sm-7">
+            <div class="logo succession"></div>
+          </div>
+          <div class="col-sm-5 align-right">
+            <a class="button purchase" ng-click='requestApp("succession");' href="#">More information</a>
+            <a class="button go" ui-sref="succession">Start App</a>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="row">
+          <div class="col-md-12">
+            <p class="intro">
+              Improve the succession strength and quality by understanding people flows within your
+              organisation. Ensure a strong leadership pipeline through dynamic and interactive
+              succession reporting.
+            </p>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-lg-6">
+            <a ng-click='goIfAuthorized("succession.overview.summary")'>
+            <div class="feature">
+              <b>Overview</b>
+              <p>
+                Get an overview of the succession planning metrics and visualise the succession
+                network.
+              </p>
+            </div>
+            </a>
+          </div>
+          <div class="col-lg-6">
+            <a ng-click='goIfAuthorized("succession.risk.positions")'>
+            <div class="feature">
+              <b>Risk</b>
+              <p>
+                Understand the true strength of the succession bench and identify risks and
+                weaknesses.
+              </p>
+            </div>
+            </a>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-lg-6">
+          <a ng-click='goIfAuthorized("succession.quality.flow")'>
+            <div class="feature">
+              <b>Quality</b>
+              <p>
+                Visualise the succession flows and understand how it contributes to a strong
+                leadership pipeline.
+              </p>
+            </div>
+          </a>
+          </div>
+          <div class="col-lg-6">
+          <a ng-click='goIfAuthorized("succession.powerreport")'>
+            <div class="feature">
+              <b>Power Report</b>
+              <p>
+                Build any customised report on succession bench metrics.
+              </p>
+            </div>
+          </a>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-12">
+            <p>
+              Monitor individual career development and identify new succession candidates by using
+              <a class="link" ng-click="goIfAuthorized('talent')">Crunchr talent</a>.
+            </p>
+          </div>
+        </div>
+      </div>
+
+
+
+
+
+
+
+
+
+      <div class="info talent">
+        <div class="row header">
+          <div class="col-sm-7">
+            <div class="logo talent"></div>
+          </div>
+          <div class="col-sm-5 align-right">
+            <a class="button purchase" ng-click='requestApp("talent");' href="#">More information</a>
+            <a class="button go" ui-sref="talent">Start App</a>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="row">
+          <div class="col-md-12">
+            <p class="intro">
+              Create oversight of the talent pipeline and identify the talent features that apply
+              within your organisation. Find hidden talent or talent at risk and gain insight in the
+              individual talent profiles.
+            </p>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-lg-6">
+          <a ng-click='goIfAuthorized("talent.summary")'>
+            <div class="feature">
+              <b>Overview</b>
+              <p>
+                Understand characteristics of your talent and find out how they perform.
+              </p>
+            </div>
+          </a>
+          </div>
+          <div class="col-lg-6">
+            <a ng-click='goIfAuthorized("talent.distribution.location")'>
+            <div class="feature">
+              <b>Distribution</b>
+              <p>
+                Show where your talents reside in the organisation and compare for internal
+                reference.
+              </p>
+            </div>
+            </a>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-lg-6">
+          <a ng-click='goIfAuthorized("talent.exploration.risk")'>
+            <div class="feature">
+              <b>Exploration</b>
+              <p>
+                Find unidentified talent, report talents at risk and view individual talent
+                profiles.
+              </p>
+            </div>
+          </a>
+          </div>
+          <div class="col-lg-6">
+          <a ng-click='goIfAuthorized("talent.powerreport")'>
+            <div class="feature">
+              <b>Power Report</b>
+              <p>
+                Build any customised report on talent distributions and overviews.
+              </p>
+            </div>
+          </a>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-12">
+            <p>
+              To understand what drives your talent and workforce, use
+              <a class="link" ng-click="goIfAuthorized('preference')">Crunchr preference</a> to optimise the company
+              value proposition.
+            </p>
+          </div>
+        </div>
+      </div>
+
+
+
+
+
+
+
+
+
+      <div class="info preference">
+        <div class="row header">
+          <div class="col-sm-7">
+            <div class="logo preference"></div>
+          </div>
+          <div class="col-sm-5 align-right">
+            <a class="button purchase" ng-click="requestApp('preference')" href="#">More information</a>
+            <a class="button go" ui-sref="preference">Start App</a>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="row">
+          <div class="col-md-12">
+            <p class="intro">
+              Launch a employee preference scan and use the results to create an unique and
+              effective employer brand. The build-in algorithms optimise the employee value
+              proposition for different groups of employees. Explore our market research to
+              understand what future employees want.
+            </p>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-lg-6">
+            <a ng-click='goIfAuthorized("preference.surveys")'>
+              <div class="feature">
+                <b>Surveys</b>
+                <p>
+                  Launch a preference scan with your employees or explore ready-to-use market
+                  research.
+                </p>
+              </div>
+            </a>
+          </div>
+          <div class="col-lg-6">
+            <a ng-click='goIfAuthorized("preference.participation")'>
+              <div class="feature">
+                <b>Participation</b>
+                <p>
+                  Monitor real-time the participation statistics and profiles of the preference scan
+                  participants.
+                </p>
+              </div>
+            </a>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-lg-6">
+            <a ng-click='goIfAuthorized("preference.preference")'>
+              <div class="feature">
+                <b>Preference</b>
+                <p>
+                  Explore the preferences of the average employee or zoom in on specific sub-groups
+                  and preference areas.
+                </p>
+              </div>
+            </a>
+          </div>
+          <div class="col-lg-6">
+            <a ng-click='goIfAuthorized("preference.scenarios")'>
+              <div class="feature">
+                <b>Scenarios</b>
+                <p>
+                  Design new scenarios and predict how employees respond to changing labour
+                  conditions.
+                </p>
+              </div>
+            </a>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-12">
+            <p>
+              Compare how employees appreciate the total rewards proposition and the cost to the
+              organisation with <a class="link" ng-click="goIfAuthorized('reward')">Crunchr reward</a>.
+            </p>
+          </div>
+        </div>
+      </div>
+
+
+
+
+
+
+
+
+
+      <div class="info reward">
+        <div class="row header">
+          <div class="col-sm-7">
+            <div class="logo reward"></div>
+          </div>
+          <div class="col-sm-5 align-right">
+            <a class="button purchase" ng-click='requestApp("reward");' ref="#">More information</a>
+            <a class="button go" href="#">Start App</a>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="row">
+          <div class="col-md-12">
+            <p class="intro">
+              Model the cost of the total reward proposition and predict workforce budgets.
+              Virtually all elements, ranging from pension benefits, variable pay, to learning
+              budgets can be modelled and compared in scenarios.
+            </h3>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-lg-6">
+            <a ng-click='goIfAuthorized("reward.overview")'>
+              <div class="feature">
+                <b>Overview</b>
+                <p>
+                  View the cost of total reward packages and a breakdown by reward element.
+                </p>
+              </div>
+            </a>
+          </div>
+          <div class="col-lg-6">
+            <a ng-click='goIfAuthorized("reward.scenarios")'>
+              <div class="feature">
+                <b>Scenarios</b>
+                <p>
+                  Build your own scenarios and assess the impact on future workforce budgets.
+                </p>
+              </div>
+            </a>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-lg-6">
+            <a ng-click='goIfAuthorized("reward.modeler")'>
+              <div class="feature">
+                <b>Modeler</b>
+                <p>
+                  Build a customised total reward proposition with a simple wizard or select from our
+                  library.
+                </p>
+              </div>
+            </a>
+          </div>
+          <div class="col-lg-6">
+            <a ng-click='goIfAuthorized("reward.powerreport")'>
+              <div class="feature">
+                <b>Power Report</b>
+                <p>
+                  Build any customised report on reward cost and segment by element and group of
+                  employees.
+                </p>
+              </div>
+            </a>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-12">
+            <p>
+              To assess how much workforce budget can be unlocked by making your organisation more
+              efficient, add <a class="link" ng-click="goIfAuthorized('organisation')">Crunchr organisation</a>, or add <a
+              class="link" ng-click="goIfAuthorized('preference')">Crunchr preference</a> to understand employee
+              appreciation for reward elements.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="popup">
+  <div class="content">
+    <div class="container">
+    <div class="row">
+      <div class="col-xs-8 col-xs-offset-2">
+        <div class="window">
+          <div class="row">
+            <div class="col-xs-1 col-xs-offset-11">
+              <a href="#" class="closePopup">
+                <ng-include 
+                  src="'/static/kapstok/logos/close.svg'"
+                  class="fo-close">
+                </ng-include>
+              </a>
+
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-xs-12">
+              <h3>You have no subscription to this application</h3>
+              <p>We are happy to schedule a demo and answer your questions. <br/>
+              You can also visit our website for examples, features and pricing.</p>
+              <br/>
+              <div ng-show="successfullyRequestedDemo()">
+                <p>The Crunchr team will contact you soon.</p>
+              </div>
+              <div class="row">
+                <div class='col-xs-4 col-xs-offset-2'>
+                  <a href="#" ng-click="requestDemo()"
+                  ng-class="{'disabled':successfullyRequestedDemo()}" class="button">Request demo</a>
+                </div>
+                <div class='col-xs-4'>
+                  <a target='_blank' href="{{commercialSite.url}}#{{requestedApp}}" class="button
+                    closePopup">visit website</a>
+                </div>
+              </div>
+            </div>
+          </div>
+          <br/>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,405 @@
+\documentclass{beamer}
+
+
+\usetheme{Madrid}
+\usecolortheme{focusorange}
+\usepackage{multicol}
+\usepackage{amsmath}
+
+\usepackage{textpos}
+
+\begin{document}
+
+\title{Detecting Interesting Outliers}
+\subtitle{An Active Learning Approach}
+\author{Floris den Hengst} 
+\institute[short]{Mark Hoogendoorn \\ Vrije Universiteit Amsterdam \\ $ $ \\ Dirk Jonker \\ Focus Orange}
+\date{July 13, 2015} 
+
+\titlegraphic{
+  \includegraphics[height=1.5cm,keepaspectratio]{../logos/foLogo.png}\hspace*{4cm}~
+  \includegraphics[width=2cm,keepaspectratio]{../logos/vuLogo.png}
+}
+
+\begin{frame}
+\maketitle
+\end{frame}
+
+%\addtobeamertemplate{frametitle}{}{%
+%\begin{textblock*}{100mm}(.70\textwidth,-1cm)
+%\includegraphics[height=1cm]{../logos/vuLogo.png}
+%\includegraphics[height=1cm]{../logos/foLogo.png}
+%\end{textblock*}}
+\setbeamercovered{transparent}
+\setbeamertemplate{itemize items}[square]
+\setbeamertemplate{sections/subsections in toc}[square]
+\setbeamertemplate{enumerate items}[square]
+
+\AtBeginSection[]
+{
+  \begin{frame}<beamer>
+    \frametitle{Are we there yet?}
+    \tableofcontents[currentsection]
+  \end{frame}
+}
+
+
+\logo{
+  \makebox[0.95\textwidth]{
+    \hfill
+    \includegraphics[height=0.7cm,keepaspectratio]{../logos/foLogo.png}%
+    \ \
+    \includegraphics[width=0.9cm,keepaspectratio]{../logos/vuLogo.png}%
+  }
+}
+
+\frame{
+  \frametitle{Overview}
+  \tableofcontents
+} 
+
+\section{Introduction}
+  \subsection{Scientific Background}
+  %TODO: more strong motivation
+  %      - growth in available data?
+  %      - state more clearly why outliers are interesting
+  %      - state more clearly why difference between noise and outliers is interesting
+  %        - in atrophysics
+  %        - medical domain
+  \frame{
+    \frametitle{Scientific Context}
+    \begin{columns}
+      \column[t]{.5\textwidth}
+        Historically:
+        \begin{itemize}
+          \item Statistics
+          \item Improve quality of analysis (i.e. remove measurement errors)
+          \item Typically low-dimensional data
+          \item Underlying distribution usually known
+        \end{itemize}
+      \pause
+      \column[t]{.5\textwidth}
+        Recently:
+        \begin{itemize}
+          \item ML, Data Mining, KDD
+          \item Fraud detection \cite{phua2010comprehensive},
+                finding brain tumours \cite{prastawa2004brain},
+                intrusion detection \cite{portnoy2001intrusion}
+          \item Up to thousands of features
+          \item Limited knowledge on data
+       
+       \end{itemize}
+    \end{columns}
+  }
+
+  \subsection{Business Context}
+  \frame{
+    \frametitle{`Crunchr': an HR Analytics Framework}
+    Focus Orange recently launched HR analytics platform `Crunchr'
+    \vspace{1cm}
+    \begin{columns}
+      \column{.6\textwidth}
+        Process HR data to provide insights in
+        \begin{itemize}
+          \item future workforce needs
+          \item weak succession plans
+          \item organisational weaknesses
+          \item location and movement of talents
+        \end{itemize}
+        for large organisations ($> 1000$ employees)
+      \column{.4\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{imgs/workforce.png}
+    \end{columns}
+  }
+
+  \frame{
+    \frametitle{ETL Pipeline}
+    \includegraphics[width=\textwidth]{imgs/process_flow.pdf}
+  }
+
+  \frame{
+    \frametitle{ETL Pipeline}
+    \includegraphics[width=\textwidth]{imgs/process_flow_marked.pdf}
+  }
+
+  \frame{
+    \frametitle{Interesting Outliers}
+    Observation: not all outliers are `interesting'
+    \pause
+    \begin{itemize}
+      \item Only one employee born in Lutjebroek (HR)
+      \pause
+      \item Passing satellites cause uncommon patterns (astrophysics) \cite{pelleg2004active}
+      \pause
+      \item System failure causes an abrupt end of a network connection (intrusion detection) \
+    \end{itemize}
+    \vspace{1cm}
+    \pause
+    In practice, what is `interesting' might even depend on:
+    \begin{itemize}
+      \item characteristics of data point
+      \item interests of expert
+      \item future usage of data
+    \end{itemize}
+  }
+
+  \subsection{Problem Statement}
+  \frame{
+    \frametitle{Research Question}
+    Main questions:
+    \begin{enumerate}
+      \item How can we efficiently detect outliers without \emph{a priori} knowledge?
+      \item How can we separate \emph{noise} from \emph{anomalies} among outliers?
+    \end{enumerate}
+    \vspace{1cm}
+    \pause
+    \small Context:
+    \begin{itemize}
+      \item \small No class labels present 
+      \item \small Both normal points, noise and anomalies are present
+      \item \small Numerical data only
+      \item \small 1000 -- 10000 points
+      %TODO: around -> ~
+      \item \small around 15 features
+      \item \small expert is available to provide hints
+    \end{itemize}
+  }
+
+%TODO: insert overzicht
+\section{Related work} 
+ \subsection{Outlier Detection Models}
+  \frame{
+    \frametitle{Probabilistic}
+    \begin{columns}
+      \column{0.6\textwidth}
+      \begin{itemize}
+        \item Set of data points
+        \item Assumed underlying distribution
+      \end{itemize}
+      \vspace{1cm}
+      \begin{itemize}
+        \pause
+        \item Probability function gives likelihood for each value
+        \pause
+        \item Flag points that have a low likelihood
+      \end{itemize}
+      \column{0.4\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{imgs/normal_distribution.jpg}
+    \end{columns}
+    \vspace{.8cm}
+    \pause
+    \begin{block}{Probabilistic model}
+    Value is unlikely given some \emph{distribution}
+    \end{block}
+  }
+
+  \frame{
+    \frametitle{Extreme Value-based}
+    \begin{columns}
+      \column{0.4\textwidth}
+      \includegraphics[width=.8\textwidth]{imgs/convex_hull_contours.png}
+
+      \column{0.6\textwidth}
+      \begin{itemize}
+        \item Set of data points
+      \end{itemize}
+      \vspace{1cm}
+      \begin{itemize}
+        \pause
+        \item Values with high or low values are outliers
+      \end{itemize}
+    \end{columns}
+    \pause
+    \vspace{.8cm}
+    \begin{block}{Extreme Value Model}
+    Value is unlikely if it is at the \emph{edge} of data set
+    \end{block}
+  }
+  \frame{
+    \frametitle{Subspace-based}
+    \begin{columns}
+      \column{0.6\textwidth}
+      \begin{itemize}
+        \item Set of data points
+      \end{itemize}
+      \pause
+      \vspace{.3cm}
+      \begin{itemize}
+        \item Express features in terms of other features
+        \pause
+        \item Results in lower dimensionality
+        \pause
+        \item Per-point error (or \emph{residue}) determines how well it fits global pattern
+        \pause
+        \item Apply one of previous methods to find outliers
+      \end{itemize}
+
+      \column{0.4\textwidth}
+      \includegraphics[width=\textwidth]{imgs/outlier_dimensionality_reduction.pdf}
+    \end{columns}
+    \vspace{.8cm}
+    \pause
+    \begin{block}{Subspace Model}
+      Map data to subspace and flag points that do not map well
+    \end{block}
+  }
+  \frame{
+    \frametitle{Proximity-based}
+    \begin{columns}
+      \column{0.4\textwidth}
+      \includegraphics[width=\textwidth]{imgs/clusters.png}
+
+      \column{0.6\textwidth}
+      \begin{itemize}
+        \item Set of data points
+      \end{itemize}
+      \pause
+      \vspace{.1cm}
+      \begin{itemize}
+        \item Outliers lie \emph{far} from other points
+        \pause
+        \item Calculate distances between points using some distance function
+        \pause
+        \item Outliers are data points
+        \begin{itemize}
+          \item in sparse regions, or
+          \item with far-away neighbours
+        \end{itemize}
+      \end{itemize}
+
+    \end{columns}
+    \vspace{.4cm}
+    \pause
+    \begin{block}{Proximity Model}
+      Outliers are data points that located fartest from other points
+    \end{block}
+  }
+
+  \subsection{Machine Learning in Outlier Detection}
+    \begin{frame}<beamer>
+      \frametitle{Are we there yet?}
+      \tableofcontents[currentsubsection]
+    \end{frame}
+    \frame{
+      \frametitle{Why existing ML methods don't cut it}
+      \begin{itemize}
+      \item Unsupervised methods can't model interestingness \\
+      \small this requires external input
+      \item Supervised methods require class labels \\
+      \small these are not available
+      \pause
+      \item Active Learning methods are barely available
+        \begin{itemize}
+          \item A method in \cite{pelleg2004active} has strong assumptions
+          \pause
+          \item A method in \cite{zhu2011outlier} employs active learning to
+          determine which level of outlieryness is `interesting'
+        \end{itemize}
+      \end{itemize}
+      \pause
+      \vspace{1cm}
+      \begin{block}{Solution}
+      Combine unsupervised method (discovery) with supervised
+      method (classification)
+      \end{block}
+    }
+
+    \frame{
+      \frametitle{Local Outlier Factor}
+      Local Outlier Factor is an unsupervised distance-based method \cite{breunig2000lof}
+      \begin{itemize}
+      \pause
+      \item $D^k_{i}$, the \emph{distance} of point $i$ to its $k$th nearest neighbour
+      \pause
+      \item $R^k(i, j) = max(dist(i,j), D^k_{j})$, the \emph{reachability} of $i$ from $j$
+      \pause
+      \item $L^k_{i}$, the \emph{locality} of point $i$, i.e. the set of points within $D^k_{i}$ of $i$
+      \pause
+      \end{itemize}
+      \begin{block}{Local Reachability Distance}
+        \[ lrd(i) = 1 / \bigg( \frac{ \sum_{\ell \in L^k_{i}}{R^k(i,\ell)}}{|L^k_{i}|} \bigg) \]
+      \end{block}
+      \pause
+      \begin{block}{Local Outlier Factor}
+        \[ LOF_k(i) = \bigg( \frac{\sum_{\ell \in L^k_{i}} lrd(\ell)}{|L_k(i)|} \bigg) / lrd(i) \]
+      \end{block}
+    }
+    
+    \frame{
+      \frametitle{Support Vector Machines}
+      Support Vector Machines (SVM) solve 2-classification problems
+      \begin{columns}
+        \column{.5\textwidth}
+          \begin{itemize}
+            \item Finds \emph{separating hyperplane} between two classes
+            \pause
+            \item Use \emph{kernel} to create nonlinear boundary
+          \end{itemize}
+        \column{.4\textwidth}
+          \centering
+          \includegraphics[width=.6\textwidth]{imgs/linear_svm.png}
+          \\
+          \includegraphics[width=1.1\textwidth]{imgs/nonlinear_svm.png}
+      \end{columns}
+    }
+
+\section{Methodology}
+  \frame{
+    \frametitle{Establishing Ground Truth}
+    Research questions:
+    \begin{enumerate}
+      \item How can we efficiently detect outliers without \emph{a priori} knowledge?
+        \begin{itemize}
+          \item 2 annotated real-life HR data sets
+          \item 2 `well known' data set from UCI Machine Learning repository
+        \end{itemize}
+      \item How can we separate \emph{noise} from \emph{anomalies} among outliers?
+        \begin{itemize}
+          \item 2 annotated real-life HR data sets
+        \end{itemize}
+    \end{enumerate}
+  }
+
+  \frame{
+    \frametitle{Precision vs. Recall}
+    We will look at the trade-off between \emph{Precision} and \emph{Recall}:
+    \vspace{0.5cm}
+    \begin{columns}
+      \column{0.5\textwidth}
+      \[ Precision = \frac{True \: Positives}{Predicted \: Positives} \]
+      \column{0.5\textwidth}
+      \[ Recall = \frac{False \: Positives}{Actual \: Positives} \]
+    \end{columns}
+    \vspace{.8cm}
+    We want a lot of \emph{Recall}, while keeping a lid on the paid \emph{Precision}
+    \vspace{.6cm} \\
+    These are relevant, since we expect a human to go over the first couple of
+    results anyhow.
+
+    \begin{block}{F1-score: Precision and Recall combined}
+    \[ F_1 = 2 * \frac{ Precision * Recall}{ Precision + Recall} \]
+    \end{block}
+  }
+
+  \frame{
+    \frametitle{Other metrics}
+    \begin{description}
+      \item[parameters] Use parameters with highest F1 score through simple grid search
+      \item[learning] plot the F1 score against the number of hints get \emph{learning curve}
+      \item[runtime] measure runtimes of \emph{interactive phase} of method
+      given different numbers of rows and features
+    \end{description}
+  }
+  
+\section{Questions}
+  \frame{
+    \frametitle{Questions?}
+    \bibliographystyle{plain}
+    \tiny \bibliography{presentation}
+  }
+
+\end{document}
+
+

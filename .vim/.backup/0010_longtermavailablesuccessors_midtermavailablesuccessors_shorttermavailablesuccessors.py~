@@ -1,0 +1,63 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models, migrations
+import os
+
+def get_file(file_name):
+  f = open(os.path.join(os.path.dirname(__file__), file_name))
+  query = f.read()
+  return query
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('database', '0009_add_ceo_data'),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='LongTermAvailableSuccessors',
+            fields=[
+                ('id', models.IntegerField(primary_key=True, serialize=False)),
+                ('title', models.CharField(max_length=200)),
+                ('effective', models.FloatField()),
+            ],
+            options={
+                'managed': False,
+                'db_table': 'view_longtermavailablesuccessors',
+            },
+            bases=(models.Model,),
+        ),
+        migrations.CreateModel(
+            name='MidTermAvailableSuccessors',
+            fields=[
+                ('id', models.IntegerField(primary_key=True, serialize=False)),
+                ('title', models.CharField(max_length=200)),
+                ('effective', models.FloatField()),
+            ],
+            options={
+                'managed': False,
+                'db_table': 'view_midtermavailablesuccessors',
+            },
+            bases=(models.Model,),
+        ),
+        migrations.CreateModel(
+            name='ShortTermAvailableSuccessors',
+            fields=[
+                ('id', models.IntegerField(primary_key=True, serialize=False)),
+                ('title', models.CharField(max_length=200)),
+                ('effective', models.FloatField()),
+            ],
+            options={
+                'managed': False,
+                'db_table': 'view_shorttermavailablesuccessors',
+            },
+            bases=(models.Model,),
+        ),
+
+        migrations.RunSQL(get_file("0010_view_longtermavailablesuccessors_midtermavailablesuccessors_shorttermavailablesuccessors.sql"),
+                         "DROP VIEW IF EXISTS view_shorttermavailablesuccessors, view_midtermavailablesuccessors, view_longtermavailablesuccessors"),
+
+    ]

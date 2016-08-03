@@ -1,0 +1,80 @@
+<?php
+class clients extends controller{
+
+  function __construct(){
+    parent::__construct();
+    $this->_list_tpl = TEMPLATE_ROOT . 'management/clients.tpl';
+    $this->_edit_tpl = TEMPLATE_ROOT . 'management/edit-client.tpl';
+    $this->_create_tpl = TEMPLATE_ROOT . 'management/create-client.tpl';
+  }
+
+  function POST($id){
+    $this->_matches = $id;
+    global $_SESSION;
+    $this->_matches = $id;
+
+    if(count($id) > 2){
+      $newClient= $id[2] == "new";
+      $client= Client::fromData(NULL, $_POST['group'], $_POST['label']);
+      if(!$newClient){
+        // an id was provided. We're updating the given id.
+        $client->id = $id[2];
+        $id = $client->update($this->_db);
+      } else {
+        $id = $client->create($this->_db);
+      }
+      $this->all($id);
+    } else {
+      // no id was provided. Which client are we trying to update??
+      // TODO: this might have to result in creating a new client 
+      throw new Exception('Tried to alter client presentation without providing ID');
+    }
+  }
+
+  function create(){
+    print_r($this->_ANYONE_CAN_EDIT);
+    if($this->_ANYONE_CAN_EDIT || $this->_user['is_superuser']){
+      $groups = Group::get_dropdown_options($this->_db, $this->_user);
+      $data = array(
+        'groups'        => $groups,
+      );
+      parent::output($this->_create_tpl, $data);
+    }else{
+      $this->_response_not_authorized(
+        "Not authorized",
+        "You do not have authorization to perform this action"
+      );
+    }
+  }
+
+  function edit($id){
+    $groups = Group::get_dropdown_options($this->_db, $this->_user);
+    $client = Client::get_auth_assoc($this->_db, $id, $this->_user);
+    if($client == NULL){
+      $this->_response_not_authorized(
+        'Oops',
+        "Couldn't find Client with id '$id'"
+      );
+    }
+    $data = array(
+      'client'        => $client,
+      'groups'        => $groups,
+    );
+    parent::output($this->_edit_tpl, $data);
+  }
+
+  function delete($id){
+    $result = Client::delete($this->_db, $id);
+    $this->all($this->_db);
+  }
+
+  function all($highlightId=FALSE){
+    $data = array(
+      'clients'       => Client::get_all_auth_assoc($this->_db, $this->_user),
+      'highlight_id'  => $highlightId,
+      'user'          => $this->_user
+    );
+    parent::output($this->_list_tpl, $data);
+  }
+}
+?>

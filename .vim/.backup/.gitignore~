@@ -1,0 +1,7 @@
+.~lock*
+php/Dwoo/lib/compiled/**
+php/Dwoo/lib/compiled/**.*php
+*~
+*.swp
+*.swo
+

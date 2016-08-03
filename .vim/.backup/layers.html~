@@ -1,0 +1,344 @@
+<fo-message>
+  Have you ever played that game that one person whispers a message in someone’s ear, who then
+  whispers it to the next person and so on? The more people involved, the more difficult to
+  keep the original message intact. This section shows the number of reporting layers within
+  your organization. It also includes a line or stack graph on the distribution per reporting
+  level as well as the cumulative distribution of your workforce. At the bottom of the page,
+  you will see the maximum distance between your CEO and the lowest reporting level.
+</fo-message>
+
+<!-- Profile lightbox -->
+<fo-profile-lightbox id="{{positionID}}" show="profileLightBoxIsVisble"
+      position-details="positionDetails"
+      callback="profileLightBoxCallback(layerLevel, id)"
+      close-callback="profileLightBoxCloseCallback()"></fo-profile-lightbox>
+
+<div class="row">
+  <div class="col-xs-12">
+    <h1>Reporting Layers</h1>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-xs-12">
+    <div class="content-divider" />
+  </div>
+</div>
+
+<div class="row" />
+
+<!-- Reporting layers -->
+<div class="row">
+  <div class="col-xs-offset-1 col-xs-3">
+    <fo-stat
+        label="'Layers'"
+        value="numLayerLevels">
+      <fo-loading ready="$parent.$parent.ready"></fo-loading>
+    </fo-stat>
+  </div>
+
+  <div class="col-xs-7">
+    <div class="textbox">
+      The tile on the left shows the number of layers within your organization. This is just a
+      figure, below you will see distributions across your workforce. Use the filter on the left
+      to look at different organization perspectives and the learn function on the right to create
+      some insight in what you see.
+    </div>
+  </div>
+</div>
+
+<div class="row" />
+
+<div class="row">
+  <div class="col-xs-12">
+    <div class="content-divider" />
+  </div>
+</div>
+
+<!-- FTE per layer -->
+<fo-include data="/api/organisation/structure/layers/fte"
+                      post-parms="FTE.compareSendData">
+  <div class="row">
+    <div class="col-xs-12">
+      <h2>FTE per layer</h2>
+    </div>
+  </div>
+
+  <div class="row overflowable">
+
+    <!-- Compare options -->
+    <div class="col-xs-11 col-xs-push-1 compare-row">
+      <div class="col-xs-3 compare-options group-by" ng-show="FTE.isVisible">
+        GROUP BY
+
+        <fo-multi-select
+            name="fte-attrib"
+            value="attribLabels"
+            ng-model="FTE.compareData.selectedAttrib"
+            input-data-ready="FTE.inputDataReady"
+            single-mode="true"
+            overlay-checkbox="true"
+            show-search-box="false"
+            close-on-click="true">
+        </fo-multi-select>
+      </div>
+
+      <div class="col-xs-5 col-xs-push-3 compare-options" ng-show="FTE.isVisible">
+        <div class="row">
+          <div class="col-xs-12">
+            COMPARE {{attribLabels[FTE.compareData.selectedAttrib[0]].name | uppercase }}
+          </div>
+        </div>
+        <div class="row overflowable">
+          <div class="col-xs-6">
+            <fo-multi-select
+                name="fte-attribValues1"
+                label="Selection 1"
+                value="FTE.compareData.attribValues"
+                ng-model="FTE.compareData.selectedAttribValues[0]"
+                input-data-ready="FTE.inputDataReady"
+                overlay-checkbox="true"
+                show-search-box="FTE.compareData.showAttribValuesSearchBox">
+            </fo-multi-select>
+          </div>
+          <div class="col-xs-6">
+            <fo-multi-select
+                name="fte-attribValues2"
+                label="Selection 2"
+                value="FTE.compareData.attribValues"
+                ng-model="FTE.compareData.selectedAttribValues[1]"
+                input-data-ready="FTE.inputDataReady"
+                overlay-checkbox="true"
+                show-search-box="FTE.compareData.showAttribValuesSearchBox">
+            </fo-multi-select>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xs-4 right">
+          <div class="col-xs-12">
+            TYPE OF GRAPH
+          </div>
+          <div class="col-xs-3 graph-picker-min-width" ng-click="barFte=false">
+            <ng-include src="'/static/kapstok/logos/graph.svg'"
+                class="graph-picker" ng-class="{'clicked': !barFte}"></ng-include>
+          </div >
+          <div class="col-xs-3 graph-picker-min-width" ng-click="barFte=true">
+            <ng-include src="'/static/kapstok/logos/bar_graph.svg'"
+                class="graph-picker" ng-class="{'clicked': barFte}"></ng-include>
+          </div>
+      </div>
+    </div>
+
+    <!-- Line/Bar chart -->
+    <div class="col-xs-8 col-xs-offset-1">
+      <div class="chart-container">
+        <fo-google-line
+              ng-show="!barFte"
+              data="$parent.dataTables[0]"
+              xtitle="Layer"
+              ytitle="Fte">
+        </fo-google-line>
+        <fo-google-bar
+              ng-show="barFte"
+              data="$parent.dataTables[0]"
+              xtitle="Layer"
+              ytitle="Fte">
+        </fo-google-bar>
+      </div>
+      <div><fo-loading ready="$parent.$parent.ready"></fo-loading></div>
+    </div>
+
+    <div class="col-xs-1 col-xs-offset-2">
+      <div class="graph-options">
+        <ul>
+          <fo-learn-widget></fo-learn-widget>
+          </li>
+          <li class="dividerLine"  ng-class="{'selected': compareFte}" ng-click="FTE.toggleCompare()">
+            <ng-include src="'/static/kapstok/logos/compare.svg'"></ng-include>COMPARE
+          </li>
+          <!--
+          <li><ng-include src="'/static/kapstok/logos/export.svg'"></ng-include>EXPORT</li>
+          <li><a href="#/organisation?page=powerreport">
+            <ng-include src="'/static/kapstok/logos/power report.svg'"></ng-include>POWER REPORT
+          </a></li>
+          -->
+        </ul>
+      </div>
+    </div>
+    <div class="col-xs-11 col-xs-push-1 compare-row compare-legend">
+      <div class="col-xs-2 col-xs-offset-2" ng-show="FTE.isVisible">
+        <ng-include class="selection-1" src="'/static/kapstok/logos/square.svg'"></ng-include> selection 1
+      </div>
+      <div class="col-xs-2" ng-show="FTE.isVisible">
+        <ng-include class="selection-2" src="'/static/kapstok/logos/square.svg'"></ng-include> selection 2
+      </div>
+    </div>
+  </div>
+  
+  <div class="row">
+    <div class="col-xs-12">
+      <div class="content-divider" />
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-xs-12">
+      <h2>Cumulative FTE over all layers</h2>
+    </div>
+  </div>
+
+  <div class="row overflowable">
+
+    <!-- Compare options -->
+    <div class="col-xs-11 col-xs-push-1 compare-row">
+
+      <div class="col-xs-3 compare-options group-by" ng-show="FTE.isVisible">
+        GROUP BY
+
+        <fo-multi-select
+            name="cumul-attrib"
+            value="attribLabels"
+            ng-model="FTE.compareData.selectedAttrib"
+            input-data-ready="FTE.inputDataReady"
+            single-mode="true"
+            overlay-checkbox="true"
+            show-search-box="false"
+            close-on-click="true">
+        </fo-multi-select>
+      </div>
+
+      <div class="col-xs-5 col-xs-push-3 compare-options" ng-show="FTE.isVisible">
+        <div class="row">
+          <div class="col-xs-12">
+            COMPARE {{attribLabels[FTE.compareData.selectedAttrib[0]].name | uppercase }}
+          </div>
+        </div>
+        <div class="row overflowable">
+          <div class="col-xs-6">
+            <fo-multi-select
+                name="cumul-attribValues1"
+                label="Selection 1"
+                value="FTE.compareData.attribValues"
+                ng-model="FTE.compareData.selectedAttribValues[0]"
+                input-data-ready="FTE.inputDataReady"
+                overlay-checkbox="true"
+                show-search-box="FTE.compareData.showAttribValuesSearchBox">
+            </fo-multi-select>
+          </div>
+          <div class="col-xs-6">
+            <fo-multi-select
+                name="cumul-attribValues2"
+                label="Selection 2"
+                value="FTE.compareData.attribValues"
+                ng-model="FTE.compareData.selectedAttribValues[1]"
+                input-data-ready="FTE.inputDataReady"
+                overlay-checkbox="true"
+                show-search-box=FTE.compareData.showAttribValuesSearchBox>
+            </fo-multi-select>
+          </div>
+        </div>
+      </div>
+
+
+    </div>
+  </div>
+
+  <div class="row">
+
+    <!-- Cumulative area chart -->
+    <div class="col-xs-7 col-xs-offset-1">
+      <div class="chart-container">
+        <fo-google-area
+            data="$parent.dataTables[1]"
+            xtitle="Layer"
+            ytitle="Cumulative FTE percentage">
+        </fo-google-area>
+    </div>
+      <div><fo-loading ready="$parent.$parent.ready"></fo-loading></div>
+    </div>
+
+    <div class="col-xs-1 col-xs-push-3">
+      <div class="graph-options lower">
+        <ul>
+          <fo-learn-widget></fo-learn-widget>
+          <li class="dividerLine"  ng-class="{'selected': compareFte}" ng-click="FTE.toggleCompare()">
+            <ng-include src="'/static/kapstok/logos/compare.svg'"></ng-include>COMPARE
+          </li>
+          <!--
+          <li><ng-include src="'/static/kapstok/logos/export.svg'"></ng-include>EXPORT</li>
+          <li><a href="#/organisation?page=powerreport">
+            <ng-include src="'/static/kapstok/logos/power report.svg'"></ng-include>POWER REPORT
+          </a></li>
+          -->
+        </ul>
+      </div>
+    </div>
+    <div class="col-xs-11 col-xs-push-1 compare-row compare-legend">
+      <div class="col-xs-2 col-xs-offset-2" ng-show="FTE.isVisible">
+        <ng-include class="selection-1" src="'/static/kapstok/logos/square.svg'"></ng-include> selection 1
+      </div>
+      <div class="col-xs-2" ng-show="FTE.isVisible">
+        <ng-include class="selection-2" src="'/static/kapstok/logos/square.svg'"></ng-include> selection 2
+      </div>
+    </div>
+  </div>
+
+</fo-include>
+
+<div class="row" />
+
+<!-- Maximal reporting path -->
+<div id="max-reporting-path" class="content-divider" />
+
+<div class="row">
+  <div class="col-xs-12">
+    <h2>Maximal reporting path</h2>
+  </div>
+</div>
+
+<!-- Search box -->
+<div class="row overflowable">
+  <div class="col-xs-12">
+    <div class="search-box-container">
+      <fo-search-box callback="setSelectedPosition(id, layer)"></fo-search-box>
+    </div>
+  </div>
+</div>
+
+<!-- People in path -->
+<div class="row same-height">
+  <div class="col-xs-offset-2 col-xs-6 structure-table">
+    <a href="#max-reporting-path">
+      <div class="right">
+          <div>
+            <div ng-repeat="p in maxReportingPath" ng-click="getPositionData(p['id'].v)">
+              <div class="textbox">
+                <span class="name">{{p['first-name'].v}} {{p['last-name'].v}}</span>
+                <h1>Layer: {{p['layer'].v}}</h1>
+                <div class="incentive">View profile</div>
+              </div>
+            </div>
+          </div>
+          <div><fo-loading ready="ready"></fo-loading></div>
+      </div>
+    </a>
+  </div>
+
+  <div class="col-xs-1 col-xs-push-3">
+    <div class="graph-options lower">
+      <ul>
+        <fo-learn-widget></fo-learn-widget>
+        <!--
+        <li><ng-include src="'/static/kapstok/logos/export.svg'"></ng-include>EXPORT</li>
+        <li><a href="#/organisation?page=powerreport">
+          <ng-include src="'/static/kapstok/logos/power report.svg'"></ng-include>POWER REPORT
+        </a></li>
+        -->
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Fake ui-view div for profile lightbox -->
+<div ui-view></div>

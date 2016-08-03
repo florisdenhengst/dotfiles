@@ -1,0 +1,26 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models, migrations
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('database', '0003_auto_20141128_1213'),
+    ]
+
+    operations = [
+        migrations.AlterField(
+            model_name='position',
+            name='business_unit',
+            field=models.ForeignKey(db_column='businessunit_id', to='database.BusinessUnit'),
+            preserve_default=True,
+        ),
+        migrations.AlterField(
+            model_name='position',
+            name='grade',
+            field=models.ForeignKey(null=True, to='database.Grade'),
+            preserve_default=True,
+        ),
+    ]

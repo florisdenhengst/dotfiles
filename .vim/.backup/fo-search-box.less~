@@ -1,0 +1,64 @@
+@profile-logo-size: 18px;
+.search-box-wrapper{
+  .right {
+    float: right !important;
+  }
+
+  svg{
+    width:@profile-logo-size;
+    height:@profile-logo-size;
+    margin: 0px 5px;
+  }
+
+  .search-box {
+    width: 100%;
+    border-radius: 15px;
+    padding: 3px 9px;
+    font-size: 13px;
+    border: 1px solid @organisation-green;
+    outline: none;
+
+    &.opened {
+      border-radius: 15px 15px 0 0;
+    }
+  }
+
+  .search-result{
+    b {
+      font-size: inherit;
+      color: inherit;
+      font-weight: @weight-bolder;
+    }
+    ol {
+      width: 100%;
+      padding: 10px 0px;
+      border-radius: 0 0 15px 15px;
+      background-color: white;
+      list-style-type: none;
+      overflow: hidden;
+    }
+    li {
+      color: black;
+      font-size: 13px;
+      font-weight: @weight-normal;
+      cursor: pointer;
+      padding: 0px;
+      border-bottom: 1px solid rgba(0,0,0,0.1);
+    }
+    .no-result {
+      cursor: default;
+      padding: 0px @profile-logo-size*2;
+    }
+    .no-result:hover {
+      background-color: inherit;
+    }
+  }
+  .overlay {
+    z-index: 5;
+    position: absolute !important;
+    right: 0;
+  }
+  .search-results, .search-result {
+    width:100%;
+  }
+}

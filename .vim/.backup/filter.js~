@@ -1,0 +1,387 @@
+(function() {
+
+var filter = angular.module('fo.filter', ['multi-select']);
+
+/**
+ * The FilterData service maintains the global state of the filter. Like any service, it is
+ * instantiated once at the start of the application. This instance is then shared between any
+ * function that injects FilterData. You can use it like this in your controller:
+ *
+ * myModule.controller('MyController', function($scope, FilterData) {
+ *   $scope.filter = FilterData;
+ *   // your templates now have access to e.g.: filter.isVisible() and filter.selections
+ *   
+ *   FilterData.toggle();
+ *   FilterData.reset('locations');
+ * })
+ */
+
+filter.service('FilterData', function($rootScope, $log, $http, $state) {
+  var self = this;
+  
+  this.selections = {
+      location: [],
+      function: [],
+      business: [],
+      jobTitle: [],
+      gender: [],
+      age: [20, 65],
+      talentStatus: [],
+      performanceStatus: [],
+      contractType: [],
+      employeeGrade: [],
+      positionGrade: [],
+      managers: "null",
+  };
+  
+  this.processedSelections = {};   // Selection that gets send in post request
+  
+  this.filterLabelMapping = {
+    "location": "location",
+    "function": "functional area",
+    "business": "business unit",
+    "jobTitle": "job title",
+    "gender": "gender",
+    "age": "age",
+    "talentStatus": "talent status",
+    "performanceStatus": "performance status",
+    "contractType": "contract type",
+    "employeeGrade": "grade (emp)",
+    "positionGrade": "grade (pos)",
+    "managers": "people managers",
+  };
+  
+  this._visible = false;
+  this._contentLoaded = false;
+  this.showMultiPositions = true;
+  this.multiPositionsEnabled = true; // TODO: Add css to multi pos button based on this boolean
+  
+  /**
+   * Returns whether the filter is shown in the sidebar.
+   */
+  
+  this.isVisible = function() {
+    return this._visible;
+  }
+
+  this.showFilterBar = function() {
+    if($state.current.name.indexOf(".") < 0){
+      return false;
+    }else{
+      return true;
+    }
+  } 
+
+  this.toggleMultiPositions = function() {
+    if(this.multiPositionsEnabled)
+      this.showMultiPositions = !this.showMultiPositions;
+  }
+  
+  this.enableMultiPositions = function() {
+    this.multiPositionsEnabled = true;
+  }
+  
+  this.disableMultiPositions = function() {
+    this.multiPositionsEnabled = false;
+    this.showMultiPositions = false;
+  }
+
+  /**
+   * Returns whether something is selected in a given filter. Used for determining whether to
+   * display a reset button. While the case of having everything selected is normalized to no
+   * selection in the application, we still return true here because it is very confusing to have
+   * two reset states. People expect a reset button to be able to clear all check marks.
+   * 
+   * @param {string} filterName the property name of the selection that should be checked
+   * @return {boolean} whether something is selected in filter filterName
+   */
+  
+  this.hasSelection = function(filterName) {
+    var filter = this.selections[filterName];
+    
+    switch(filterName) {
+      case "age":
+        return filter[0] != this.contents.age.min || filter[1] != this.contents.age.max;
+      
+      case "location":
+      case "function":
+      case "business":
+      case "gender":
+      case "jobTitle":
+      case "talentStatus":
+      case "contractType":
+      case "performanceStatus":
+      case "employeeGrade":
+      case "positionGrade":
+        return filter.length > 0;
+      case "managers":
+        return filter != "null";
+      case "multiPositions":
+        return true; //multipositions is always either true or false
+    
+      default:
+        $log.warn("filter.js: HasSelection not implemented for: " + filterName);
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Resets the given filter to its initial state
+   */
+  
+  this.reset = function(filterName) {
+    var filter = this.selections[filterName];
+    
+    switch(filterName) {
+      case "gender":
+        filter.splice(0, filter.length);
+        this.applyFilter();
+        break;
+      
+      case "age":
+        filter[0] = this.contents.age.min;
+        filter[1] = this.contents.age.max;
+        this.applyFilter();
+        break;
+      
+      case "location":
+      case "function":
+      case "business":
+      case "jobTitle":
+      case "employeeGrade":
+      case "positionGrade":
+        this.resetMultiSelect(filterName);
+        break;
+        
+      case "talentStatus":
+      case "performanceStatus":
+      case "contractType":
+        filter.splice(0, filter.length);
+        this.applyFilter();
+        break;
+        
+      case "managers":
+        this.selections["managers"] = "null";
+        
+      default:
+        $log.warn("filter.js: Reset not implemented for: " + filterName);
+    }
+  }
+  
+  // Returns whether multi positions are allowed
+  this.isMultiPosAllowed = function() {
+    var multiPosAllowed = !this.hasSelection("age") &&
+          this.selections["gender"].length == 0 &&
+          this.selections["talentStatus"].length == 0 &&
+          this.selections["performanceStatus"].length == 0 &&
+          this.selections["contractType"].length == 0 &&
+          this.selections["managers"] == "null";
+          
+    if(!multiPosAllowed)
+      this.disableMultiPositions();
+    else
+      this.enableMultiPositions();
+  
+    return multiPosAllowed;
+  }
+
+  // Applies the filter
+  this.applyFilter = function() {
+    this.isMultiPosAllowed();
+    
+    // First process selection, make a deep copy, which does not include age
+    // if it has default values
+    for(s in this.selections) {
+      if(s == "age" && !this.hasSelection("age")) {
+        //this.processedSelections[s] = [];
+      }
+      else
+        this.processedSelections[s] = this.selections[s];
+    }
+    this.processedSelections["multiPositions"] = this.showMultiPositions; 
+          
+    // Signal data retrieval directives, so they can update their data
+    if(this._contentLoaded)
+      $rootScope.$broadcast("filterChanged");
+  };
+  
+  this.disable = function() {
+    this._visible = false;
+  }
+  
+  this.toggle = function() {
+    this._visible = !this._visible;
+    
+    // Once the filter contents are loaded, don't load them again. On failure, you can try again by
+    // hiding and reshowing the filter sidebar.
+    //
+    // TODO retry automatically every n^2 seconds until success
+    if(!this._contentLoaded) {
+      loadContents();
+    }
+  }
+  
+  function loadContents() {  
+    var url = "/api/global_filter/";
+    var options = { responseType: 'json' };
+  
+    $http.get(url, options).success(function(data) {   
+      self.contents = data;
+
+      // Set initial min and max values of age slider
+      self.selections.age[0] = self.contents.age.min;
+      self.selections.age[1] = self.contents.age.max;
+      
+      self._contentLoaded = true;
+      
+      $log.info("filter.js: Filter content loaded");
+    });
+  }
+  
+  loadContents();
+});
+
+filter.directive('foFilterBar', function() {
+  return {
+      restrict: 'E',
+      replace: true,
+      templateUrl: 'static/kapstok/html/filter/fo-filter-bar.html',
+      link: function(scope, element, attrs) {
+        element.Stickyfill();
+      }
+  };
+});
+
+/**
+ * Implements the <fo-filter> element. You can use it like this:
+ *
+ * <fo-filter
+ *   contents="filter.contents"
+ *   selections="filter.selections"
+ *   disabled-filters="business-unit manager-status"></fo-filter>
+ */
+
+filter.directive('foFilter', function($log, $window, FilterData) {
+  
+  return {
+    restrict: 'E',
+    replace: true,
+    scope: {}, // isolated scope because filter should only interact with FilterData service
+    templateUrl: 'static/kapstok/html/filter/fo-filter.html',
+    controller: function($rootScope, $scope) {
+      
+      // Applies the filter
+      $scope.applyFilter = function() {
+        if(!$scope.filter.isMultiPosAllowed()) {
+          // TODO: Show feedback
+        }
+        
+        $scope.filter.applyFilter();
+      }
+      
+      // Create children array, to which multi-select children will add themselves
+      $scope.children = [];
+    },
+    link: function($scope, $element, $attrs) {      
+      
+      /**
+       * Functions
+       */
+      
+      // Returns whether an element is selected in a filter
+      // Only used for checkboxes
+      $scope.hasSelected = function(filterName, value) {
+        var list = $scope.filter.selections[filterName];
+        var index = -1;
+        
+        for(var i = 0; i < list.length; i++) {
+          if(list[i] == value)
+            index = i;
+        }
+        
+        return index >= 0;
+      }
+      
+      // Toggle element in a filter (e.g. add or remove 'M' to/from the 'gender' filter)
+      // Only used for checkboxes
+      $scope.toggleFilterElement = function(filterName, value) {
+        var list = $scope.filter.selections[filterName];
+        var index = -1;
+        
+        for(var i = 0; i < list.length; i++) {
+          if(list[i] == value)
+            index = i;
+        }
+        
+        if(index == -1)
+          list.push(value);
+        else
+          list.splice(index, 1);
+          
+        // Apply filter
+        $scope.applyFilter();
+      }
+      
+      // Reset fo-multi-select directive associated with a filter      
+      FilterData.resetMultiSelect = function(filterName) {
+        $scope.children[filterName].resetSelection();
+      }
+      
+      // Set (or reset) timer that will apply the filter when it times out
+      var TIMEOUT = 1000;   // Timeout in milliseconds for the multi-select controls
+      var timeoutHandle = undefined;
+      
+      function setApplyTimeout() {        
+        if(timeoutHandle)
+          clearTimeout(timeoutHandle);
+
+        timeoutHandle = setTimeout(function() {
+            $scope.applyFilter();
+            timeoutHandle = undefined;
+          }, TIMEOUT);
+      }
+      
+      // Call applyFilter after $watch has been triggered
+      function callApplyAfterWatch(newValue, oldValue) {
+        if(newValue != oldValue)
+          $scope.applyFilter();
+      }
+      
+      // Call setApplyTimeout after $watch has been triggered
+      function callApplyTimeoutAfterWatch(newValue, oldValue) {
+        if(newValue != oldValue)
+          setApplyTimeout();
+      }
+      
+      /**
+       * Main code
+       */
+      
+      $scope.filter = FilterData;
+      
+      // Set watches after the filter has been loaded
+      var unregisterContentLoadedWatch = $scope.$watch('filter._contentLoaded', function() {
+        // Listen for changes in age and to fo-multi-select instances
+        $scope.$watch("filter.selections['age'][0]", callApplyAfterWatch);
+        $scope.$watch("filter.selections['age'][1]", callApplyAfterWatch);
+        $scope.$watch("filter.selections['managers']", callApplyAfterWatch);
+        
+        $scope.$watch("filter.selections['location']", callApplyTimeoutAfterWatch);
+        $scope.$watch("filter.selections['function']", callApplyTimeoutAfterWatch);
+        $scope.$watch("filter.selections['business']", callApplyTimeoutAfterWatch);
+        $scope.$watch("filter.selections['jobTitle']", callApplyTimeoutAfterWatch);
+        $scope.$watch("filter.selections['employeeGrade']", callApplyTimeoutAfterWatch);
+        $scope.$watch("filter.selections['positionGrade']", callApplyTimeoutAfterWatch);
+        
+        // Listen for changes in multi positions button
+        $scope.$watch("filter.showMultiPositions", callApplyAfterWatch);
+        
+        // Unregister listener, because watches have to be set only once
+        unregisterContentLoadedWatch();
+      })
+    }
+  }
+});
+
+})();

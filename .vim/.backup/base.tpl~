@@ -1,0 +1,53 @@
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <title>Control centre</title>
+
+    <!-- jQuery -->
+    <script 
+      src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js">
+    </script>
+    
+    <!-- moment.js -->
+    <script
+      src="/js/moment/moment.min.js">
+    </script>
+    
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet"
+      href="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+    <!-- Bootstrap JavaScript -->
+    <script 
+      src="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js">
+    </script>
+
+
+    <!-- bootstrap-datetimepicker -->
+    <script
+      src="/js/bootstrap-datetimepicker.min.js">
+    </script>
+    <link rel="stylesheet" href="/css/bootstrap-datetimepicker.css">
+
+    <!-- custom CSS -->
+    <link rel="stylesheet" href="/css/main.css">
+    <!-- custom JS -->
+    <script
+      src="/js/main.js">
+    </script>
+
+	  {block "custom-css"}
+	  {/block}
+  </head>
+  <body {block "bodyclass"} {/block}>
+    {block "menu"}
+    {/block}
+    <div class='container-fluid'>
+      <h1>{block "title"}Welcome!{/block}</h1>
+      {block "content"}
+      Welcome to the index page.
+      {/block}
+    </div>
+  </body>
+</html>

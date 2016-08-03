@@ -1,0 +1,38 @@
+database.management.commands package
+====================================
+
+Submodules
+----------
+
+database.management.commands.chunk module
+-----------------------------------------
+
+.. automodule:: database.management.commands.chunk
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+database.management.commands.import module
+------------------------------------------
+
+.. automodule:: database.management.commands.import
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+database.management.commands.update_roles module
+------------------------------------------------
+
+.. automodule:: database.management.commands.update_roles
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+Module contents
+---------------
+
+.. automodule:: database.management.commands
+    :members:
+    :undoc-members:
+    :show-inheritance:

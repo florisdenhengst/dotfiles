@@ -1,0 +1,28 @@
+from database.models import *
+from django.db.models import *
+
+ts_path = 'job__data_source__timeslice'
+q_ts = Q(job__data_source__timeslice__previous=
+         F(ts_path))
+q_eid = Q(employee_id=F('employee_id'))
+
+emps = Employee.objects.annotate(previous_age=Case(
+                                    When(q_ts & q_eid,
+                                        then=F(ts_path + '__datasource__job__employee__age')
+                                        )
+                                    )
+                                    )[1:100]
+emps.query.__str__()
+for e in emps:
+    print(e.age, e.previous_age)
+
+print()
+print('doei!')
+
+q_sl = Q(solid_line_reverse=F('pk'))
+poss = Position.objects.annotate(sll=F('solid_line__solid_line_layer'))
+
+#for p in poss:
+#    print(p.solid_line_layer, p.sll)
+
+

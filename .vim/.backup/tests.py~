@@ -1,0 +1,1717 @@
+from django.apps import apps
+from django.test import TestCase, TransactionTestCase
+from django.contrib.auth.models import Group
+from django.contrib.auth import get_user_model
+from django.db import connection
+from django.db.models import Q
+from django.core.exceptions import FieldError
+from database.csvtool.csvtool import CsvTool
+from database.q_factory import *
+from database.models.core import *
+from database.models.auth import *
+from database import test_data_helpers
+from datetime import date
+from database.routes import db_routes as database_routes
+from database.routes import get_route
+import random
+import json
+import copy
+import string
+from database.datatable import DataTable
+
+class MockRequest(object):
+  pass
+
+def get_first_user():
+  return get_user_model().objects.filter(is_superuser=True).first()
+
+class ChunkingTestCase(TestCase):
+  """This test ensures that the chunking algorithm works."""
+  fixtures = ['chunktest']
+
+  @staticmethod
+  def create_group_with_role(role_name = 'test'):
+    role_group = Group(name=role_name)
+    role_group.save()
+    role = Role(name=role_name, description='', group = role_group)
+    role.save()
+    return (role_group, role)
+
+  def test_is_dataset_complete(self):
+    """Tests whether the fixture contains all the necessary data. It should contain at least
+    3 business units, locations and functional areas and at least 20 positions, positions and
+    employees."""
+    self.assertTrue(get_user_model().objects.all().count() >= 1 )
+    self.assertTrue(BusinessUnit.objects.all().count() >= 3 )
+    self.assertTrue(Location.objects.all().count() >= 3 )
+    self.assertTrue(FunctionalArea.objects.all().count() >= 3 )
+    self.assertTrue(CostCenter.objects.all().count() >= 3 )
+    self.assertTrue(LegalEntity.objects.all().count() >= 3 )
+    self.assertTrue(Position.objects.all().count() >= 20 )
+    self.assertTrue(Person.objects.all().count() >= 20 )
+    self.assertTrue(Employee.objects.all().count() >= 20 )
+    self.assertTrue(Job.objects.all().count() >= 20 )
+    self.assertTrue(MultiPosition.objects.all().count() >= 3)
+
+  def test_correct_number_of_chunks_generated(self):
+    """Tests whether this dataset contains the correct number of chunks."""
+    Chunk.generate_chunks()
+    cursor = connection.cursor()
+    cursor.execute("""
+            SELECT COUNT(*) FROM
+              (SELECT DISTINCT businessunit_id, functionalarea_id, location_id FROM position
+               UNION
+               SELECT DISTINCT businessunit_id, functionalarea_id, location_id FROM multiposition
+              ) AS chunks""")
+    expected_chunk_count = cursor.fetchone()[0]
+    assert Chunk.objects.all().count() == expected_chunk_count
+
+  def test_single_location_passes_rule(self):
+    """Create a rule that lets only one (the first) location pass.
+    Assert that the right positions pass and all others do not."""
+    allowed_location = Location.objects.first()
+
+    # Generate all chunks
+    Chunk.generate_chunks()
+
+    # Create role, add a rule and update it's accessible chunkset
+    group, role = ChunkingTestCase.create_group_with_role()
+    role.create_location_rule([allowed_location])
+    role.update()
+
+    expected_passing_chunk_ids = {c.id for c in Chunk.objects.filter(location=allowed_location).all()}
+    passing_chunk_ids = {c.id for c in role.chunks.all()}
+    self.assertEquals(expected_passing_chunk_ids, passing_chunk_ids)
+
+  def test_multiple_locations_pass_rule(self):
+    """Create a rule that lets multiple locations pass
+    Assert that the right positions pass and all others do not."""
+    # Get second and third location
+    allowed_locations = Location.objects.all()[1:3]
+
+    # Generate all chunks
+    Chunk.generate_chunks()
+
+    # Create role, add a rule and update it's accessible chunkset
+    group, role = ChunkingTestCase.create_group_with_role()
+    role.create_location_rule(allowed_locations)
+    role.update()
+
+    expected_passing_chunk_ids = {c.id for c in Chunk.objects.filter(location__in=allowed_locations).all()}
+    passing_chunk_ids = {c.id for c in role.chunks.all()}
+    self.assertEquals(expected_passing_chunk_ids, passing_chunk_ids)
+
+  def test_two_rules_grant_access_to_intersection_of_each_individual_rule(self):
+    """Tests that two rules only allow the intersection to pass. We are
+    talking about the intersection of the sets of allowed rows for each rule."""
+    allowed_location = Location.objects.first()
+    allowed_business_unit = BusinessUnit.objects.first()
+
+    # Generate all chunks
+    Chunk.generate_chunks()
+
+    # Create role, add two rules and update it's accessible chunkset
+    group, role = ChunkingTestCase.create_group_with_role()
+    role.create_location_rule([allowed_location])
+    role.create_business_unit_rule([allowed_business_unit])
+    role.update()
+
+    passing_chunks = Chunk.objects.filter(location=allowed_location, business_unit=allowed_business_unit).all()
+    expected_passing_chunk_ids = {c.id for c in passing_chunks}
+    passing_chunk_ids = {c.id for c in role.chunks.all()}
+    self.assertEquals(expected_passing_chunk_ids, passing_chunk_ids)
+
+  def test_two_roles_grant_access_to_union_of_each_role(self):
+    """A user with two roles has access to the union of the rows that are accessible
+    to each of these roles."""
+    allowed_location = Location.objects.first()
+    allowed_business_unit = BusinessUnit.objects.first()
+    user = get_first_user()
+
+    # Generate all chunks
+    Chunk.generate_chunks()
+
+    # Create two roles, add a rule to each and update them all
+    bu_group, bu_role = ChunkingTestCase.create_group_with_role('bu_role')
+    bu_role.create_business_unit_rule([allowed_location])
+    loc_group, loc_role = ChunkingTestCase.create_group_with_role('loc_role')
+    loc_role.create_location_rule([allowed_location])
+    Role.update_all()
+
+    # Add user to groups corresponding to both roles
+    bu_group.user_set.add(user)
+    loc_group.user_set.add(user)
+
+    passing_chunks = Chunk.objects.filter(Q(location=allowed_location) | Q(business_unit=allowed_business_unit)).all()
+    expected_passing_chunk_ids = {c.id for c in passing_chunks}
+    passing_chunk_ids = set(Role.get_chunk_ids_for_user(user))
+    self.assertEquals(expected_passing_chunk_ids, passing_chunk_ids)
+
+  def test_role_without_rules_grants_access_to_everything(self):
+    """A user having a role without rules has access to everything."""
+    Chunk.generate_chunks()
+
+    # Create role without rules and update it's accessible chunkset
+    group, role = ChunkingTestCase.create_group_with_role()
+    role.update()
+
+    expected_passing_chunk_ids = {c.id for c in Chunk.objects.all()}
+    passing_chunk_ids = {c.id for c in role.chunks.all()}
+    self.assertEquals(expected_passing_chunk_ids, passing_chunk_ids)
+
+  def test_persons_corresponding_to_jobs_are_accessible(self):
+    """A role grants access to exactly those persons that are related to the jobs
+    to which a role grants access."""
+    user = get_first_user()
+    allowed_functional_areas = FunctionalArea.objects.all()[1:3]
+
+    Chunk.generate_chunks()
+
+    group, role = ChunkingTestCase.create_group_with_role()
+    role.create_functional_area_rule(allowed_functional_areas)
+    role.update()
+
+    group.user_set.add(user)
+
+    expected_person_ids = {p.id for p in Person.objects.filter(
+        employee__job__position__functional_area__in=allowed_functional_areas).distinct()}
+    user.roles = Role.objects.filter(group__user=user)
+    qf = QFactory(Person)
+    q_auth = qf.auth(user)
+    passing_person_ids = {p.id for p in Person.objects.filter(q_auth)}
+    self.assertEquals(expected_person_ids, passing_person_ids)
+
+  def test_jobs_are_accessible(self):
+    """A role grants access to exactly those jobs that are related to positions
+    to which a role grants access."""
+    allowed_functional_areas = FunctionalArea.objects.all()[1:3]
+    user = get_first_user()
+
+    Chunk.generate_chunks()
+
+    group, role = ChunkingTestCase.create_group_with_role()
+    role.create_functional_area_rule(allowed_functional_areas)
+    role.update()
+
+    group.user_set.add(user)
+
+    expected_job_ids = {j.id for j in Job.objects.filter(
+      position__functional_area__in=allowed_functional_areas).distinct()}
+    user.roles = Role.objects.filter(group__user=user)
+
+    qf = QFactory(Job)
+    q_auth = qf.auth(user)
+
+    passing_job_ids = {j.id for j in Job.objects.filter(q_auth)}
+    self.assertEquals(expected_job_ids, passing_job_ids)
+
+  def test_positions_are_accessible(self):
+    """A role grants access to exactly those positions that are included in the the role's
+    set of rules."""
+    allowed_functional_areas = FunctionalArea.objects.all()[1:3]
+    user = get_first_user()
+
+    Chunk.generate_chunks()
+
+    group, role = ChunkingTestCase.create_group_with_role()
+    role.create_functional_area_rule(allowed_functional_areas)
+    role.update()
+
+    group.user_set.add(user)
+
+    expected_position_ids = {j.id for j in Position.objects.filter(
+      functional_area__in=allowed_functional_areas).distinct()}
+    user.roles = Role.objects.filter(group__user=user)
+
+
+    qf = QFactory(Position)
+    q_auth = qf.auth(user)
+
+    passing_position_ids = {p.id for p in Position.objects.filter(q_auth)}
+    self.assertEquals(expected_position_ids, passing_position_ids)
+
+  def test_multipositions_are_accessible(self):
+    """A role grants access to exactly those multipositions that are included in the the role's
+    set of rules."""
+    allowed_functional_areas = FunctionalArea.objects.all()[1:3]
+    user = get_first_user()
+
+    Chunk.generate_chunks()
+
+    group, role = ChunkingTestCase.create_group_with_role()
+    role.create_functional_area_rule(allowed_functional_areas)
+    role.update()
+
+    group.user_set.add(user)
+
+    expected_multipos_ids = {j.id for j in MultiPosition.objects.filter(
+      functional_area__in=allowed_functional_areas).distinct()}
+    user.roles = Role.objects.filter(group__user=user)
+
+    qf = QFactory(MultiPosition)
+    q_auth = qf.auth(user)
+
+    passing_multipos_ids = {j.id for j in MultiPosition.objects.filter(q_auth)}
+    self.assertEquals(expected_multipos_ids, passing_multipos_ids)
+
+
+  def test_employees_corresponding_to_jobs_are_accessible(self):
+    """A role grants access to exactly those employees that are related to the jobs
+    that are accessible."""
+    allowed_functional_areas = FunctionalArea.objects.all()[0:2]
+    user = get_first_user()
+
+    Chunk.generate_chunks()
+
+    group, role = ChunkingTestCase.create_group_with_role()
+    role.create_functional_area_rule(allowed_functional_areas)
+    role.update()
+
+    group.user_set.add(user)
+
+    expected_employee_ids = {e.id for e in Employee.objects.filter(
+        job__position__functional_area__in=allowed_functional_areas).distinct()}
+    user.roles = Role.objects.filter(group__user=user)
+
+    qf = QFactory(Employee)
+    q_auth = qf.auth(user)
+
+    passing_employee_ids = {e.id for e in Employee.objects.filter(q_auth)}
+    self.assertEquals(expected_employee_ids, passing_employee_ids)
+
+  def test_access_is_revoked_after_role_removal(self):
+    """Test that removing a role will prevent a user from accessing the associated chunks."""
+    allowed_functional_areas = FunctionalArea.objects.all()[0:2]
+    user = get_first_user()
+
+    Chunk.generate_chunks()
+
+    # Create a role, update it and add the user, allowing it to see some FA's
+    group, role = ChunkingTestCase.create_group_with_role()
+    role.create_functional_area_rule(allowed_functional_areas)
+    role.update()
+    group.user_set.add(user)
+
+    # Exactly all jobs related to a position having that functional area should be accessible
+    expected_position_ids = {p.id for p in
+        Job.objects.filter(position__functional_area__in=allowed_functional_areas).distinct()}
+    user.roles = Role.objects.filter(group__user=user)
+    qf = QFactory(Job)
+    q_auth = qf.auth(user)
+    accessible_position_ids = {p.id for p in Job.objects.filter(q_auth).distinct()}
+    self.assertEqual( expected_position_ids, accessible_position_ids )
+
+    # Remove the user
+    group.user_set.remove(user)
+
+    # User no longer has access to any positions
+    # Lambda: is a trick to make sure the exception does not "escape" and cause
+    # the test to fail with an error
+    user.roles = Role.objects.filter(group__user=user)
+    q = qf.auth(user)
+    self.assertEqual(Job.objects.filter(q).count(), 0)
+
+
+  def test_access_is_granted_only_after_updating_role(self):
+    """Test that access is granted only when the newly added role is updated and not earlier."""
+    allowed_functional_areas = FunctionalArea.objects.all()[0:2]
+    user = get_first_user()
+    qf = QFactory(Job)
+
+    Chunk.generate_chunks()
+
+    # By default, a user cannot access anything (and an exception should be thrown)
+    # Lambda: is a trick to make sure the exception does not "escape" and cause
+    # the test to fail with an error
+    user.roles = Role.objects.filter(group__user=user)
+
+    q = qf.auth(user)
+    self.assertEqual(Job.objects.filter(q).count(), 0)
+
+    # Create a role with a rule that allows the user to see some functional areas
+    group, role = ChunkingTestCase.create_group_with_role()
+    role.create_functional_area_rule(allowed_functional_areas)
+    group.user_set.add(user)
+
+    # Even though the user has the new role, an update is still required for him to
+    # to get access to any data
+    user.roles = Role.objects.filter(group__user=user)
+
+    q = qf.auth(user)
+    self.assertEqual(Job.objects.filter(q).count(), 0)
+
+    # Update the chunks for this role
+    role.update()
+
+    # After the update, exactly all positions having that functional area should be accessible
+    expected_position_ids = {p.id for p in Job.objects.filter(
+                            position__functional_area__in=allowed_functional_areas).all()}
+    user.roles = Role.objects.filter(group__user=user)
+    q_auth = qf.auth(user)
+    accessible_position_ids = {p.id for p in Job.objects.filter(q_auth)}
+    self.assertEqual( expected_position_ids, accessible_position_ids )
+
+class ValidateModelsTestCase(TestCase):
+  """Test case for validating generic functions that should be present on all Models."""
+  fixtures = ['main']
+
+  def setUp(self):
+    usr = get_user_model()(
+        username=''.join(random.choice(string.ascii_uppercase) for _ in range(10)),
+        )
+    usr.save()
+    group = Group()
+    group.save()
+    role = Role(group=group)
+    role.save()
+    rule = Rule(role=role, field=Rule.RULE_FIELD[0][0], value_set="[]")
+    rule.save()
+
+  def __model_instance_to_string(self, some_instance):
+    """Tests whether an instance has a string representation."""
+    result = some_instance.__str__()
+
+    self.assertNotEqual(result, '')
+    self.assertIsNotNone(result)
+
+  def test_all_models_to_string(self):
+    """Tests that all models in the database app have a valid string representation."""
+    nullable_models = ['employeedelta']
+    app = apps.get_app_config('database')
+    models = set(app.models) - set(nullable_models)
+    for model in models:
+      model = app.models[model]
+      # test first instance
+      self.__model_instance_to_string(model.objects.first())
+      # test last instance
+      self.__model_instance_to_string(model.objects.last())
+      # test random instance
+      random_instances = model.objects.order_by('?')
+
+      self.assertGreater(random_instances.count(), 0,
+                         msg="No instances for model {}".format(model))
+      self.__model_instance_to_string(random_instances[0])
+
+      # Some special cases
+      #   Job can be vacant, check it's possible to make a string
+      if model == Job:
+        instance = model.objects.filter(employee__isnull=True).first()
+        self.__model_instance_to_string(instance)
+
+
+  def test_all_protected_models_implement_authorized(self):
+    """Tests that all models that subclass the AuthorizableModel class can call
+     the authorized() method."""
+    nullable_models = [EmployeeDelta]
+    protected_models = set(AuthorizableModel.__subclasses__()  + CrunchrModel.__subclasses__()) - set(nullable_models)
+    user = get_first_user()
+    user.roles = Role.objects.filter(group__user=user)
+    for model in protected_models:
+      if not model._meta.abstract:
+        instances = model.objects
+        self.assertGreater(instances.count(), 0)
+        result = instances.authorized(user).count()
+
+        result2 = instances.authorized(user, pk__in=[1]).count()
+        self.assertNotEquals(result, result2)
+
+
+class QFactorySingleTimesliceTestCase(TestCase):
+  fixtures = ['main']
+  SELECTION_RANGE = (0, 1000)
+  SELECTION_ID_RANGE = range(0, 1000)
+  MULTIPOSITION_MODELS = [MultiPosition]
+
+  @staticmethod
+  def all_subclasses(cls):
+    """Returns all direct (child) and indirect (grandchild) subclasses
+    for cls."""
+    # Stop searching for subclasses if this is a non-abstract class
+    if not cls._meta.abstract:
+      return list()
+    # use list(set(...)) to ensure unique elements in array
+    return list(set(cls.__subclasses__() + [g for s in cls.__subclasses__()
+                                   for g in QFactorySingleTimesliceTestCase.all_subclasses(s)]))
+
+  def setUp(self):
+    # retrieve all models for the database app
+    self.app = apps.get_app_config('database')
+    self.database_models = self.app.models
+
+    # a set of selections that should be treated as empty
+    empty_variations = [[], {}, None, (), '']
+    n_empty_variations = len(empty_variations)
+
+    # a series of selections that is going to be built up
+    self.selections = {}
+    self.empty_selections = {}
+
+    # build up selections for all attributes
+    counter = 0
+    for attribute, options in QFactory._filter_attributes.items():
+      if(attribute == 'directSpanPositions' or attribute == 'indirectSpanPositions'):
+        selection = [0]   # These filters need a list of Position IDs
+      elif(options['lookup'] == '__range'):
+        selection = self.SELECTION_RANGE
+      elif(options['lookup'] == '_id__in'):
+        selection = list(self.SELECTION_ID_RANGE)
+      elif(options['lookup'] == '__in'):
+        selection = self.SELECTION_RANGE
+      elif(options['lookup'] == ''):
+        selection = True
+      else:
+        # An unknown lookup was encountered - ABORT!
+        self.assertTrue(False, msg="Unknown lookup lookup '%s' for attribute %s" %
+            (str(options['lookup']), attribute))
+        selection = None
+      self.selections[attribute] = selection
+      # An any empty lookup to the empty __selections, but make sure all are included once
+      self.empty_selections[attribute] = empty_variations[counter % n_empty_variations]
+      counter += 1
+    # since MultiPositions support only a subset of the selections, build a
+    # special set of selections for MultiPositions.
+    self.multiposition_selections = {}
+    for attribute, options in QFactory._multiposition_filter_attributes.items():
+      if(attribute == 'directSpanPositions' or attribute == 'indirectSpanPositions'):
+        selection = [0]   # This filter need a list of Position IDs
+      elif(options['lookup'] == '__range'):
+        selection = self.SELECTION_RANGE
+      elif(options['lookup'] == '_id__in'):
+        selection = list(self.SELECTION_ID_RANGE)
+      elif(options['lookup'] == '__in'):
+        selection = self.SELECTION_RANGE
+      elif(options['lookup'] == ''):
+        selection = True
+      else:
+        self.assertTrue(False, msg="Unknown lookup '%s' for attribute %s" %
+            (str(options['lookup']), attribute))
+        selection = None
+      self.multiposition_selections[attribute] = selection
+
+    # a selection that is invalid in any case (...I hope it will be invalid for while...)
+    self.invalid_attributes_selections = {
+        'fo-4-life':        (0, 100),
+        'dirk-the-master':  [1,2,3],
+        }
+
+
+  def test_get_paths_to_fields(self):
+    """get_path_to_field should either return a valid result or raise a NotImplementedError."""
+    for model in self.database_models:
+      if model not in QFactory.routes and model not in [Location, BusinessUnit, FunctionalArea]:
+        self.assertRaises(NotImplementedError, QFactory, model)
+        continue
+
+      qf = QFactory(model)
+
+      regular_attrs = (list(qf._filter_attributes.items()) +
+                       list(qf._auth_attributes.items()))
+
+      multipos_attrs = (list(qf._multiposition_filter_attributes.items()) +
+                        list(qf._multiposition_auth_attributes.items()))
+
+      for attribute, options in regular_attrs:
+        to_field = options['field']
+        if model in qf.routes and model not in self.MULTIPOSITION_MODELS:
+          # if the model is in the routing table, it should be routed to from every attribute type
+          route = qf.get_path_to_field(to_field)
+        else:
+          # if the model is not in the routing table, looking for it should result in a
+          # ModelRoutingError
+          self.assertRaises(ModelRoutingError, qf.get_path_to_field, to_field)
+
+      for attribute, options in multipos_attrs:
+        to_field = options['field']
+        if model in qf.routes and (model in self.MULTIPOSITION_MODELS or model == PositionTitle):
+          # if the model is in the routing table, it should be routed to from every attribute type
+          route = qf.get_path_to_field(to_field)
+        else:
+          # if the model is not in the routing table, looking for it should result in a
+          # ModelRoutingError
+          self.assertRaises(ModelRoutingError, qf.get_path_to_field, to_field)
+
+  def test_q_node(self):
+    """get_q_node should return a Q object that can be used in a MyModel.filter(my_q_obj)
+    call OR raise a ModelRoutingError."""
+    for model in self.database_models:
+      for attribute, selection in self.selections.items():
+        if model in QFactory.routes.keys() or model in [Location, BusinessUnit,
+            FunctionalArea]:
+          qf = QFactory(model)
+          if model in [Location, BusinessUnit, FunctionalArea]:
+            self.assertRaises(ModelRoutingError, qf.get_q_node, attribute, selection)
+          elif model not in self.MULTIPOSITION_MODELS:
+            q = qf.get_q_node(attribute, selection)
+            count = model.objects.filter(q).count()
+            self.assertIsInstance(count, int)
+          else: # model in self.MULTIPOSITION_MODELS
+            if attribute not in qf.attributes:
+              self.assertRaises(InvalidAttributeError, qf.get_q_node, attribute, selection)
+            else:
+              q = qf.get_q_node(attribute, selection)
+              count = model.objects.filter(q).count()
+            self.assertIsInstance(count, int)
+        else:
+          self.assertRaises(NotImplementedError, QFactory, model)
+
+
+  def test_direct_span_positions_q_node(self):
+    """Tests that the direct span positions filter works correctly. Both Position and
+    MultiPosition models are tested."""
+
+    qf = QFactory(Position)
+    mp_qf = QFactory(MultiPosition)
+
+    # Verify that the returned positions and multi-positions are as expected by testing a random
+    # node from three different layers
+    for layer in [1,2,3]:
+      q_active = qf.get_q_node("active", True)
+      employee = Employee.objects.filter(q_active, job__position__solid_line_layer=layer).first()
+      position_ids = Position.objects.filter(job__employee=employee).values_list("id", flat=True)
+
+      expected_position_ids = list(Position.objects.filter(solid_line_id__in=position_ids).values_list("id", flat=True))
+      expected_mp_ids = list(MultiPosition.objects.filter(solid_line_id__in=position_ids).values_list("id", flat=True))
+
+      # Unlike the 'indirect span positions' Q factory filter, this filter requires position IDs
+      # (not employee IDs). The middleware transforms employee IDs from position IDs (which is
+      # not tested in this test)
+      q_object = qf.get_q_node("directSpanPositions", position_ids)
+      mp_q_object = mp_qf.get_q_node("directSpanPositions", position_ids)
+
+      position_ids_from_q_object = Position.objects.filter(q_object).values_list("id", flat=True)
+      mp_ids_from_q_object = MultiPosition.objects.filter(mp_q_object).values_list("id", flat=True)
+
+      # Check that both the length and contents are equal to the expected value
+      # We also check the lengths to verify that there are no duplicates
+      self.assertEqual(len(position_ids_from_q_object), len(expected_position_ids))
+      self.assertEqual(len(mp_ids_from_q_object), len(expected_mp_ids))
+
+      self.assertSetEqual(set(position_ids_from_q_object), set(expected_position_ids))
+      self.assertSetEqual(set(mp_ids_from_q_object), set(expected_mp_ids))
+
+
+  def test_indirect_span_positions_q_node(self):
+    """Tests that the indirect span positions filter works correctly. Both Position and
+    MultiPosition models are tested."""
+
+    def get_descendant_ids(node):
+      """Returns a tuple containing two lists of IDs of the descendants of a node. The first
+      # element of the tuple contains Position descendants, the second tuple contains MultiPosition
+      descendants."""
+
+      children = Position.objects.filter(solid_line=node.id)
+      mp_children = MultiPosition.objects.filter(solid_line=node.id)
+      descendants = []
+      mp_descendants = []
+
+      for child in children:
+        child_descendants = get_descendant_ids(child)
+        descendants.extend([child.id] + child_descendants[0])
+        mp_descendants.extend(child_descendants[1])
+
+      for mp_child in mp_children:
+        mp_descendants.append(mp_child.id)
+
+      return (descendants, mp_descendants)
+
+    qf = QFactory(Position)
+    mp_qf = QFactory(MultiPosition)
+
+    # Verify that returned positions are as expected by testing a random node from three
+    # different layers
+    for layer in [1,2,3]:
+
+      q_active = qf.get_q_node("active", True)
+      employee = Employee.objects.filter(q_active, job__position__solid_line_layer=layer).first()
+      positions = Position.objects.filter(job__employee=employee)
+
+      all_expected_position_ids = []
+      all_expected_mp_ids = []
+
+      for position in positions:
+        (expected_position_ids, expected_mp_ids) = get_descendant_ids(position)
+        all_expected_position_ids.extend(expected_position_ids)
+        all_expected_mp_ids.extend(expected_mp_ids)
+
+      # Unlike the 'direct span positions' Q factory filter, the 'indirect span positions' filter
+      # requires employee IDs (not position IDs). The transformation to position IDs is not performed in
+      # middleware (as with the 'direct span positions' filter), but is done in a special method
+      # in the Q factory because this filter is more complex than other filters.
+      q_object = qf.get_q_node("indirectSpanPositions", [employee.id])
+      mp_q_object = mp_qf.get_q_node("indirectSpanPositions", [employee.id])
+
+      positions_ids_from_q_object = Position.objects.filter(q_object).values_list("id", flat=True)
+      mp_ids_from_q_object = MultiPosition.objects.filter(mp_q_object).values_list("id", flat=True)
+
+      # Check that both the length and contents are equal to the expected value
+      # We also check the lengths to verify that there are no duplicates
+      self.assertEqual(len(positions_ids_from_q_object), len(all_expected_position_ids))
+      self.assertEqual(len(mp_ids_from_q_object), len(all_expected_mp_ids))
+
+      self.assertSetEqual(set(positions_ids_from_q_object), set(all_expected_position_ids))
+      self.assertSetEqual(set(mp_ids_from_q_object), set(all_expected_mp_ids))
+
+
+  def test_q_tree(self):
+    """get_q_tree should return a Q object that can be used in MyModel.filter(my_q_obj)
+    OR raise a ModelRoutingError for regular models. For MultiPositions, an InvalidAttributeError
+    should be raised if the attribute is not filterable for MultiPositions."""
+    for model in self.database_models:
+      if model in QFactory.routes.keys() or model in [Location, BusinessUnit, FunctionalArea]:
+        qf = QFactory(model)
+        if model in qf.routes and model not in self.MULTIPOSITION_MODELS:
+          # if the model is in the routing table, a working Q object should be returned.
+          q = qf.get_q_tree(self.selections)
+          count = model.objects.filter(q).count()
+          self.assertIsInstance(count, int)
+        elif model in self.MULTIPOSITION_MODELS:
+          q = qf.get_q_tree(self.multiposition_selections, '')
+          count = model.objects.filter(q).count()
+          self.assertIsInstance(count, int)
+      else:
+        # if the model is not in the routing table, a ModelRoutingError should be raised
+        self.assertRaises(NotImplementedError, QFactory, model)
+
+  def test_prefix_present_filter(self):
+    """Tests whether the prefix that is handed to get_filter is present in all generated
+    lookups."""
+
+    def test_lookup(lookup, prefix):
+      """Tests whether generated prefix is correct."""
+      expect_to_find_prefix = lookup[0:len(prefix)]
+      mdl = str(model)
+      self.assertEquals(prefix, expect_to_find_prefix, msg="{}".format(mdl))
+
+    prefix = 'crunchrdebeste__'
+
+    model = Position
+    qf = QFactory(model)
+    q_obj = qf.get_q_tree(self.selections, prefix=prefix)
+    for child in q_obj.children:
+      if isinstance(child, Q):
+        # We're dealing with a complex Q object, so we need to traverse through the Q object
+        # (which is hierarchical) and find all the lookups we need to check
+        lookup = None
+
+        for sub_child in child.children:
+          if type(sub_child) is tuple:
+            lookup = sub_child[0]
+            test_lookup(lookup, prefix)
+
+        # There should always be a lookup. Otherwise fail the test, just to make sure this
+        # test is actually testing something
+        self.assertIsNotNone(lookup)
+      else:
+        test_lookup(child[0], prefix)
+
+    # Since MultiPositions are treated differently, also make a separate test
+    model = MultiPosition
+    qf = QFactory(model)
+    q_obj = qf.get_q_tree(self.multiposition_selections, prefix=prefix)
+    lookup = None
+
+    for child in q_obj.children:
+      if type(child) is tuple:
+        lookup = child[0]
+        expect_to_find_prefix = lookup[0:len(prefix)]
+        mdl = str(model)
+        self.assertEquals(prefix, expect_to_find_prefix, msg="{}".format(mdl))
+
+    # There should always be a lookup. Otherwise fail the test, just to make sure this
+    # test is actually testing something
+    self.assertIsNotNone(lookup)
+
+  def test_succession_auth(self):
+    """Tests that authorized succession models are models of which both the position and the
+    employee fall in authorisation scope."""
+    user = get_user_model().objects.get(username='test2')
+    user.roles = Role.objects.filter(group__user=user)
+    auth_emps = Employee.objects.authorized(user).count()
+    self.assertLess(auth_emps, Employee.objects.all().count())
+
+    auth_successions = Succession.objects.authorized(user)
+    for auth_succession in auth_successions:
+      # test that both the employee and position are in scope
+      self.assertGreater(Position.objects.authorized(user).filter(pk=auth_succession.position.id).count(),
+          0)
+      self.assertGreater(Employee.objects.authorized(user).filter(pk=auth_succession.employee.id).count(),
+          0)
+
+    auth_positions = Position.objects.authorized(user)
+    self.assertLess(auth_positions.count(), Position.objects.all().count())
+    unauthorized_through_position = Succession.objects.filter(~Q(position__in=auth_positions))
+    for unauth_succession in unauthorized_through_position:
+      self.assertEqual(Succession.objects.authorized(user).filter(pk=unauth_succession.id).count(),
+          0)
+
+    auth_employees = Employee.objects.authorized(user)
+    self.assertLess(auth_employees.count(), Employee.objects.all().count())
+    unauthorized_through_employee = Succession.objects.filter(~Q(employee__in=auth_employees))
+    for unauth_succession in unauthorized_through_employee:
+      self.assertEqual(Succession.objects.authorized(user).filter(pk=unauth_succession.id).count(), 0)
+
+  def test_generated_prefix_direct_indirect(self):
+    """Tests that a prefix that is generated when the 'through' parameter has been provided
+    to get_q_tree for both directly related fields (a Field that points from this Model
+    to another Model) or indirectly related (a Field that points to this Model from another Model)."""
+
+    def test_lookup(lookup, prefix):
+      """Tests whether the generated prefix is correct."""
+      expect_to_find_prefix = lookup[0:len(prefix)]
+      self.assertEquals(prefix, expect_to_find_prefix)
+
+    # test for a direct related field (where the `through` field lives in the model
+    # for which we're building the filter
+    model = Succession
+    through_field = 'employee'
+    prefix = 'employee__'
+
+    qf = QFactory(model)
+    q_obj = qf.get_q_tree(self.selections, through=through_field)
+    for child in q_obj.children:
+      if isinstance(child, Q):
+        # We're dealing with a complex Q object, so we need to traverse through the Q object
+        # (which is hierarchical) and find all the lookups we need to check
+        lookup = None
+
+        for sub_child in child.children:
+          if type(sub_child) is tuple:
+            lookup = sub_child[0]
+            test_lookup(lookup, prefix)
+
+        # There should always be a lookup. Otherwise fail the test, just to make sure this
+        # test is actually testing something
+        self.assertIsNotNone(lookup)
+      else: # regular Q object. access the lookup directly
+        test_lookup(child[0], prefix)
+
+    # test for an indirect related field (where the `through` field DOESN'T live in the model
+    # for which we're building the filter, but points at it)
+    model = Employee
+    through_field = 'job'
+    prefix = 'job__'
+
+    qf = QFactory(model)
+    q_obj = qf.get_q_tree(self.selections, through=through_field)
+    for child in q_obj.children:
+      if isinstance(child, Q):
+        # We're dealing with a complex Q object, so we need to traverse through the Q object
+        # (which is hierarchical) and find all the lookups we need to check
+        lookup = None
+
+        for sub_child in child.children:
+          if type(sub_child) is tuple:
+            lookup = sub_child[0]
+            test_lookup(lookup, prefix)
+
+        # There should always be a lookup. Otherwise fail the test, just to make sure this
+        # test is actually testing something
+        self.assertIsNotNone(lookup)
+      else: # regular Q object. access the lookup directly
+        test_lookup(child[0], prefix)
+
+  def test_invalid_selection_attributes_raises_error(self):
+    """Tests that an InvalidAttributeError is raised when an invalid set of selections
+    is passed to the QFactory."""
+    model = Position
+    qf = QFactory(model)
+    self.assertRaises(InvalidAttributeError, qf.get_q_tree, self.invalid_attributes_selections)
+
+    model = MultiPosition
+    qf = QFactory(model)
+    self.assertRaises(InvalidAttributeError, qf.get_q_tree, self.invalid_attributes_selections)
+
+
+  def test_multipositions_correctly_excluded(self):
+    """Tests that when multipositions should be excluded, a Q object that can never return any
+    MultiPositions is returned."""
+    qf = QFactory(MultiPosition)
+    q = qf.filtered({'multipositions': False})
+    self.assertGreater(MultiPosition.objects.count(), 0)
+    self.assertEqual(MultiPosition.objects.filter(q).count(), 0)
+
+
+  def test_empty_selections(self):
+    """Tests that passing an empty selection to the QFactory results in a Q object
+    that restricts nothing (an empty Q object)."""
+    model = Position
+    qf = QFactory(model)
+    q_obj = qf.get_q_tree(self.empty_selections)
+    self.assertEquals(q_obj.children, Q().children)
+    self.assertEquals(q_obj.children, [])
+
+    model = MultiPosition
+    qf = QFactory(model)
+    q_obj = qf.get_q_tree(self.empty_selections)
+    self.assertEquals(q_obj.children, Q().children)
+
+    self.assertEquals(q_obj.children, [])
+
+  def test_filtered(self):
+    """Tests that the filtered() method is a correct wrapper method."""
+    # Default case: no 'through' argument provided
+    model = Position
+    qf = QFactory(model)
+    global_filter = {
+        'selections': self.selections, # a valid set of selections
+        'ignore_me' : True,            # some other attribute that is to be ignored
+        'multipositions': True
+        }
+    q_obj = qf.filtered(global_filter)
+    regular_count = model.objects.filter(q_obj).count()
+    self.assertIsInstance(regular_count, int)
+
+    # Special case: through argument provided
+    q_obj = qf.filtered(global_filter, through='job')
+    count = model.objects.filter(q_obj).count()
+    self.assertIsInstance(count, int)
+
+
+    # Default case: no 'through' argument provided
+    model = MultiPosition
+    qf = QFactory(model)
+    global_filter_mp = {
+        'selections': self.multiposition_selections,
+        'ignore_me' : True,
+        'multipositions': True
+        }
+    q_obj = qf.filtered(global_filter_mp)
+    count = model.objects.filter(q_obj).count()
+    self.assertIsInstance(count, int)
+
+    # Special case: through argument provided
+    q_obj = qf.filtered(global_filter, through='dotted_line')
+    count = model.objects.filter(q_obj).count()
+    self.assertIsInstance(count, int)
+
+  def test_all_authorizable_models_correctly_implement_authorized(self):
+    """Tests that all AuthorizableModels correctly implement the authorized() method.
+    We assume the fixture contains a user who has chunks explicitly set (i.e. not implictly)."""
+    crunchr_models = self.all_subclasses(AuthorizableModel)
+    user = get_user_model().objects.filter(groups__role__rules__isnull=False).first()
+    user.roles = Role.objects.filter(group__user=user)
+    for model in crunchr_models:
+      if not model._meta.abstract:
+        qf = QFactory(model)
+        auth_query = model.objects.filter(qf.auth(user)).query.__str__()
+        regular_query = model.objects.all().query.__str__()
+        if issubclass(model, AuthorizableModel):
+          self.assertNotEquals(auth_query, regular_query)
+        else:
+          self.assertEquals(auth_query, regular_query)
+
+  def test_non_filterable_model_leads_to_exception(self):
+    """Tests that when calling filtered() on non-filterable models, an error is raised."""
+    qf = QFactory(Location)
+    self.assertRaises(ModelNotFilterableException, qf.filtered, {})
+
+  def test_all_filterable_models_correctly_implement_filtered(self):
+    """Tests that all AuthorizableModels correctly implement the filtered() method."""
+
+    crunchr_models = self.all_subclasses(FilterableModel)
+
+    for model in crunchr_models:
+      if not model._meta.abstract:
+        qf = QFactory(model)
+        if model in self.MULTIPOSITION_MODELS:
+          selections = self.multiposition_selections
+        else:
+          selections = self.selections
+
+        global_filter = {
+            'selections': selections,
+            'multipositions': True,
+            }
+
+        q_filter_query = model.objects.filter(qf.get_q_tree(selections)).query.__str__()
+        filtered_query = model.objects.filtered(global_filter).query.__str__()
+        extra_filtered_query = model.objects.filtered(global_filter, pk__in=[1,2])
+
+        # skip this assertion for multipositions, as the selections are copied inside
+        # the qfactory. Therefore comparing queries on equality is extremely difficult:
+        # the order of the selections might be different (dictionary) and therefore
+        # the filters in the query are not in the same order.
+        if model not in self.MULTIPOSITION_MODELS:
+          self.assertEquals(q_filter_query, filtered_query)
+
+        self.assertNotEquals(q_filter_query, extra_filtered_query)
+
+        global_filter = {
+            'selections': selections,
+            'multipositions': False,
+        }
+
+        q_filter_query2 = model.objects.filter(qf.get_q_tree(selections)).query.__str__()
+        filtered_query2 = model.objects.filtered(global_filter).query.__str__()
+
+        if(model in self.MULTIPOSITION_MODELS):
+          filtered_query2_count = model.objects.filtered(global_filter).count()
+          self.assertEquals(filtered_query2_count, 0)
+          self.assertNotEquals(filtered_query2, filtered_query)
+        else:
+          self.assertEquals(filtered_query2, filtered_query)
+          self.assertEquals(filtered_query2, q_filter_query2)
+
+
+
+
+  def test_combined_auth_filtered(self):
+    """Tests that the CrunchrQuerySet.auth_filtered method returns correct results."""
+    model = Position
+    qf = QFactory(model)
+    user = get_first_user()
+    user.roles = Role.objects.filter(group__user=user)
+
+    selections = {
+        'age': (0, 30),
+        }
+
+    q_filter = qf.get_q_tree(selections)
+    q_auth = qf.auth(user)
+    expected_count = model.objects.filter(q_filter, q_auth).distinct().count()
+
+    # Get most recent timeslice as default
+    timeslice = Timeslice.objects.order_by('capture_month').last()
+
+    mock_request = MockRequest()
+    mock_request.user = user
+    mock_request.global_filter = {
+        'selections': selections,
+        'timeslice': timeslice.id,
+        }
+    created_count = model.objects.auth_filtered(mock_request, ignore_left=False).count()
+
+    self.assertEquals(expected_count, created_count)
+
+    expected_count = model.objects.filter(q_filter, q_auth).count()
+    created_count = model.objects.auth_filtered(mock_request, distinct=False,
+        ignore_left=False).count()
+
+    self.assertEquals(expected_count, created_count)
+
+
+class QFactoryMultiTimesliceTestCase(TestCase):
+  """Tests that the ORM functions regarding versioning are implemented correctly:
+
+     * Correct Jobs in a Timeslice are returned
+     * Correct MultiPositions in a Timeslice are returned
+     * Correct Succession in a Timeslice are returned
+
+     Checking these three models is enough, as the other models are filtered through these
+     models. Routing and filtering tests in the QFactorySingleTimesliceTestCase make sure
+     this works correctly.
+     Should be a TransactionTestCase, since Chunks are generated (which happens in a
+     Transaction).
+    """
+
+  def _create_user_full_access(self):
+    self.user = get_user_model()(is_superuser=True, username='', password='')
+    self.user.save()
+    group = Group()
+    group.save()
+    self.user.groups.add(group)
+    role = Role(group=group)
+    role.save()
+    role.update()
+
+    self.user.roles = Role.objects.filter(group__user=self.user)
+
+  def setUp(self):
+    """Creates user with full access (no rules related to this users' Role.
+    Creates an empty filter-object.
+    Creates an empty mock request"""
+    self._create_user_full_access()
+    self.empty_filter = {
+                          'selections': {},
+                          'multipositions': True,
+                          }
+    self.mock_request = MockRequest()
+    is_ok, log = CsvTool.postprocess()
+    # TODO: this doesn;t work some how
+    assert is_ok
+
+  @classmethod
+  def setUpTestData(cls):
+    """Creates data for Timeslices for the following DataSource-types:
+
+       _____________|_1_|_2_|_3_|_4_|_5_
+                core| x | x | x | x | x
+          succession| x | x | x |   | x
+       multiposition| x | x | x |   | x
+
+    to ensure that all tests work.
+    """
+    CORE_SET_SIZE = 10
+    SUCC_SET_SIZE = 4
+    MULP_SET_SIZE = 4
+    core_tss = test_data_helpers.generate_cores(5, CORE_SET_SIZE, True)
+    for (ds, jobg) in core_tss:
+      cnt = 0
+      for job in jobg:
+        if cnt > CORE_SET_SIZE:
+          break
+        cnt += 1
+
+
+    # first generate three succession timeslices.
+    succession_set_size = 3
+    for ts in Timeslice.objects.order_by('capture_month')[:3]:
+
+      (ds, succg) = test_data_helpers.generate_succession_timeslice(set_size=SUCC_SET_SIZE,
+                                                                    timeslice=ts)
+      cnt = 0
+      for succ in succg:
+        if cnt > SUCC_SET_SIZE:
+          break
+        cnt += 1;
+
+    # generate three multiposition timeslices.
+    for ts in Timeslice.objects.order_by('capture_month')[:3]:
+      (ds, mpg) = test_data_helpers.generate_multiposition_timeslice(set_size=MULP_SET_SIZE,
+                                                                     timeslice=ts)
+      cnt = 0
+      for mp in mpg:
+        if cnt > MULP_SET_SIZE:
+          break
+        cnt += 1;
+
+    # generate a succession and multiposition set for the fifth timeslice separately.
+    last_timeslice = Timeslice.objects.order_by('capture_month').last()
+    (ds, succg) = test_data_helpers.generate_succession_timeslice(set_size=SUCC_SET_SIZE,
+                                                                  timeslice=last_timeslice)
+    cnt = 0
+    for succ in succg:
+      if cnt > SUCC_SET_SIZE:
+        break
+      cnt += 1;
+
+    (ds, mpg) = test_data_helpers.generate_multiposition_timeslice(set_size=MULP_SET_SIZE,
+                                                                   timeslice=last_timeslice)
+    cnt = 0
+    for mp in mpg:
+      if cnt > MULP_SET_SIZE:
+        break
+      cnt += 1;
+
+    Chunk.generate_chunks()
+    for i, timeslice in enumerate(Timeslice.objects.all()):
+      cls.create_manager_hierarchy(timeslice, i * 2)
+
+  @classmethod
+  def create_manager_hierarchy(cls, timeslice, pattern_shift=0): 
+    '''Creates a manager hierarchy whithin ``timeslice`` in the following pattern (denoted here
+    are employee_ids, as these are constant over time) when ``pattern_shift == 0``:
+
+    1               a
+    2          b         c 
+    3       d     e   f     g
+    4                     h i j
+
+    ``pattern_shift`` can be set to rotate the employee_ids, e.g. when ``pattern_shift==2``:
+
+    1               c
+    2          d         e 
+    3       f     g   h     i
+    4                     j a b
+
+    Contains the hard-coded assumption that there are 10 unique employees over time in this
+    dataset.
+    '''
+    pattern = {
+            'a': None,
+            'b': 'a',
+            'c': 'a',
+            'd': 'b',
+            'e': 'b',
+            'f': 'c',
+            'g': 'c',
+            'h': 'g',
+            'i': 'g',
+            'j': 'g',
+            }
+    for subordinate in Employee.objects.filter(job__data_source__timeslice=timeslice).all():
+      subordinate_emp_id = subordinate.employee_id 
+
+      shifted_subordinate_id = chr(
+              ord('a') + (ord(subordinate_emp_id) - ord('a') + pattern_shift) % len(pattern)
+              )
+      
+      reporting_to = pattern[shifted_subordinate_id]
+
+      if reporting_to is not None:
+        boss_position = Position.objects.get(job__employee__employee_id=reporting_to,
+                                             job__data_source__timeslice=timeslice)
+
+        for job in subordinate.job_set.all():
+          pos = job.position
+          pos.solid_line = boss_position
+          pos.save()
+
+  def test_jobs_in_timeslice(self):
+    """Tests that only jobs in the selected timeslice are returned."""
+
+    self.assertGreater(Job.objects.count(),
+                       0,
+                       msg='Cannot run test when there are no jobs.')
+    self.assertGreater(Timeslice.objects.count(),
+                       1,
+                       msg='Cannot run test when there are 0 or 1 Timeslices.')
+    qf = QFactory(Job)
+    q_auth = qf.auth(self.user)
+    self.assertGreater(Job.objects.filter(q_auth).count(),
+                       0,
+                       msg='Cannot run test when there are no authorized jobs.')
+
+    timeslice_ids = Timeslice.objects.values_list('id', flat=True)
+    for timeslice_id in timeslice_ids:
+      self.empty_filter['timeslice'] = timeslice_id
+      q_auth_filtered = qf.auth_filtered(self.user, self.empty_filter, ignore_left=False)
+      auth_filtered_timesliced_jobs = Job.objects.filter(q_auth_filtered)
+      self.assertGreater(Job.objects.filter(data_source__timeslice_id=timeslice_id).count(),
+                         0,
+                         msg="Found no jobs for timeslice '{}'.".format(timeslice_id))
+      self.assertGreater(auth_filtered_timesliced_jobs.count(),
+                         0,
+                         msg="No authorized jobs found for timeslice '{}'." \
+                             .format(timeslice_id))
+      # check whether job is in correct timeslice
+      for job in auth_filtered_timesliced_jobs:
+        msg = 'QFactory.auth_filtered() returned job ({j}) from wrong timeslice({ts1}). '
+        msg += 'Expected timeslice ({ts2})'.format(j=job,
+                                                   ts1=job.data_source.timeslice.id,
+                                                   ts2=timeslice_id)
+        self.assertEqual(job.data_source.timeslice.id,
+                         timeslice_id,
+                         msg=msg)
+
+
+  def test_mp_in_timeslice(self):
+    """Tests that only MultiPositions in the selected timeslice are returned."""
+
+    self.assertGreater(MultiPosition.objects.count(),
+                       0,
+                       msg='Cannot run test when there are no MultiPositions.')
+    self.assertGreater(Timeslice.objects.count(),
+                       1,
+                       msg='Cannot run test when there are 0 or 1 Timeslices.')
+    qf = QFactory(MultiPosition)
+    q_auth = qf.auth(self.user)
+    self.assertGreater(MultiPosition.objects.count(),
+                       0,
+                       msg='Cannot run test when there are no authorized multipositions.')
+
+    timeslice_ids = Timeslice.objects.values_list('id', flat=True)
+    for timeslice_id in timeslice_ids:
+      self.empty_filter['timeslice'] = timeslice_id
+      q_auth_filtered = qf.auth_filtered(self.user, self.empty_filter)
+      auth_filtered_timesliced_mps = MultiPosition.objects.filter(q_auth_filtered)
+      for mp in auth_filtered_timesliced_mps:
+        msg = 'QFactory.auth_filtered() returned MultiPositoin({mp}) from wrong timeslice({ts1}). '
+        msg += 'Expected timeslice ({ts2})'
+        msg = msg.format(mp=mp,
+                         ts1=mp.data_source.timeslice.id,
+                         ts2=timeslice_id)
+        self.assertEqual(mp.data_source.timeslice.id,
+                         timeslice_id,
+                         msg=msg)
+
+
+  def test_successions_in_timeslice(self):
+    """Tests that only Successions in the selected timeslice are returned."""
+
+    self.assertGreater(Succession.objects.count(),
+                       0,
+                       msg='Cannot run test when there are no Successions.')
+    self.assertGreater(Timeslice.objects.count(),
+                       1,
+                       msg='Cannot run test when there are 0 or 1 Timeslices.')
+    qf = QFactory(Succession)
+    q_auth = qf.auth(self.user)
+    self.assertGreater(Succession.objects.count(),
+                       0,
+                       msg='Cannot run test when there are no authorized multipositions.')
+
+
+    timeslice_ids = Timeslice.objects.values_list('id', flat=True)
+    for timeslice_id in timeslice_ids:
+      self.empty_filter['timeslice'] = timeslice_id
+      q_auth_filtered = qf.auth_filtered(self.user, self.empty_filter)
+      auth_filtered_timesliced_succs = Succession.objects.filter(q_auth_filtered)
+      for succ in auth_filtered_timesliced_succs:
+        msg = 'QFactory.auth_filtered() returned Succession ({s}) from wrong timeslice({ts1}). '
+        msg += 'Expected timeslice ({ts2})'
+        msg = msg.format(s=succ,
+                         ts1=succ.data_source.timeslice.id,
+                         ts2=timeslice_id)
+        self.assertEqual(succ.data_source.timeslice.id,
+                         timeslice_id,
+                         msg=msg)
+
+  def test_person_in_timeslice(self):
+    """Tests that only Persons related to Employees in the selected timeslice are
+    returned. This case is interesting, as Employees are 'versioned' whereas Persons are
+    not."""
+    self.assertGreater(Person.objects.count(),
+                       0,
+                       msg='Cannot run test when there are no Persons.')
+    self.assertGreater(Timeslice.objects.count(),
+                       1,
+                       msg='Cannot run test when there are 0 or 1 Timeslices.')
+    qf = QFactory(Person)
+    timeslice_ids = Timeslice.objects.values_list('id', flat=True)
+    for timeslice_id in timeslice_ids:
+      self.empty_filter['timeslice'] = timeslice_id
+      q_auth_filtered = qf.auth_filtered(self.user, self.empty_filter)
+      auth_filtered_timesliced_persons = Person.objects.filter(q_auth_filtered)
+      for person in auth_filtered_timesliced_persons:
+        msg = 'auth_filtered() returned a Person ({}) that is not associated to an '
+        msg += 'Employee in the required Timeslice ({}).'
+        msg = msg.format(person.id, timeslice_id)
+        person = Person.objects.filter(employee__job__data_source__timeslice_id=timeslice_id)
+        self.assertTrue(person.exists(), msg=msg)
+
+  def test_positiontitle_in_timeslice(self):
+    """Tests that only PositionTitles related to Employees in the selected timeslice are
+    returned. This case is interesting, as Employees are 'versioned' whereas PositionTitles are
+    not."""
+    self.assertGreater(PositionTitle.objects.count(),
+                       0,
+                       msg='Cannot run test when there are no PositionTitles.')
+    self.assertGreater(Timeslice.objects.count(),
+                       1,
+                       msg='Cannot run test when there are 0 or 1 Timeslices.')
+    qf = QFactory(PositionTitle)
+    timeslice_ids = Timeslice.objects.values_list('id', flat=True)
+    for timeslice_id in timeslice_ids:
+      self.empty_filter['timeslice'] = timeslice_id
+      q_auth_filtered = qf.auth_filtered(self.user, self.empty_filter)
+      auth_filtered_timesliced_pts = PositionTitle.objects.filter(q_auth_filtered)
+      for pt in auth_filtered_timesliced_pts:
+        msg = 'auth_filtered() returned a PositionTitle ({}) that is not associated to an '
+        msg += 'Employee in the required Timeslice ({}).'
+        msg = msg.format(pt.id, timeslice_id)
+        pt = PositionTitle.objects.filter(employee__job__data_source__timeslice_id=timeslice_id)
+        self.assertTrue(pt.exists(), msg=msg)
+
+  def _test_in_range_for_model(self, model, first_ts, last_ts):
+    """This helper method can test whether the resulting instances for a given model lie
+    between the range (first_ts, last_ts)."""
+    # Create a set of timeslice.ids that are between first and last (inclusive).
+    # This is going to be used to create a set of Job.id's that we expect to see.
+    ts_ids_in_range = set()
+    for ts in Timeslice.objects.all():
+      if (ts.capture_month >= first_ts.capture_month and
+          ts.capture_month <= last_ts.capture_month):
+        ts_ids_in_range.add(ts.id)
+
+    # Create a set of Job.id's that we're expecting to see.
+    expected_ids = set()
+    for instance in model.objects.all():
+      ts_id = instance.data_source.timeslice_id
+      if ts_id in ts_ids_in_range:
+        # The instance falls into the range. Add it to the expected set.
+        expected_ids.add(instance.pk)
+
+    # Create a q object to express the 'in timeslice' filtering behavior.
+    qf = QFactory(model)
+    q_ts = qf.in_timeslice(first_ts.id, last_ts.id)
+    instance_ids = set(model.objects.filter(q_ts).values_list('id', flat=True))
+
+    msg = 'in_timeslice() resulted in incorrect set of IDs for model {}'.format(model.__name__)
+    self.assertEqual(instance_ids, expected_ids, msg=msg)
+
+  def _test_gap_in_range_for_csvtype(self, first_ts, last_ts, csv_type):
+    """Tests that there is a 'gap' in the range of timeslices between first_ts and last_ts
+    (inclusive), i.e. that there exist timeslices in this range that have no DataSource
+    with csv_format 'csv_type' associated to them. This can happen when there is a 'core'
+    Timeslice for which there is no 'succession' data, for instance."""
+    timeslices_in_range = Timeslice.objects.filter(
+                              capture_month__gte=first_ts.capture_month,
+                              capture_month__lte=last_ts.capture_month)
+    # For there to be a gap, we require at least 3 timeslices in the range.
+    n_ts_in_range = timeslices_in_range.count()
+    msg = 'There cannot be a gap in a range consisting of just {} Timeslices.'.format(n_ts_in_range)
+    self.assertGreaterEqual(n_ts_in_range, 3, msg=msg)
+
+    # We check whether the first and last timeslices provided have a DataSource with
+    # csv_format 'csv_type' firs
+    msg="Couldn't find datasource with type {} at start of range at Timeslice {}".format(
+        csv_type, first_ts)
+    self.assertTrue(first_ts.datasource_set.filter(csv_format=csv_type).exists(),
+                    msg=msg)
+    msg="Couldn't find datasource with type {} at end of range at Timeslice {}".format(
+        csv_type, last_ts)
+    self.assertTrue(last_ts.datasource_set.filter(csv_format=csv_type).exists(),
+                    msg=msg)
+
+    # Now check whether there are Timeslices without a DataSource with csv_format
+    # 'csv_type'.
+
+    gapping_timeslice = Timeslice.objects.filter(~Q(datasource__csv_format=csv_type),
+                                                 capture_month__gte=first_ts.capture_month,
+                                                 capture_month__lte=last_ts.capture_month)
+    msg = 'Could not find an expected timeslice for which there is no DataSource with csv_format {}. '
+    msg = msg.format(csv_type)
+    self.assertTrue(gapping_timeslice.exists(), msg=msg)
+
+  def test_range_in_timeslice_core(self):
+    """Tests whether the range returned by the in_timeslice method is correct when the
+    range of two non-subsequent timeslices is requested for a model requiring only the
+    core dataset. There can be no 'gaps' in this range (i.e. timeslices for which there is
+    no 'core' dataset), under the assumption that a 'core' dataset is always required."""
+    # We require at least 4 'core' timeslices.
+    csv_format = DataSource.CSV_CORE
+    core_ds_cnt = DataSource.objects.filter(csv_format=csv_format).count()
+    msg = 'This test requires 5 core timeslice. Found only {}.'.format(core_ds_cnt)
+    self.assertEqual(core_ds_cnt, 5, msg=msg)
+
+    # We need a model that requires only the core dataset. Let's stick with Job.
+    model = Job
+    all_ts = Timeslice.objects.all()
+
+    first_ts = all_ts.order_by('capture_month')[1]
+    last_ts = all_ts.order_by('-capture_month')[1]
+
+    self._test_in_range_for_model(model, first_ts, last_ts)
+
+  def test_range_in_timeslice_succession(self):
+    """Tests whether the range returned by the in_timeslice method is correct when the
+    range of timeslices for a Succession model is requested. The range should consist of
+    Timeslices that are related to a 'Succession'-type DataSource. We assume (and check)
+    that there is a 'gap' in the range used (i.e. timeslices for which there is no
+    'succession' dataset fall within the range)."""
+    succ_ds_cnt = DataSource.objects.filter(csv_format=DataSource.CSV_SUCCESSION).count()
+
+    msg = 'This test requires at least 3 Succession timeslices. Found only {}.'
+    msg.format(succ_ds_cnt)
+    self.assertGreaterEqual(succ_ds_cnt,
+                            2,
+                            msg=msg)
+
+    model = Succession
+    all_ts = Timeslice.objects.filter(datasource__csv_format=DataSource.CSV_SUCCESSION)
+    first_ts = all_ts.order_by('capture_month')[0]
+    last_ts = all_ts.order_by('-capture_month')[0]
+    self._test_gap_in_range_for_csvtype(first_ts, last_ts, DataSource.CSV_SUCCESSION)
+    self._test_in_range_for_model(model, first_ts, last_ts)
+
+  def test_range_in_timeslice_mp(self):
+    """Tests whether the range returned by the in_timeslice method is correct when the
+    range of timeslices for a MultiPosition model is request. The range should consist of
+    Timeslices that are related to a 'MultiPosition'-type DataSource."""
+    mp_ds_cnt = DataSource.objects.filter(csv_format=DataSource.CSV_SUCCESSION).count()
+
+    msg = 'This test requires at least 3 MultiPosition timeslices. Found only {}.'
+    msg.format(mp_ds_cnt)
+    self.assertGreaterEqual(mp_ds_cnt,
+                            2,
+                            msg=msg)
+
+    model = MultiPosition
+    all_ts = Timeslice.objects.filter(datasource__csv_format=DataSource.CSV_SUCCESSION)
+    first_ts = all_ts.order_by('capture_month')[0]
+    last_ts = all_ts.order_by('-capture_month')[0]
+    self._test_gap_in_range_for_csvtype(first_ts, last_ts, DataSource.CSV_SUCCESSION)
+    self._test_in_range_for_model(model, first_ts, last_ts)
+
+  def test_aggregate_in_timeslice(self):
+    """Tests whether the in_timeslice function results in a correct aggregation. Assuming
+    the in_timeslice() method works for getting all Jobs in a Timeslice."""
+    ts = Timeslice.objects.first()
+
+    # Calculate the expected value for some metric fit for aggregations.
+    expected_fte = 0
+    for j in Job.objects.filter(data_source__timeslice=ts):
+      expected_fte += j.fte
+
+    # Create a QFactory, in_timeslice Q-object and make an aggregation.
+    self.empty_filter['timeslice'] = ts.id
+    qf = QFactory(Job)
+    q_in_ts = qf.in_timeslice(ts.id)
+    aggregated_fte = Job.objects.filter(q_in_ts).aggregate(aggr_fte=Sum('fte'))['aggr_fte']
+
+    # Compare expected value with value from timesliced aggregation.
+    msg = 'Expecting aggregated value for a \'timeslice filtered\' QuerySet to be equal to '
+    msg += 'the result of a \'manual\' calculation in Python.'
+    self.assertEqual(expected_fte, aggregated_fte, msg=msg)
+
+  def test_overridden_required_datasources(self):
+    """Tests whether overriding the type of DataSource which is required when creating the
+    list is used by creating a range on a 'Succession'-model QFactory and requesting only
+    'core'-type DataSources by using the 'required_datasources' kwarg."""
+    # Set up the filter to have a timeslice in it. This timeslice should be a timeslice
+    # for which there is no 'succession' DataSource.
+    ts = Timeslice.objects.filter(~Q(datasource__csv_format=DataSource.CSV_SUCCESSION)) \
+                           .order_by('capture_month').first()
+    self.empty_filter['timeslice'] = ts.id
+
+    # Create a QFactory for a model which requires the missing datasource.
+    qf = QFactory(Succession)
+
+    # Call in_timeslice while overriding the default required_datasources. We call this
+    # method, as its being used by the other functions (such as auth_filtered). We expect
+    # there to be no errors (MissingDataSourceException), as the required datasource is
+    # actually there.
+    q_in_timeslice = qf.in_timeslice(ts.id, required_datasources=[DataSource.CSV_CORE])
+
+    msg = 'Found Successions for a timeslice for which there should be no \'succession\' DataSource.'
+    self.assertFalse(Succession.objects.filter(q_in_timeslice).exists(), msg=msg)
+
+  def test_missing_datasource_error(self):
+    """Tests whether a missing 'succession'-type DataSource results in a
+    MissingDataSourceException."""
+    ts = Timeslice.objects.filter(~Q(datasource__csv_format=DataSource.CSV_SUCCESSION)) \
+                           .order_by('capture_month').first()
+    self.empty_filter['timeslice'] = ts.id
+
+    # Create a QFactory for a model which requires the missing datasource.
+    qf = QFactory(Succession)
+
+    # Call in_timeslice on a timeslice for which we know there are no successions.
+    # We expect to get the error.
+    msg = 'Expected a MissingDataSourceException, but got none.'
+    with self.assertRaises(MissingDataSourceException, msg=msg):
+      q_in_timeslice = qf.in_timeslice(ts.id)
+      Succession.objects.filter(q_in_timeslice).exists()
+
+  def test_missing_datasource_suppressed(self):
+    """Tests whether a missing 'succession'-type DataSource does not lead to a
+    MissingDataSourceException when suppressed using the allow_empty kwarg."""
+    ts = Timeslice.objects.filter(~Q(datasource__csv_format=DataSource.CSV_SUCCESSION)) \
+                           .order_by('capture_month').first()
+    self.empty_filter['timeslice'] = ts.id
+
+    # Create a QFactory for a model which requires the missing datasource.
+    qf = QFactory(Succession)
+
+    # Call in_timeslice on a timeslice for which we know there are no successions.
+    # We expect to find no instances without hitting an exception.
+    msg = 'Found Successions for a timeslice for which there should be no \'succession\' DataSource.'
+    q_in_timeslice = qf.in_timeslice(ts.id, allow_empty=True)
+    self.assertFalse(Succession.objects.filter(q_in_timeslice).exists(),
+                     msg=msg)
+    
+  def test_span_position_correct_over_time(self):
+    '''Tests that a selection of managers when querying over multiple timeslices results in the
+    right results on the Job model.
+    First creates some manager hierarchy, then run CsvTool.postprocess in order to set all
+    relations and then validate some results.'''
+    # Select a manager in the first timeslice.
+    some_manager = Employee.objects.filter(job__position__solid_line_direct_span__gt=0).first()
+    # now make a filter selection that selects this manager
+    global_filter = {'selections':
+            {
+                'spanPositions': {
+                    'ids': [some_manager.person_id],
+                    'includeIndirectSpan': True,
+                    },
+            },
+    }
+    qf = QFactory(Job)
+    q_node = qf.auth_filtered(self.mock_request.user, global_filter, ignore_timeslice=True)
+
+    jobs = Job.objects.filter(q_node)
+    # TODO finalize test.
+
+class RuleTestCase(TestCase):
+  """Tests some of the non-core functionalities of Rules (used in authorisation)."""
+
+  def setUp(self):
+    # set up a Group
+    self.groups = []
+    self.groups.append(Group(name='mocked_group'))
+    # we have to save in order to make the right references
+    [group.save() for group in self.groups]
+
+    # set up a User
+    self.users = []
+    self.users.append(get_user_model()(username='mocked_user'))
+    # we have to save in order to make the right references
+    [user.save() for user in self.users]
+    self.users[0].groups.add(self.groups[0])
+    self.users[0].save()
+
+    # set up a Role
+    self.roles = []
+    self.roles.append(Role(
+      name='mocked_role',
+      description='',
+      group=self.groups[0],
+      )
+    )
+    # we have to save in order to make the right references
+    [role.save() for role in self.roles]
+
+    # set up some Rules
+    EMPTY_VALUE_SET = '[]'
+    VALUE_SET = '[1,2,3]'
+    self.rules = []
+    for (index, name) in Rule.RULE_FIELD:
+      self.rules.append(
+          Rule(
+            field=index, value_set=EMPTY_VALUE_SET, role=self.roles[0],
+            )
+      )
+    # we have to save in order to make the right references
+    Rule.objects.bulk_create(self.rules)
+
+    # set up some BusinessUnits, FunctionalAreas and Locations
+    for model in [BusinessUnit, FunctionalArea, Location]:
+      for x in range(0, 3):
+        model().save()
+
+  def test_format_value_set(self):
+    """Tests whether a value_set of a Rule can be formatted in a nice way."""
+    for rule in self.rules:
+      result = rule.format_value_set()
+      self.assertNotEqual(result, '')
+      self.assertIsNotNone(result)
+
+  def test_format_field(self):
+    """Tests whether an instance of a Rule has a sensible formatted field."""
+    for rule in self.rules:
+      result = rule.format_field()
+      self.assertNotEqual(result, '')
+      self.assertIsNotNone(result)
+
+  def test_get_value_set(self):
+    """Tests whether a Rule instance can generate a sensible value_set."""
+    for rule in self.rules:
+      result = rule.get_value_set()
+      # should be JSON decoding of value_set
+      json_str = json.dumps(result)
+      self.assertEquals(json_str, rule.value_set)
+
+  def test_set_value_set(self):
+    """Tests whether we can set the value_set of a Rule."""
+    value_set = [1, 2, 3]
+    rule = Rule(field=Rule.RULE_FIELD[0][0],role=self.roles[0],
+        value_set='[4,5,6]')
+    rule.save()
+    rule.set_value_set(value_set)
+    self.assertEqual(rule.get_value_set(), value_set)
+
+class TimesliceTests(TestCase):
+  """
+  Tests that the functions of the timeslice model work correctly.
+  """
+
+  # Months for which we create our test timeslices
+  MONTHS = [date(2001, 1, 1), date(2001, 2, 1), date(2001, 6, 1), date(2002, 1, 1)]
+
+  @classmethod
+  def setUpTestData(cls):
+    user = get_user_model()(username='test')
+    user.save()
+
+    # Create timeslices and store their ID's in an array
+    cls.ts = []
+    cls.ts_id = []
+    for i, month in enumerate(TimesliceTests.MONTHS):
+      timeslice = Timeslice(capture_month=month)
+      timeslice.save()
+      cls.ts.append(timeslice)
+      cls.ts_id.append(timeslice.id)
+    # Convenient way to pass args that we do not find important
+    extra_args = {"user": user, "upload_date": date(2000,1,1)}
+    # Create some datasources for our timeslices
+    cls.ds0 = DataSource(timeslice=cls.ts[0], csv_format=DataSource.CSV_CORE, **extra_args)
+    cls.ds1 = DataSource(timeslice=cls.ts[1], csv_format=DataSource.CSV_CORE, **extra_args)
+    cls.ds2 = DataSource(timeslice=cls.ts[3], csv_format=DataSource.CSV_CORE, **extra_args)
+    cls.succession_ds = DataSource(timeslice=cls.ts[1], csv_format=DataSource.CSV_SUCCESSION, **extra_args)
+    cls.ds0.save()
+    cls.ds1.save()
+    cls.ds2.save()
+    cls.succession_ds.save()
+
+  def test_range_by_month_contains_right_timeslices(self):
+    """
+    Selecting a range of timeslices by giving first/last capture months results in the right slices.
+    """
+    # Dataset ts_id[2] has no core dataset so it is not expected in the result
+    expected_ids = [self.ts_id[0], self.ts_id[1], self.ts_id[3]]
+    actual_ids = Timeslice.range_by_month(TimesliceTests.MONTHS[0], TimesliceTests.MONTHS[-1])
+    self.assertEqual(sorted(expected_ids), sorted(actual_ids))
+
+  def test_range_by_ids_contains_right_timeslices(self):
+    """
+    Selecting a range of timeslices by giving first/last id's results in the right slices.
+    """
+    # Dataset ts_id[2] has no core dataset so it is not expected in the result
+    expected_ids = [self.ts_id[0], self.ts_id[1], self.ts_id[3]]
+    actual_ids = Timeslice.range_by_id(self.ts_id[0], self.ts_id[3])
+    self.assertEqual(sorted(expected_ids), sorted(actual_ids))
+
+  def test_empty_range_results_in_exception(self):
+    """
+    When the specified range contains no timeslices (that have the required
+    datasources), an exception is raised. A core datasource is assumed by
+    default for each timeslice.
+    """
+    try:
+      # April 2001 has no corresponding timeslice. The 2nd timeslice has no core dataset.
+      # There are no timeslices inbetween april 2001 and the third timeslice (June 2001)
+      # so this should cause the exception to be thrown
+      actual_ids = Timeslice.range_by_month(date(2001, 4, 1), TimesliceTests.MONTHS[2])
+      self.fail("No exception raised")
+    except MissingDataSourceException:
+      pass
+
+  def test_empty_range_is_suppressed(self):
+    """
+    When the specified range contains no timeslices (that have the required
+    datasources), an exception is raised. A core datasource is assumed by
+    default for each timeslice.
+    """
+    try:
+      # This range should be empty (see previous test). However, now we suppress the exception by
+      # passing allow_empty.
+      actual_ids = Timeslice.range_by_month(date(2001, 4, 1), TimesliceTests.MONTHS[2], allow_empty=True)
+    except MissingDataSourceException:
+      self.fail("Exception thrown while it should be suppressed")
+
+  def test_succession_timeslices_are_correct(self):
+    """
+    The right timeslices are returned when we only select ones that have succession datasets.
+    """
+    # We only have succession data in timeslice 2
+    expected_ids = [self.ts_id[1]]
+    actual_ids = Timeslice.range_by_id(self.ts_id[0], self.ts_id[-1],
+                                       required_datasources=[DataSource.CSV_SUCCESSION])
+    self.assertEqual(sorted(expected_ids), sorted(actual_ids))
+
+  def test_inverted_range_causes_exception(self):
+    """
+    Ranges where the first comes after last cause a ValueError
+    """
+    try:
+      Timeslice.range_by_month(date(2000, 2, 1), date(2000, 1, 1))
+      self.fail("ValueError expected")
+    except ValueError:
+      pass
+
+  def test_equal_months_imply_single_month_range(self):
+    """
+    When the first and last month are equal, the range must cover a single month
+    This also tests capture month normalization (where day-of-month is stripped away)
+    """
+    expected_ids = [self.ts_id[0]]
+    actual_ids = Timeslice.range_by_month(date(2001, 1, 1), date(2001, 1, 20))
+    self.assertEqual(sorted(expected_ids), sorted(actual_ids))
+
+class DatabaseRouterTests(TestCase):
+  """
+  Tests that all database routes in database.routes are valid (contain no typo's)
+  """
+
+  def test_all_routes_are_valid(self):
+    for base_model, routes in database_routes.items():
+      for dest_model, _ in routes.items():
+        # explicitly call get_routes instead of grabbing the path from the routing dict
+        route = get_route(base_model, dest_model)
+        pk_lookup = route+'id'
+        try:
+          list(base_model.objects.values(pk_lookup).all())
+        except FieldError:
+          self.fail("Route from {} to {} did not result in valid query" \
+                    .format(base_model.__name__, dest_model.__name__))

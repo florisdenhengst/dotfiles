@@ -1,0 +1,29 @@
+<?php
+include_once 'settings.php';            // General settings
+include_once 'db.php';	                // DB specific settings and connection 
+include_once 'session_management.php';  // Load enhanced session functions
+include_once 'TemplateWrapper.php';     // Load wrapper class for Dwoo templates
+
+include_once 'gluephp/glue.php';        // Include URL router
+include_once 'urls.php';                // Include URL routes
+
+
+require DWOO_ROOT . 'dwooAutoload.php';      // Dwoo template engine
+$dwoo = new Dwoo();
+
+include_once 'models/DataObject.php'; // First load the base class
+// Load all derived classes 
+foreach(glob("models/*.php") as $file){
+  include_once $file;
+}
+
+include_once 'controllers/controller.php'; // First load base controller
+// Load all derived controllers 
+foreach(glob("controllers/*.php") as $file){
+  include_once $file;
+}
+
+// TODO: REMOVE!!
+
+$result = glue::stick($urls);
+?>

@@ -1,0 +1,47 @@
+{extends "menu-page.tpl"}
+
+{block "title"}
+  Edit Group {if $group.label == ""}{$group.id}{else}{$group.label}{/if}
+{/block}
+
+{block "content"}
+  <form class=""
+        method="POST">
+    <div class="form-group form-group-md">
+      {if isset($group.id)}
+        <input type='hidden' value="{$group.id}"> 
+      {/if}
+      <div class="row">
+        {include(file='forms/text-input.tpl',
+                  label       = 'label',
+                  input_type  = 'text',
+                  input_id    = 'label',
+                  placeholder = 'description',
+                  value       = $group.label,
+                  autofocus   = TRUE)
+        }
+      </div>
+      {if $user['is_superuser']}
+      <div class="row">
+        {include(file='forms/dropdown.tpl',
+                    label     = 'owner',
+                    input_id  = 'owner',
+                    input_name= 'owner',
+                    options   = $users,
+                    selected  = $group.owner,
+                    required  = TRUE,
+                    )
+         }
+      </div>
+      {/if}
+      <div class="row">
+        {include(file='forms/back-submit.tpl',
+                  submit_button_id    = '',
+                  back_button_id      = '',
+                  back_url            = '/management/groups'
+        )}
+      </div>
+    </div>
+
+  </form>
+{/block}

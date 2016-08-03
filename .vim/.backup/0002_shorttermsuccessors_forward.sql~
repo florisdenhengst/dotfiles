@@ -1,0 +1,14 @@
+CREATE OR REPLACE VIEW shorttermsuccessors AS
+  SELECT id, title,
+  COALESCE(listed.count, 0) AS listed_successors
+  FROM POSITION
+  LEFT OUTER JOIN(
+    SELECT COUNT(*), position_id
+    FROM succession
+    LEFT OUTER JOIN successionterm
+      ON succession.term_id = successterm.id
+    WHERE successionterm.major_term = 3
+    GROUP BY position_id
+    ORDER BY position_id
+  ) listed
+ON listed.position_id = position.id;

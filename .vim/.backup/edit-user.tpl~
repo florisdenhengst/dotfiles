@@ -1,0 +1,60 @@
+{extends "base.tpl"}
+
+{block "title"}
+  Edit {$user.username}
+{/block}
+
+{block "content"}
+  {assign "$username_pattern" "[a-zA-Z0-9_\-@]+"}
+  <form class="form-horizontal"
+        method="POST">
+    <div class="form-group form-group-md">
+      {if isset($user.id)}
+        <input type='hidden' value="{$user.id}"> 
+      {/if}
+      <div class="row">
+        {include(file='forms/text-input.tpl',
+                  label       = 'username [a-Z0-9_-@]',
+                  input_type  = 'text',
+                  input_id    = 'username',
+                  placeholder = 'username',
+                  value       = $user.username
+                  required    = TRUE,
+                  autofocus   = TRUE,
+                  pattern     = $username_pattern
+        )}
+      </div>
+      <div class="row">
+        {include(file='forms/text-input.tpl',
+                  label       = 'password',
+                  input_type  = 'password',
+                  input_id    = 'password',
+                  placeholder = 'password',
+                  required    = TRUE,
+        )}
+      </div>
+      <div class="row">
+        {include(file='forms/checkbox.tpl',
+                  label       = 'active',
+                  input_id    = 'active',
+                  checked     = $user.active 
+        )}
+      </div>
+      <div class="row">
+        {include(file='forms/checkbox.tpl',
+                  label       = 'superuser',
+                  input_id    = 'is_superuser',
+                  checked     = $user.is_superuser
+        )}
+      </div>
+      <div class="row">
+        {include(file='forms/back-submit.tpl',
+                  submit_button_id    = '',
+                  back_button_id      = '',
+                  back_url            = '/management/users'
+        )}
+      </div>
+    </div>
+
+  </form>
+{/block}

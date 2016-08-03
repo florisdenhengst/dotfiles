@@ -1,0 +1,355 @@
+#!/usr/bin/env python3 
+"""Imports data from CSV's. This data may override existing data or can be appended
+to various tables."""
+import csv
+import sys
+import datetime
+import codecs
+import tempfile
+import zipfile
+import os
+import shutil
+from database.csvtool import consts
+from database.csvtool import CSVLogger
+from database.csvtool import extract_enum_members_from_core
+from database.csvtool import extract_enum_members_from_succession
+from database.csvtool import compile_enum_csv
+from database.csvtool import parse_enum_csv
+from database.csvtool import import_enum
+from database.csvtool import can_import_core 
+from database.csvtool import parse_core_csv
+from database.csvtool import import_core
+from database.csvtool import can_import_succession
+from database.csvtool import parse_succession_csv
+from database.csvtool import import_succession
+from database.csvtool import can_import_multiposition
+from database.csvtool import parse_multiposition_csv
+from database.csvtool import import_multiposition
+from database.csvtool import compute_spans
+from database.models import DataSource
+from database.models import Chunk
+from database.models import Role
+from database.models import Timeslice
+from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
+from django.contrib.auth import get_user_model
+
+class CsvTool(object):
+
+  CAN_IMPORT_FUNCS = {'core' : can_import_core,
+                      'succession' : can_import_succession,
+                      'multiposition' : can_import_multiposition}
+
+  PARSER_FUNCS = { 'enum' : parse_enum_csv,
+                   'core' : parse_core_csv,
+                   'succession' : parse_succession_csv,
+                   'multiposition' : parse_multiposition_csv}
+
+  IMPORTER_FUNCS = { 'enum' : import_enum,
+                     'core' : import_core,
+                     'succession' : import_succession,
+                     'multiposition' : import_multiposition}
+
+  # Constants used in importzip command implementation
+  CHANGELOG_FILENAME = "changelog.txt"
+  ENUM_CSV_FILENAME = "enum.csv"
+  # The versioned csv formats in the order in which they should be loaded!
+  VERSIONED_CSV_FORMATS = ['core', 'succession', 'multiposition']
+  CSV_EXTENSION = ".csv"
+
+  @staticmethod
+  def do_import(csv_format, capture_month, csv_reader, csv_file=None, log=None, **options):
+    """Loads a dataset from a single csv in a timeslice denoted by
+    'capture_month'. The csv_format determines the type of data that is loaded
+    and the tables in which it ends up.
+
+    First, a validation step is executed to check whether the data can be imported
+    this depends on the current state of the database, the timeslice and what kind
+    of data (csv_format) we are importing.
+
+    We then parse the rows provided by the csv reader. During parsing we perform
+    a number of checks. When doing a dry-run, the function terminates after parsing.
+
+    When we do not do a dry-run and no errors were reported, we will apply our
+    changes to the database. This function will not run post processing logic.
+
+    Parameters:
+
+    * csv_reader: The filename of the csv containing our dataset to load
+    * csv_format: A string representing the format / data type of csv
+    * csv_file: An optional Python file object containing the dataset to load
+    * capture_month: The month in which the data was 'measured'. This specifies
+    * log: an optional logger to write errors/info to. When not given, a new one is created
+    * the timeslice
+    """
+    if log is None:
+      log = CSVLogger()
+
+    # Are we importing a valid csv format?
+    if csv_format not in DataSource.CSV_FORMATS.values():
+      log.report_error("Invalid csv format {}".format(csv_format))
+      return False, None, log
+
+    try:
+      can_import_func = CsvTool.CAN_IMPORT_FUNCS.get(csv_format)
+      parser_func = CsvTool.PARSER_FUNCS[csv_format]
+      importer_func = CsvTool.IMPORTER_FUNCS[csv_format]
+    except KeyError:
+      log.report_error("No parser/importer for csv_format: {}".format(csv_format))
+      return False, None, log
+
+    # The user performing the upload must exist!
+    username = options[consts.OPT_USER]
+    try:
+      upload_user = get_user_model().objects.filter(username=username).get()
+    except ObjectDoesNotExist:
+      log.report_error(("Django user \"{}\" does not exist. Use the --user option "
+                        "to select an alternative uploading user.")
+                       .format(username))
+      return False, None, log
+
+    # Check whether all conditions for importing are met
+    if can_import_func != None:
+      if not can_import_func(capture_month, log, **options):
+        return False, None, log
+
+    # Parse the CSV
+    try:
+      parsed_rows = parser_func(csv_reader, log, capture_month, **options)
+    except UnicodeDecodeError as ude:
+      log.report_error("Csv with csvformat {} for timeslice {} contains non-unicode characters: {}" \
+                       .format(csv_format, capture_month, str(ude)))
+    if not log.is_ok():
+      return False, None, log
+
+    ds_description = options[consts.OPT_DESCRIPTION] if consts.OPT_DESCRIPTION in options else ''
+    datasource = CsvTool.new_data_source_and_timeslice(upload_user, capture_month,
+            ds_description, csv_format, log, csv_file=csv_file)
+
+    # Insert parsed rows into database
+    importer_func(parsed_rows, datasource, log, **options)
+
+    if not log.is_ok():
+      return False, datasource, log
+    return True, datasource, log
+
+  @staticmethod
+  def do_import_from_file(csvfilename, csv_format, capture_month, **options):
+    """
+    Imports a single csv from a file.
+
+    * csvfilename: The filename of the csv containing our dataset to load
+    * csv_format: A string representing the format / data type of csv
+    * capture_month: The month in which the data was 'measured'. This specifies the timeslice
+
+    Return a tuple of succes and the log
+    """
+    with codecs.open(csvfilename, 'rU', encoding='utf-8-sig') as csvfile:
+      csv_reader = csv.reader(csvfile, delimiter=';')
+      (succes, datasource, log) = CsvTool.do_import(csv_format, capture_month,
+                                                    csv_reader, csvfile, **options)
+      return succes, log
+
+
+  @staticmethod
+  def do_extract_enums(core_csv_filename, output_csv_filename, succession_csv_filename=None):
+    log = CSVLogger()
+
+    models_to_enum_members = {}
+
+    # Extract enum members from a given core.csv (append to models_to_enum_members)
+    with codecs.open(core_csv_filename, 'rU', encoding='utf-8-sig') as csvfile:
+      csv_reader = csv.reader(csvfile, delimiter=';')
+      extract_enum_members_from_core(csv_reader, log, models_to_enum_members)
+
+    # When succession.csv given, extract SuccessionTerms as well! 
+    # (append to models_to_enum_members)
+    if succession_csv_filename != None:
+      with codecs.open(succession_csv_filename, 'rU', encoding='utf-8-sig') as csvfile:
+        csv_reader = csv.reader(csvfile, delimiter=';')
+        extract_enum_members_from_succession(csv_reader, log, models_to_enum_members)
+
+    # Write collected enum members to output csv
+    with open(output_csv_filename, "w") as output_csv:
+      compile_enum_csv(models_to_enum_members, output_csv)
+
+    print("===INFO===")
+    for info in log.info:
+      print("{}".format(info))
+    if not log.is_ok():
+      print("===ERRORS===")
+      for error in log.errors:
+        print("{}".format(error))
+
+  @staticmethod
+  def postprocess(log=None):
+    if log is None:
+      log = CSVLogger()
+
+    # Rebuild chunk table
+    Chunk.objects.all().delete()
+    Chunk.generate_chunks()
+    log.report_info("{} chunks generated".format(Chunk.objects.count()))
+
+    # Update the roles
+    Role.update_all()
+    log.report_info("Updated roles")
+
+    # Compute/store Layers and spans
+    for timeslice in Timeslice.objects.all():
+      compute_spans(timeslice, log)
+
+    return log.is_ok(), log
+
+  @staticmethod
+  def import_dataset_from_zip(zipfilename, **options):
+    """
+    Imports all csv's in the zipfile into crunchr.
+
+    Extracts the zip in a temporary file and imports the individual csvs into
+    crunchr. "enum.csv" is required. All other csv's have the
+    "<csv_format>_<YYYY-MM>.csv" format.  A "changelog.txt" file is optional.
+    """
+    temp_extract_dir = tempfile.mkdtemp()
+    log = CSVLogger()
+
+    # Abort when timeslices exist
+    timeslice_count = Timeslice.objects.count()
+    if timeslice_count > 0:
+      log.report_error("Importzip requires the database to be empty, but {} timeslices were found." \
+                       .format(timeslice_count))
+      return False, log
+
+    try:
+      # Extract dataset zip
+      with zipfile.ZipFile(zipfilename, "r") as z:
+        z.extractall(temp_extract_dir)
+
+      # Check if filenames are correct. Report unexpected non-matching filenames
+      filenames = os.listdir(temp_extract_dir)
+
+      # We allow a changelog file in the dataset zip
+      if CsvTool.CHANGELOG_FILENAME in filenames:
+        filenames.remove(CsvTool.CHANGELOG_FILENAME)
+
+      # enum.csv is obligatory
+      if CsvTool.ENUM_CSV_FILENAME not in filenames:
+        log.report_error("no '{}' found in '{}'".format(CsvTool.ENUM_CSV_FILENAME, zipfilename))
+      else:
+        filenames.remove(CsvTool.ENUM_CSV_FILENAME)
+
+      # All other filenames must be valid csv files with a strict format
+      csvs = []
+      for csv_filename in filenames:
+        # Check and strip off extension
+        if not csv_filename.endswith(CsvTool.CSV_EXTENSION):
+          log.report_error("File {} is not a csv".format(csv_filename))
+        basename = csv_filename[:-len(CsvTool.CSV_EXTENSION)]
+        # Check filename components
+        try:
+          (csv_format, csv_date_str) = basename.split('_')
+        except ValueError:
+          log.report_error("Filename {} does not adhere to <csvformat>_<YYYY-MM>.csv format".format(csv_filename))
+          continue
+        if csv_format not in CsvTool.VERSIONED_CSV_FORMATS:
+          log.report_error("Filename '{}' does not start with a valid csv format".format(csv_format))
+          continue
+        try:
+          csv_date = datetime.datetime.strptime(csv_date_str, "%Y-%m").date()
+        except ValueError:
+          log.report_error("Filename {} has invalid date".format(csv_filename))
+          continue
+        # When all checks passed, add it for importing
+        csvs.append((csv_filename, csv_format, csv_date))
+
+      # Abort when invalid files where found in the zipfile
+      if not log.is_ok():
+        return False, log
+
+      # Import enum csv
+      log.report_info("Importing enumeration tables...")
+      enum_csv_filename = temp_extract_dir+'/'+CsvTool.ENUM_CSV_FILENAME
+      (ok, _) = CsvTool.do_import_from_file(enum_csv_filename, "enum", None, log=log, **options)
+      if not ok:
+        log.report_error("Failed to import enum.csv")
+        return False, log
+
+      # Sort csv's according to order in VERSIONED_CSV_FORMATS!
+      # This order is important since there are dependencies between datasets
+      csvs = sorted(csvs, key=lambda csv: CsvTool.VERSIONED_CSV_FORMATS.index(csv[1]))
+
+      # Import all versioned csv's
+      first_timeslice = True
+      for csv_info in csvs:
+        csv_filename = temp_extract_dir+'/'+csv_info[0]
+        csv_format = csv_info[1]
+        capture_month = csv_info[2]
+        log.report_info("Importing a {} csv for timeslice {}...".format(csv_format, str(capture_month)))
+
+        # Automatically add new found taxonomies and position titles
+        import_options = options.copy()
+        if csv_format == "core" or csv_format == "multiposition":
+          import_options[consts.OPT_ADD_TAXONOMY] |= first_timeslice
+          import_options[consts.OPT_ADD_TITLE] |= first_timeslice
+        first_timeslice = True
+
+        # Import the csv
+        (ok, _) = CsvTool.do_import_from_file(csv_filename, csv_format, capture_month, log=log, **import_options)
+        if not ok:
+          log.report_error("Failed to import csv {}".format(csv_info[0]))
+          return False, log
+
+      # Do post processing
+      (ok, _) = CsvTool.postprocess(log=log)
+      if not ok:
+        log.report_error("Postprocessing failed")
+        return False, log
+    finally:
+      shutil.rmtree(temp_extract_dir)
+    return log.is_ok(), log
+
+  @staticmethod
+  def new_data_source_and_timeslice(upload_user, capture_month, description, 
+                                    csv_format, log, csv_file=None):
+    """Creates a new datasouce for an import.
+    
+    * upload_user: The model of the user that uploads the dataset
+    * capture_month: a 'date' object representing when the dataset was captured 
+    * description: An optional description of the upload
+    * csv_format: One of the constants in DataSource
+    * csv_file: An optional Python file containing the contents of the dataset to load
+
+    Returns the datasource model
+    """
+    # Read entire CSV to string
+    if csv_file is not None:
+      csv_file.seek(0)
+      csv_data = csv_file.read()
+    else:
+      csv_data = ''
+    
+    format_to_id = {fmt_str: fmt_id for fmt_id, fmt_str in DataSource.CSV_FORMATS.items()}
+
+    if csv_format == 'enum':
+      timeslice = None
+    else:
+      # Create a new timeslice, or use an existing Timeslice if it already exists.
+      # Write which one of both happened to the info logger.
+      timeslice, created = Timeslice.objects.get_or_create(
+              capture_month=capture_month)
+
+      if created:
+        log.report_info('Created new Timeslice "{}"'.format(timeslice))
+      else:
+        log.report_info('Using existing Timeslice "{}" for "{}" dataset'.format(timeslice,
+                                                                                csv_format))
+
+    datasource = DataSource(user=upload_user,
+                            upload_date=datetime.datetime.now(),
+                            timeslice=timeslice,
+                            description=description,
+                            csv_data=csv_data,
+                            csv_format=format_to_id[csv_format])
+    datasource.save()
+    return datasource
+

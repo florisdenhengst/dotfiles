@@ -1,0 +1,10 @@
+import time
+from database.models import *
+
+time1 = time.time()
+Chunk.generate_chunks()
+time2 = time.time()
+diff = time2 - time1
+ms = diff * 1000.0
+print('%0.3f ms' % ms)
+

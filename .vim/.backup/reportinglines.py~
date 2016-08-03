@@ -1,0 +1,336 @@
+from database.csvtool import base
+from database.csvtool import consts
+from database.models import core
+from django.db import transaction
+from django.db import DatabaseError
+from django.db.models import Q
+
+# Solid line & layer validation
+ERR_INVALID_SOLID_LINE = "Invalid solid line \'{}\' found for position with id \'{}\'"
+ERR_MP_INVALID_SOLID_LINE = "Invalid solid line \'{}\' found for mulitposition with id \'{}\'"
+ERR_INVALID_DOTTED_LINE = "Invalid dotted line \'{}\' found for position with id \'{}\'"
+ERR_MP_INVALID_DOTTED_LINE = "Invalid dotted line \'{}\' found for mulitposition with id \'{}\'"
+ERR_ALL_POSITIONS_REPORT_TO_INVALID = "All positions report to positions having invalid solid lines."
+ERR_NO_ROOTS = "No root positions found. Please remove the cycle(s)"
+ERR_FLOATING_TREE = "Floating tree detected of size {} at root position {}. Please specify a layer for this position."
+ERR_CYCLE_FOUND = "Cycle found {}. {} positions report into it."
+ERR_LAYER_INCONSISTENT = "Assigned layer {} for position {} conflicts with computed layer {}"
+ERR_MP_LAYER_INCONSISTENT = "Assigned layer {} for multiposition {} conflicts with computed layer {}"
+
+class Position(object):
+
+  def __init__(self, id, solid_line, layer, csv_row):
+    self.id = id
+    self.solid_line = solid_line
+    self.layer = layer
+    self.boss = None
+    self.children = []
+    self.solid_line_direct_span = 0
+    self.solid_line_indirect_span = 0
+    # This is the sum of all headcounts of all multipositions directly
+    # reporting into this position through the solid line
+    self.solid_line_multiposition_direct_span = 0
+    self.csv_row = csv_row
+
+  def set_layer(self, layer):
+    self.layer = layer
+
+  def set_boss(self, boss):
+    self.boss = boss
+
+  def add_child(self, child):  
+    self.children += [child]
+
+
+def validate_position_solid_lines(position_entries, log, **options):
+  """
+  Validates the solid reporting lines of a list of positions (TableEntry
+  objects), which represent positions. It also validates layers and computes
+  the layers of all positions reporting to a position at a known layer. The
+  computed layers will be stored in the TableEntry objects so they can be
+  imported!
+  
+  It reports:
+
+  - positions reporting to non-existent positions
+  - assigned layers which are inconsistent with computed ones
+  - cycles in the reporting hierarchy
+  - floating tree structures of positions for which layers cannot be computed
+  """
+  # Convert TableEntry objects to Positions
+  positions = {}
+  for e in position_entries:
+    pos_id     = e.fields['position_id']
+    solid_line = e.fields.get('solid_line')
+    layer      = e.fields.get('solid_line_layer')
+    csv_row    = e.get_csv_row()
+    position = Position(pos_id, solid_line, layer, csv_row)
+    positions[pos_id] = position
+
+  # This may remove positions from 'positions'
+  validate_solid_lines_of_positions(positions, log, **options)
+
+  # Add layers back into the TableEntry objects so that they can later be
+  # inserted into the db. This overwrites any positions for which wrong solid
+  # line layers where provided
+  for p in position_entries:
+    position = positions.get(p.fields['position_id'])
+    if position is not None:
+      p.fields['solid_line_layer'] = position.layer
+
+
+def validate_position_dotted_lines(position_entries, log, **options):
+  """
+  Ensure that dotted lines of positions (TableEntry objects) refer to valid
+  positions
+  """
+  position_ids = [p.fields['position_id'] for p in position_entries]
+  for position in position_entries:
+    log.row_nr = position.get_csv_row()
+    dotted_line = position.fields.get('dotted_line')
+    if dotted_line != None and dotted_line not in position_ids:
+      log.report_error(ERR_INVALID_DOTTED_LINE.format(position.fields['dotted_line']))
+
+
+def validate_multiposition_solid_lines(multiposition_entries, timeslice, log, **options):
+  """
+  Ensure that solid lines refer to valid positions (TableEntry objects) and
+  that the provided layers are correct. In case the layer is not set and the
+  solid line supervisor is known and has a layer, the multiposition layer is 
+  inferred and included in the multiposition's TableEntry object.
+
+  It requires the previously imported core datasource to validate position
+  layers
+  """
+  # Create (position_id, Position) dictionary
+  position_map = positions_from_db(timeslice)
+  for mp in multiposition_entries:
+    log.row_nr = mp.get_csv_row()
+    mp_id = mp.fields.get('multiposition_id')
+    solid_line = mp.fields.get('solid_line')
+    # Validate solid_line and layer
+    if solid_line != None:
+      if solid_line not in position_map:
+        log.report_error(ERR_MP_INVALID_SOLID_LINE.format(solid_line, mp_id))
+        continue
+
+      # We can only validate the layer when we have a solid line supervisor
+      # with a known layer. Otherwise, we assume it is the correct layer
+      boss = position_map[solid_line]
+      if boss == None or boss.layer == None:
+        continue
+
+      # Validate and let the inferred layer overwrite the specified layer
+      layer = mp.fields.get('solid_line_layer')
+      if layer != None and layer != boss.layer + 1:
+        log.report_error(ERR_MP_LAYER_INCONSISTENT.format(layer, mp.id, boss.layer + 1))
+      mp.fields['solid_line_layer'] = boss.layer + 1
+
+
+def validate_multiposition_dotted_lines(multiposition_entries, timeslice, log, **options):
+  # TODO: Make versioning aware
+  """
+  Ensures that the dotted lines refer to existing positions (TableEntry objects)
+  """
+  position_ids = {pid for pid in
+                  core.Job.objects \
+                          .values_list('position__position_id', flat=True) \
+                          .filter(~Q(employee__status__major_type=core.EmployeeStatus.LEFT),
+                                     data_source__timeslice=timeslice)
+                  }
+  for mp in multiposition_entries:
+    log.row_nr = mp.get_csv_row()
+    if 'dotted_line' in mp.fields and \
+       mp.fields['dotted_line'] not in position_ids:
+      log.report_error(ERR_MP_INVALID_SOLID_LINE.format(mp.fields['dotted_line'],
+                                                        mp.fields['multiposition_id']))
+
+
+def _validate_layer(pos, layer, unvisited, log):
+  """
+  Recursively validates the layers for 'pos' and all positions reporting into
+  it. All visited positions are removed from unvisited
+  """
+  if pos.layer is not None and pos.layer != layer:
+    log.row_nr = pos.csv_row
+    log.report_error(ERR_LAYER_INCONSISTENT.format(pos.layer, pos.id, layer))
+  pos.layer = layer
+  unvisited.remove(pos)
+  for child in pos.children:
+    _validate_layer(child, layer + 1, unvisited, log)
+
+
+def _count_and_remove_tree(pos, unvisited):
+  """
+  Recursively counts the positions in the tree starting at 'pos' and removes
+  all nodes from the unvisited list
+  """
+  child_count = 0
+  for child in pos.children:
+    child_count += _count_and_remove_tree(child, unvisited)
+  unvisited.remove(pos)
+  return child_count + 1
+
+    
+def validate_solid_lines_of_positions(positions, log, **options):
+  """
+  Validates solid lines for a dictionary of Position objects.
+  This dictionary must map position_id's to their corresponding Position objects.
+  Look at validate_solid_lines_of_position_entries for more details
+  """
+  ignore_floating_trees = (options.get(consts.OPT_IGNORE_FLOATING_TREES) == True)
+
+  # Eliminate positions with invalid reporting lines
+  position_count = len(positions)
+  clean_positions = {}
+  for pos in positions.values():
+    log.row_nr = pos.csv_row
+    if pos.solid_line is None or pos.solid_line in positions.keys():
+      clean_positions[pos.id] = pos
+    else:
+      log.report_error(ERR_INVALID_SOLID_LINE.format(pos.solid_line, pos.id))
+  log.row_nr = 0
+
+  # Iteratively prune all positions that report to invalid ones
+  while len(clean_positions) < len(positions):
+    positions = clean_positions
+    clean_positions = {pid: pos for pid, pos in positions.items()
+                       if pos.solid_line is None or pos.solid_line in positions.keys()}
+  positions = clean_positions
+
+  # Report number of prune positions
+  if position_count - len(positions) > 0:
+    log.report_info("{} positions pruned as a result of invalid solid lines" \
+                    .format(position_count - len(positions)))
+
+  if len(positions) == 0:
+    log.report_error(ERR_ALL_POSITIONS_REPORT_TO_INVALID)
+    return
+  
+  # Set boss / children for all positions
+  positions = build_hierarchy(positions)
+
+  # Get root positions
+  roots = [pos for pos in positions.values() if pos.boss is None]
+  if len(roots) == 0:
+    log.report_error(ERR_NO_ROOTS)
+    return
+
+  # Validate layers (traverse them top-down. Keep track of an 'unvisited' list
+  # of positions)
+  unvisited = list(positions.values())
+  for root in roots:
+    if root.layer is not None:
+      _validate_layer(root, root.layer, unvisited, log)
+    else:
+      span = _count_and_remove_tree(root, unvisited)
+      msg = ERR_FLOATING_TREE.format(span, root.id)
+      if not ignore_floating_trees:
+        log.report_error(msg)
+      else:
+        # floating trees may be ignored. Report an info instead
+        log.report_info(msg)
+
+
+  # Unvisited positions are part of cycles. Report them!
+  while len(unvisited) > 0:
+    pos = unvisited[0]
+    path = []
+    # Traverse reporting lines for an unvisited position until we find a cycle
+    while pos is not None:
+      if pos.id in path:
+        # Cycle found. Break it and compute size of tree!
+        pos.boss.children.remove(pos)
+        span = _count_and_remove_tree(pos, unvisited)
+        cycle_str = ','.join(path)
+        log.report_error(ERR_CYCLE_FOUND.format(cycle_str, span))
+        break
+      path += [pos.id]
+      pos = pos.boss
+
+def positions_from_db(timeslice):
+  """
+  Grab all position models linked to a given datasource and 
+  return a dictionary mapping position_id's to Position objects
+  """
+  result = {}
+  positions = core.Job.objects.values_list('position__position_id',
+                                           'position__solid_line__position_id',
+                                           'position__solid_line_layer') \
+                                   .filter(~Q(employee__status__major_type=core.EmployeeStatus.LEFT),
+                                           data_source__timeslice=timeslice)
+  for p in positions:
+    result[p[0]] = Position(p[0], p[1], p[2], 0)
+  return result
+
+def build_hierarchy(positions):
+  """
+  Sets the boss and the children for all positions and returns the list
+  """
+  for pos in positions.values():
+    if pos.solid_line is not None:
+      boss = positions[pos.solid_line]
+      pos.set_boss(boss)
+      boss.add_child(pos)
+  return positions
+
+
+def compute_spans(timeslice, log):
+  """
+  Computes direct and indirect spans for the solid reporting lines. 
+
+  This function should be called as a post processing step
+  """
+  # Get positions from DB and initialize boss / children
+  positions = build_hierarchy(positions_from_db(timeslice))
+
+  # Compute solid line multiposition direct spans. This is the sum of all headcounts 
+  # in all multipositions that are directly reporting to a position
+  mp_solidline_headcounts = core.MultiPosition.objects \
+                            .values_list('solid_line__position_id', 'headcount') \
+                            .filter(solid_line__position_id__isnull=False,
+                                    data_source__timeslice=timeslice) \
+                            .all()
+  for mp in mp_solidline_headcounts:
+    boss = positions[mp[0]]
+    boss.solid_line_multiposition_direct_span += mp[1]
+    boss.solid_line_direct_span += mp[1]
+
+  # Compute spans in top-down fashion by starting at the root positions
+  positions_with_spans = 0
+  roots = [pos for pos in positions.values() if pos.solid_line is None]
+  for root in roots:
+    positions_with_spans = _compute_position_spans(root)
+
+  log.report_info("Spans computed for {} positions from {} root positions" \
+                  .format(positions_with_spans, len(roots)))
+
+  # Insert spans into db
+  try:
+    for batch in base.transaction_batches(positions.values()):
+      with transaction.atomic():
+        for position in batch:
+          log.row_nr = position.csv_row
+          core.Position.objects.filter(position_id=position.id,
+                                       job__data_source__timeslice=timeslice) \
+                               .update(solid_line_direct_span=position.solid_line_direct_span,
+                                       solid_line_indirect_span=position.solid_line_indirect_span)
+    log.report_info("Computed spans were inserted into database.")
+  except DatabaseError as dbe:
+    log.report_error("Database error while importing: {}".format(dbe))
+
+
+def _compute_position_spans(position):
+  """
+  Recursive function that computes the direct and indirect span of the given positions
+  and all other positions reporting to it. It takes into account the solid line multiposition
+  spans, which equals the headcount in multipositions directly reporting into the position
+  """
+  indirect_span = position.solid_line_multiposition_direct_span
+  for child in position.children:
+    indirect_span += _compute_position_spans(child)
+
+  position.solid_line_direct_span = len(position.children) + \
+                                    position.solid_line_multiposition_direct_span
+  position.solid_line_indirect_span = indirect_span
+  return indirect_span + 1

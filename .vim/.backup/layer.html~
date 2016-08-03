@@ -1,0 +1,127 @@
+<!-- Layer view-->
+<div>
+
+  <!-- Profile lightbox -->
+  <fo-profile-lightbox
+      id="{{positionID}}"
+      show="profileLightBoxIsVisble"
+      position-details="positionDetails"
+      callback="profileLightBoxCallback(layerLevel, id)"
+      close-callback="profileLightBoxCloseCallback()">
+  </fo-profile-lightbox>
+
+  <!-- Navigation and search box -->
+  <div class="row overflowable">
+    <div class="col-xs-1">
+      <div class="left">
+        <div id="back-button" ui-sref="organisation.structure.overview">BACK</div>
+      </div>
+    </div>
+    <div class="col-xs-6 col-xs-offset-2">
+      <div class="center" ng-show="true">
+        <img ng-click="goToPrevLayer()"
+            class="arrow-button" ng-class="{'grayed-out': activeLayer==1}"
+            ng-disabled="true"
+            src="/static/kapstok/logos/arrowUp.png">
+      </div>
+      <!-- Current layer -->
+      <h2 class="center" ng-show="activeLayer">Layer {{activeLayer}}</h2>
+    </div>
+    <div class="col-xs-3">
+      <div class="search-box-container">
+        <fo-search-box callback="setSelectedPosition(id, layer)"></fo-search-box>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="row" ng-class="{'layer-loading-fix': !ready}" ng-show="activeLayer">
+
+    <div class="col-xs-10 col-xs-offset-1">
+
+      <!-- Positions -->
+      <div class="col-xs-2 positionbox-min-width" ng-repeat="pos in positions" >
+        <div id='p#{{pos.POSID}}'
+            class="positionbox"
+            ng-click="getPositionData(pos['position-id'].v)">
+          <div class="name">
+            {{pos['first-name'].v + " " + pos['last-name'].v}}
+          </div>
+          <h1>
+            Direct Span: <span class="fat">{{pos['direct-span'].v}}</span>
+            <br>
+            Indirect Span: <span class="fat">{{pos['indirect-span'].v}}</span>
+          </h1>
+          <div class="incentive">View profile</div>
+        </div>
+      </div>
+
+      <!-- Show next positions box -->
+      <div class="col-xs-2 positionbox-min-width" ng-show="totalNumPositions - numPositionsShown > 0"
+          ng-click="getData()">
+        <div id='p#{{pos.POSID}}'
+            class="shownext-box">
+            <div class="incentive">Show more</div>
+            <br/>
+            {{totalNumPositions}} - {{numPositionsShown}}
+            {{ totalNumPositions - numPositionsShown }} left
+        </div>
+      </div>
+
+    </div>
+    <div><fo-loading ready="ready"></fo-loading></div>
+
+    <!-- No profile matches message -->
+    <div class="col-lg-10 col-lg-push-1 no-positions" ng-show="positions.length == 0 && ready">
+        <div class="row" />
+
+        <div class="row">
+          <div class="col-lg-2 col-lg-push-5">
+            <ng-include src="'/static/kapstok/logos/stop.svg'"></ng-include>
+          </div>
+        </div>
+
+        <div class="row">
+          <p>There are currently no profile matches to your filter settings in this layer.</p>
+          <p class="incentive" ng-click="goToNearestLayer()">
+            Go directly to the nearest layer with profile matches.
+          </p>
+        </div>
+
+        <div class="row" />
+    </div>
+
+    <!-- Learn/export/power report bar -->
+    <div class="col-xs-1 ">
+      <div class="graph-options">
+        <ul>
+          <fo-learn-widget></fo-learn-widget>
+          <!--
+          <li><ng-include src="'/static/kapstok/logos/export.svg'"></ng-include>EXPORT</li>
+          <li><a href="#/organisation?page=powerreport">
+              <ng-include src="'/static/kapstok/logos/power report.svg'"></ng-include>POWER REPORT
+          </a></li>
+          -->
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Next layer navigation -->
+  <div class="row">
+    <div class="col-lg-12">
+      <div class="center" ng-show="activeLayer < numLayerLevels">
+        <img ng-click="goToNextLayer()"
+            class="arrow-button" ng-class="{'grayed-out': activeLayer >= numLayerLevels}"
+            src="/static/kapstok/logos/arrowDown.png">
+        <br>
+        <h2 style="opacity:0.67">Layer {{activeLayer + 1}}</h2>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fake UI view -->
+  <div ui-view></div>
+
+</div>

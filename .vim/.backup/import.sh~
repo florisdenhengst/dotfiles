@@ -1,0 +1,59 @@
+#!/bin/bash
+
+if [[ -z $1 || -z $2 || -z $3 ]] ; then
+  echo "Usage:"
+  echo "      import.sh [path/to/csvs] [myDB] [/full/path/to/fo/web-framework]"
+  echo "exiting..."
+  exit
+fi
+
+regex='^[0-9]+$'
+
+DST=$1
+DATABASE=$2
+CLOSURE_GENERATOR="$DST/../../closure_tables/"
+USER=$(whoami)
+SUPER_USER="postgres"
+PROJECT_DIR=$3
+APP_NAME="database"
+TABLES=(Person DataSource TalentStatus RetentionRisk RetentionRiskReason PerformanceStatus
+Potential Mobility Currency Grade FunctionalArea Location BusinessUnit BusinessUnitHierarchy Position Employee SuccessionTerm
+Succession FunctionalAreaHierarchy LocationHierarchy )
+FILES=(person datasource talentStatus retentionRisk retentionRiskReason performanceStatus
+potential mobility currency grade functionalArea location businessUnit businessUnitHierarchy position employee successionTerm
+succession functionalAreaHierarchy locationHierarchy )
+
+#python libreconverter/libreconverter.py $EXCEL_FILE $DST/%s.csv
+
+#export CLASSPATH=$CLASSPATH:/$CLOSURE_GENERATOR
+
+#Remove old data from database. structure remains
+python3 $PROJECT_DIR/manage.py flush
+
+for f in $DST/*.csv;
+do
+  #Check to see whether the first line needs to be stripped.
+  LINE=$(head -n 1 $f)
+  FIRST_CHAR=${LINE:0:1}
+  if ! [[ $FIRST_CHAR =~ [0-9] ]] ; then
+    sed -i '1d' $f
+  fi
+done
+
+for (( i=0; i< ${#TABLES[@]}; i++ ));
+do
+  echo ""
+  filename=${FILES[$i]}'Table.csv'
+  tablename=${TABLES[$i]}
+  echo "$tablename"
+#  echo "Query to be executed:" 
+#  echo  "COPY $tablename FROM '$(pwd)/$1/$filename' WITH DELIMITER ';' NULL '';"
+#  echo  "psql -U $SUPER_USER $DATABASE -c \"COPY $tablename FROM '$(pwd)/$1/$filename' WITH DELIMITER ';' NULL ''\""
+  sudo -u $SUPER_USER psql -U $SUPER_USER $DATABASE -c "COPY $tablename FROM '$(pwd)/$1/$filename' WITH DELIMITER ';' NULL''"
+  echo ""
+done
+
+
+
+
+

@@ -1,0 +1,17 @@
+<label for="{$input_id}" class="col-sm-2 control-label">{$label}</label>
+<div class="col-sm-4">
+  <div class="input-group date" id="{$input_id}">
+    <input 
+      id="{$input_id}" 
+      name="{$input_name}"
+      value="{$value}"
+      type="text"
+      class="form-control"
+      {if $autofocus}autofocus{/if}
+      {if $required}required{/if}
+      />
+    <span class="input-group-addon">
+      <span class="glyphicon glyphicon-calendar"></span>
+    </span>
+  </div>
+</div>

@@ -1,0 +1,176 @@
+\documentclass{report}
+
+
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks,
+    linkcolor={red!50!black},
+    citecolor={blue!50!black},
+    urlcolor={blue!80!black}
+}
+\usepackage[toc,page]{appendix}
+\usepackage{floatrow}
+\usepackage{multicol}
+\usepackage{csquotes}
+\usepackage{booktabs}
+\usepackage[pdftex]{graphicx}
+\graphicspath{{./imgs/}}
+\usepackage{tabularx}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{mdwlist}
+\usepackage{enumitem}
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{commath}
+\usepackage{xfrac}
+\usepackage[colorinlistoftodos]{todonotes}
+\usepackage{listings}
+\usepackage{color}
+\definecolor{name}{rgb}{0.5,0.5,0.5}
+\usepackage{sidecap}
+\usepackage{varwidth} %for the varwidth minipage environment
+\newcommand{\at}{\makeatletter @\makeatother}
+\newcommand*\ON[0]{$\surd$}
+\newcolumntype{M}{>{\begin{varwidth}{4cm}}l<{\end{varwidth}}} %M is for Maximal column
+\usepackage{courier}
+\usepackage{multirow}
+\usepackage{afterpage}
+\usepackage[section]{placeins}
+
+\DeclareCaptionFont{white}{\color{white}}
+\DeclareCaptionFormat{listing}{
+  \colorbox[cmyk]{0.43, 0.35,0.35,0.01}
+  {\parbox{\textwidth}{\hspace{15pt}#1#2#3}}
+}
+
+% citation needed functionality
+\usepackage{ifthen}
+\let\oldcite=\cite
+\renewcommand\cite[1]{\ifthenelse{\equal{#1}{NEEDED}}{[citation~needed]}{\oldcite{#1}}}
+% use \include* to include on same page
+\usepackage{newclude}
+
+
+% TODOs markbelow and markabove
+\usepackage{stackengine}
+\setstackgap{L}{.5\baselineskip}
+\newcommand\markabove[2]{{\sffamily\color{red}\hsmash{$\uparrow$}
+  \smash{\toplap{#1}{\scriptsize\bfseries#2}}}}
+\newcommand\markbelow[2]{{\sffamily\color{red}\hsmash{$\downarrow$}
+  \smash{\bottomlap{#1}{\scriptsize\bfseries#2}}}}
+\usepackage{ifthen}
+\newcounter{todoindex}
+\setcounter{todoindex}{0}
+\newcommand\TODO[1]{
+  \addtocounter{todoindex}{1}
+  \expandafter\def\csname todo\roman{todoindex}\endcsname{#1}
+  \markabove{c}{\Alph{todoindex}}
+}
+\newcounter{index}
+\newcommand\showTODOs{
+  \vspace{5ex}
+  \rule{10ex}{.5ex}\textcolor{red}{TO-DO LIST}\rule{10ex}{.5ex}\\
+  \setcounter{index}{0}
+  swhiledo{\value{index} < \value{todoindex}}{
+    \addtocounter{index}{1}
+    \markabove{c}{\Alph{index}}  \csname todo\roman{index}\endcsname\\
+  }
+}
+
+% two images in 1 line
+\newsavebox\IBoxA \newsavebox\IBoxB \newlength\IHeight
+\newcommand\TwoFig[6]{% Image1 Caption1 Label1 Image2 ...
+  \sbox\IBoxA{\includegraphics[width=0.45\textwidth]{#1}}
+  \sbox\IBoxB{\includegraphics[width=0.45\textwidth]{#4}}%
+  \ifdim\ht\IBoxA>\ht\IBoxB
+    \setlength\IHeight{\ht\IBoxB}\else\setlength\IHeight{\ht\IBoxA}\fi%
+  \begin{figure}[b]
+  \minipage[t]{0.45\textwidth}\centering
+  \includegraphics[height=\IHeight]{#1}
+  \endminipage\hfill
+  \minipage[t]{0.45\textwidth}\centering
+  \includegraphics[height=\IHeight]{#4}
+  \endminipage 
+  \end{figure}%
+}
+
+\newcommand\litem[1]{\item{\bfseries #1\\}}
+
+\newcommand*\rfrac[2]{{}^{#1}\!/_{#2}}
+\newcommand*\diffvec[1]{\vec{#1}}
+
+% command for inline code
+\newcommand*\ilcode[1]{\texttt{#1}}
+% command for denoting inline classes
+\newcommand*\ilclass[1]{\texttt{#1}}
+
+
+\date{\today}
+\date{\vspace{-5ex}}
+\begin{document}
+
+\input{titlepage/titlepage}
+
+\abstract{
+  We propose an active learning framework for finding anomalies without \emph{a
+  priori} knowledge. The framework consists of an unsupervised component for
+  detection of possible anomalies, a query selection mechanism to minimize the
+  number of required labels and a supervised component for final classification.
+  We argue that LOF is the most suitable unsupervised method as it contains
+  little assumptions on the data. We find that an SVM-based classifier yields
+  the best performance for the supervised. Our approach enables the
+  identification anomalies quickly when all data is available for querying.
+}
+
+\chapter*{Preface}
+This thesis would not have been possible without excellent guidance, great
+inspiration and indefinite support from a number of people, of which I'm deeply
+thankful.
+
+The journey that culminated into this work was initiated by Dirk Jonker with the
+open-ended question `How can we detect and errors in customer data?' Although I'm
+paraphrasing, the lack of a strict definition and any predefined goals in his
+original statement both posed a challenge and conveyed a clear message of trust.
+This unusual combination of posing challenges without steering towards paved
+roads I view as a clear example of `noise'...
+
+For being an expert in scientific precision, I thank Mark Hoogendoorn and all of
+his critical questions I can recall.  Even though his throughput of papers to
+review, courses to run and research to conduct kept growing throughout this
+journey, the unfaded attention and continously insightful remarks proved a firm
+basis for improvements to both the research and this piece of writing.
+
+Finally, a note of thanks to friends, family and all others close to me: for
+listening to ramblings and rants; for never-ending status update requests; for
+providing ever-necessary distractions; for being motivational support machines;
+for holding up a mirror and keeping my spirits up.
+
+\tableofcontents
+
+\include{introduction/introduction}
+
+\include{related_work/related_work}
+
+\include{contributions/contributions}
+
+
+\include{method/method}
+
+\include{results/results}
+
+\include{discussion/discussion}
+
+\include{conclusion/conclusion}
+
+\include{appendix/appendix}
+
+\bibliographystyle{plain}
+\bibliography{references/main}
+
+\end{document}

@@ -1,0 +1,58 @@
+CREATE TABLE `user` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `username` varchar(45) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `active` tinyint(1) NOT NULL DEFAULT '0',
+  `is_superuser` tinyint(1) DEFAULT '0',
+  `salt` text NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `username_UNIQUE` (`username`)
+) ENGINE=InnoDB AUTO_INCREMENT=468 DEFAULT CHARSET=utf8;
+
+
+CREATE TABLE `group` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `owner` int(11) NOT NULL,
+  `label` text NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `id_UNIQUE` (`id`),
+  KEY `fk_group_1_idx` (`owner`),
+  CONSTRAINT `fk_owner_user` FOREIGN KEY (`owner`) REFERENCES `user` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8;
+
+CREATE TABLE `client` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `last_active` datetime DEFAULT NULL,
+  `group` int(11) NOT NULL,
+  `label` text,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `id_UNIQUE` (`id`),
+  KEY `fk_client_group_idx` (`group`),
+  CONSTRAINT `fk_client_group` FOREIGN KEY (`group`) REFERENCES `group` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8;
+
+CREATE TABLE `presentation` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `group` int(11) NOT NULL,
+  `url` text NOT NULL,
+  `timeslot` int(11) NOT NULL,
+  `label` text,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `id_UNIQUE` (`id`),
+  KEY `fk_presentation_group_idx` (`group`),
+  KEY `fk_presentation_timeslot_idx` (`timeslot`),
+  CONSTRAINT `fk_presentation_group` FOREIGN KEY (`group`) REFERENCES `group` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION,
+  CONSTRAINT `fk_presentation_timeslot` FOREIGN KEY (`timeslot`) REFERENCES `timeslot` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8;
+
+CREATE TABLE `timeslot` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `start_time` datetime NOT NULL,
+  `end_time` datetime NOT NULL,
+  `owner` int(11) NOT NULL,
+  `label` text,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `id_UNIQUE` (`id`),
+  KEY `fk_timeslot_user_idx` (`owner`),
+  CONSTRAINT `fk_timeslot_user` FOREIGN KEY (`owner`) REFERENCES `user` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8;

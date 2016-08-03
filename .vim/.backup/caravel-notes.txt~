@@ -1,0 +1,12 @@
+Front-end
+- Queries send raw to front-end. How are they parsed?
+- Responses expose a JSON and CSV export endpoint.
+  Pretty nice, but how are they generated / linked?
+
+Models
+
+Views
+
+Architecture
+
+

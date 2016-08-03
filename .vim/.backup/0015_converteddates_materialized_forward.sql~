@@ -1,0 +1,11 @@
+CREATE MATERIALIZED VIEW view_converteddatesemployee AS
+SELECT employee.id as employee_id,
+  EXTRACT(YEAR FROM AGE(person.dateofbirth)) + EXTRACT(MONTH FROM AGE(person.dateofbirth)) / 12 AS age,
+  EXTRACT(YEAR FROM AGE(person.dateinservice)) + EXTRACT(MONTH FROM AGE(person.dateinservice)) / 12 AS yearsofservice
+FROM employee, person
+WHERE employee.person_id = person.id;
+
+CREATE MATERIALIZED VIEW view_converteddatesjob AS 
+SELECT job.id as job_id,
+  EXTRACT(YEAR FROM AGE(job.dateinposition)) + EXTRACT(MONTH FROM AGE(job.dateinposition)) / 12 AS yearsinposition
+FROM job;

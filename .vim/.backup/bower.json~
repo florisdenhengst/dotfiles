@@ -1,0 +1,22 @@
+{
+  "name": "crunchr",
+  "description": "data science for people strategies",
+  "version": "0.1.0",
+  "homepage": "http://crunchrapps.com",
+  "private": true,
+  "dependencies": {
+    "angular": "1.3.x",
+    "angular-ui-router": "0.x",
+    "angular-animate": "1.3.x",
+    "angular-mocks": "1.3.x",
+    "bootstrap": "3.x",
+    "d3": "",
+    "taffydb": "",
+    "nedb": "louischatriot/nedb#master",
+    "jquery": "",
+    "pivottable": "1.2.x",
+    "colorbox": "1.x",
+    "angular-bootstrap": "0.x",
+    "isteven-angular-multiselect": "2.x"
+  }
+}

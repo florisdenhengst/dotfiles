@@ -1,0 +1,2832 @@
+from enum import Enum
+import json, random
+from decimal import Decimal
+from django.db.models import IntegerField
+from django.http import HttpResponseBadRequest, HttpResponse, Http404
+from django.shortcuts import get_object_or_404
+from database.models import *
+from database.q_factory import *
+from django.db.models import *
+from database.datatable import DataTable
+from kapstok.formatters import *
+from collections import OrderedDict
+from django.db.transaction import atomic
+from kapstok import order_by_mapping
+from copy import deepcopy
+from django.db import connection
+import logging
+
+logger = logging.getLogger('organisation.views')
+WRONG_TIMESLICE_ERROR_MSG = 'There is no {} Timeslice with id: {}'
+MULTIPOS_EXCLUDED_BY_ATTRIBUTE = \
+   'Cannot compare including multipositions using this attribute, so multipositions are left out.'
+
+def summary_statistics(request, based_on="fte"):
+  """Returns a datatable with all necessary statistics for the summary page of organisation
+
+  This view returns a datatable with one row. The table contains a column for every statistic of
+  the summary page of organisation: 9 in total. The view checks on the POST parameter 'based_on'
+  to decide whether the statistics should be based on FTE or based on Headcount (default FTE).
+
+  Arguments:
+
+  * request -- The Django request object.
+  * based_on -- String representing on what unit the statistics should be based on, defaults to fte
+
+  """
+
+  # Create Datatable
+  result = DataTable.with_title("Summary")
+
+  # Create Q objects for auth, filter & only active positions in order
+  # to speed up queries for multiple queries on the same object
+  q_job = (QFactory(Job).auth_filtered(request.user, request.global_filter)
+                        & Q(status__active=True))
+  q_person = (QFactory(Person).auth_filtered(request.user, request.global_filter)
+                              & Q(employee__job__status__active=True))
+  q_multipos = QFactory(MultiPosition).auth_filtered(request.user, request.global_filter)
+
+  if based_on == "fte":
+    # Column for total FTE needs to be added
+    result.add_column(Decimal, "Total FTE", "fte")
+    row = _get_statistics_weighted_by_fte(q_job, q_person, q_multipos)
+  else:
+    # Column for total Headcount needs to be added
+    result.add_column(int, "Total Headcount", "headcount")
+    row = _get_statistics_weighted_by_headcount(q_job, q_person, q_multipos)
+
+  # Calculations not specifically based on FTE or Headcount
+  pos_hierarchy_filtered=Position.objects.auth_filtered(request, active=True)
+  aggregates = (Position.objects
+                        .filter(pk__in=pos_hierarchy_filtered)
+                        .aggregate(max_layer=Max("solid_line_layer"),
+                                   span=Avg(
+                                       Case(#exclude from Avg when 0
+                                           When(Q(solid_line_direct_span=0), then=None),
+                                           default=F('solid_line_direct_span')
+                                           )
+                                       )
+                                   )
+               )
+
+  # Take maximum of position layer and multiposition layer
+  max_layer = max((aggregates.get("max_layer") or 0),
+                  (MultiPosition.objects
+                                .filter(q_multipos)
+                                .aggregate(max_layer=Max("solid_line_layer"))
+                                .get("max_layer") or 0)
+              )
+
+
+  avg_span = Decimal(aggregates.get("span") or 0.0)
+
+  row.extend([
+      [max_layer, fo_format(max_layer)],
+      [avg_span, fo_format(avg_span)],
+  ])
+
+  # Add all other statistic columns
+  result.add_column(Decimal, "Average Age", "avg-age")
+  result.add_column(Decimal, "Percentage aged 60+", "percentage-60")
+  result.add_column(Decimal, "Average Years of Service", "avg-yos")
+  result.add_column(Decimal, "Average Years in Role", "avg-years-in-role")
+  result.add_column(Decimal, "Percentage Female", "percentage-female")
+  result.add_column(Decimal, "Percentage Talent", "percentage-talent")
+  result.add_column(int, "Reporting Layers", "reporting-layers")
+  result.add_column(Decimal, "Average Span of Control", "avg-span-of-control")
+
+  # These two statistics need to be added later
+  # result.add_column(float, "Turnover", "turnover")
+  # result.add_column(float, "Percentage of new hires that are still with company after 12 months", "percentage-still-with-company")
+  # Add computed row to result
+
+  result.add_row(row)
+
+  response = {'dataTables': [ result.to_JSON()]}
+
+  return HttpResponse(json.dumps(response), content_type="application/json")
+
+def _get_statistics_weighted_by_fte(q_job, q_person, q_multipos):
+  """Private method to return the statistics weighted by FTE
+
+  Arguments:
+
+  * q_job -- The Q object for authorization and filtering for the Job model
+  * q_person --   The Q object for authorization and filtering for the Person model
+  * q_multipos -- The Q object for authorization and filtering for the MultiPosition model
+  """
+  jobs = Job.objects.filter(q_job)
+  # No distinct, because it's based on FTE not on headcount
+  persons = Person.objects.filter(q_person)
+  multipos = MultiPosition.objects.filter(q_multipos)
+
+  # the 'field' kwarg replaces the field in the function of SUM, because it should be weighted by fte
+  # the 'function' kwarg replaces the SUM function with a division by the total FTE of jobs
+  # which do have a years in position entry in the database
+  job_aggregates = jobs.aggregate(
+                        fte=Sum("fte"),
+                        years_in_pos=Sum(F('years_in_position') * F('fte'),
+                            output_field=DecimalField()
+                        ),
+                        fte_with_years_in_pos=Sum(
+                            Case(
+                              When(years_in_position__isnull=False,then=F('fte')),
+                              default=0),
+                            output_field=IntegerField()
+                        )
+                   )
+
+  person_aggregates = (persons
+                            .aggregate(
+                               weighted_age=Sum(F('employee__age') * F('employee__job__fte'),
+                                 output_field=DecimalField()
+                               ),
+                               age_60=Sum(
+                                  Case(
+                                    When(employee__age__gte=60,
+                                    then=F('employee__job__fte')
+                                    ),
+                                    default=0
+                                  ),
+                                  output_field=DecimalField()
+                               ),
+                               fte_with_age=Sum(
+                                  Case(
+                                    When(employee__age__isnull=False,
+                                    then=F('employee__job__fte')),
+                                    default=0
+                                  ),
+                                  output_field=IntegerField()
+                               ),
+                               yos=Sum(
+                                 F('employee__years_of_service') *
+                                 F('employee__job__fte'),
+                                 output_field=DecimalField()
+                               ),
+                               fte_with_yos=Sum(
+                                  Case(
+                                    When(employee__years_of_service__isnull=False,
+                                    then=F('employee__job__fte')
+                                    ),
+                                    default=0
+                                  ),
+                                  output_field=IntegerField()
+                               ),
+                               male=Sum(
+                                  Case(
+                                    When(gender=Person.MALE, then=F('employee__job__fte')),
+                                    default=0
+                                  ),
+                                  output_field=IntegerField()
+                               ),
+                               female=Sum(
+                                  Case(
+                                    When(gender=Person.FEMALE, then=F('employee__job__fte')),
+                                    default=0
+                                  ),
+                                  output_field=DecimalField()
+                               ),
+                               # Talent status score might change due to new requirements!!
+                               talent=Sum(
+                                 Case(
+                                   When(employee__talent_status__score__gt=0,
+                                   then=F('employee__job__fte')
+                                   ),
+                                 default=0
+                                 ),
+                                 output_field=DecimalField()
+                               )
+                            )
+                       )
+
+  multipos_aggregates = (multipos
+                         .aggregate(fte=Sum("total_fte"),
+                                    age=Sum(F('age_average') * F('total_fte'),
+                                      output_field=DecimalField()
+                                    ),
+                                    age_60=Sum(
+                                        Case(
+                                          When(age_average__gte=60, then=F('total_fte')),
+                                          default = 0),
+                                        output_field=DecimalField()
+                                    ),
+                                    fte_with_age=Sum(
+                                        Case(
+                                          When(age_average__isnull=False, then=F('total_fte')),
+                                          default=0),
+                                        output_field=IntegerField()
+                                    ),
+                                    yos=Sum(
+                                      F('years_of_service_avg') * F('total_fte'),
+                                      output_field=DecimalField()
+                                    ),
+                                    fte_with_yos=Sum(
+                                        Case(
+                                          When(years_of_service_avg__isnull=False,
+                                            then=F('total_fte')),
+                                          default=0),
+                                        output_field=IntegerField()
+                                    ),
+                                    years_in_pos=Sum(
+                                      F('years_in_position_avg') * F('total_fte'),
+                                      output_field=DecimalField()
+                                    ),
+                                    fte_with_years_in_pos=Sum(
+                                        Case(
+                                          When(years_in_position_avg__isnull=False,
+                                            then=F('total_fte')),
+                                          default=0),
+                                        output_field=IntegerField()
+                                    ),
+                                    weighted_male_count=Sum(
+                                      ((1.0 * F('gender_count_male')) / (1.0 *  F('headcount'))) * F('total_fte'),
+                                      output_field=DecimalField()
+                                    ),
+                                    weighted_female_count=Sum(
+                                      ((1.0 * F('gender_count_female')) / (1.0 * F('headcount')))
+                                      * (1.0 * F('total_fte')),
+                                      output_field=DecimalField()
+                                    ),
+                                    headcount=Sum("headcount"))
+                         )
+
+  # Calculate the FTE. This is the sum of all job FTEs plus
+  # the sum of all multiposition FTEs
+  fte = (job_aggregates.get("fte") or Decimal(0)) + (multipos_aggregates.get("fte") or Decimal(0))
+
+  fte_with_age = (person_aggregates.get("fte_with_age") or Decimal(0.0)) + (multipos_aggregates.get("fte_with_age") or Decimal(0.0))
+
+  avg_age = ((person_aggregates.get("weighted_age") or Decimal(0.0)) + (multipos_aggregates.get("age") or
+    Decimal(0))) / (fte_with_age or 1)
+
+  age_60_percentage = Decimal(((person_aggregates.get("age_60") or Decimal(0.0)) + (multipos_aggregates.get("age_60") or Decimal(0.0)))
+                       / (fte_with_age or 1))
+
+  # Check for division with zero
+  if (fte_with_age == 0):
+    avg_age = Decimal(-1.0)
+    age_60_percentage = Decimal(-1.0)
+
+  yos = (person_aggregates.get("yos") or Decimal(0.0)) + (multipos_aggregates.get("yos") or Decimal(0.0))
+  fte_with_yos = (person_aggregates.get("fte_with_yos") or Decimal(0.0)) + (multipos_aggregates.get("fte_with_yos") or Decimal(0.0))
+  avg_yos = yos / (fte_with_yos or 1)
+
+  # Check for division with zero
+  if (fte_with_yos == 0):
+    avg_yos = Decimal(-1.0)
+
+  years_in_position = (job_aggregates.get("years_in_pos") or Decimal(0.0)) + (multipos_aggregates.get("years_in_pos") or Decimal(0.0))
+  fte_with_years_in_position = (job_aggregates.get("fte_with_years_in_pos") or Decimal(0.0)) + (multipos_aggregates.get("fte_with_years_in_pos") or Decimal(0.0))
+  avg_years_in_position = years_in_position / (fte_with_years_in_position or 1)
+
+  # Check for division with zero
+  if (fte_with_years_in_position == 0):
+    avg_years_in_position = Decimal(-1.0)
+
+  # Ratio of women in multipositions times FTE gives an
+  # approximation for the female FTE
+  multipos_female = multipos_aggregates.get('weighted_female_count') or Decimal(0)
+  multipos_male = multipos_aggregates.get('weighted_male_count') or Decimal(0)
+
+
+  female = (person_aggregates.get("female") or Decimal(0)) + multipos_female
+  sum_male_female = female + (person_aggregates.get("male") or Decimal(0)) + multipos_male
+  female_percentage = Decimal(female / (sum_male_female or 1))
+
+  # Check for division with zero
+  if (sum_male_female == 0):
+    female_percentage = Decimal(-1.0)
+
+  # Talent calculation
+  talent_percentage = Decimal((person_aggregates.get("talent") or 0)) / Decimal(fte or 1.0)
+
+  # Check for division with zero
+  if (fte == 0):
+    talent_percentage = Decimal(-1.0)
+
+
+  # Turnover calculation
+  # TODO implement turnover calculations. This requires multiple data uploads.
+  turnover = Decimal(0)
+
+  # Will stay calculation
+  # TODO Implement will-stay calculations. This requires multiple data uploads.
+  will_stay = Decimal(0)
+
+  return [
+      [Decimal(fte/100), fo_format(fte/100)],
+      [avg_age, fo_format_average(avg_age)],
+      [age_60_percentage, fo_format_percentage(age_60_percentage)],
+      [avg_yos, fo_format_average(avg_yos)],
+      [avg_years_in_position, fo_format_average(avg_years_in_position)],
+      [female_percentage, fo_format_percentage(female_percentage)],
+      [talent_percentage, fo_format_percentage(talent_percentage)],
+  ]
+
+def _get_statistics_weighted_by_headcount(q_job, q_person, q_multipos):
+  """Private method to return the statistics weighted by Headcount
+
+  Arguments:
+
+  * q_job -- The Q object for authorization and filtering for the Job model
+  * q_person --   The Q object for authorization and filtering for the Person model
+  * q_multipos -- The Q object for authorization and filtering for the MultiPosition model
+  """
+  jobs = Job.objects.filter(q_job)
+  # Distinct is necessary to exclude duplicate results due to the join with Job table
+  persons = Person.objects.filter(q_person).distinct()
+  multipos = MultiPosition.objects.filter(q_multipos)
+
+  job_aggregates = (jobs
+                    .aggregate(years_in_pos=Sum("years_in_position"),
+                               headcount_with_years_in_pos=Sum(
+                                 Case(
+                                   When(years_in_position__isnull=False,
+                                     then=1),
+                                   default=0),
+                                 output_field=IntegerField()
+                                 )
+                               )
+                   )
+  # .filter() creates a subquery to get distinct persons only
+  person_aggregates = (Person.objects
+                       .filter(pk__in=persons)
+                       .aggregate(headcount=Count("pk"),
+                                  weighted_age=Sum('employee__age'),
+                                  # join to age already created so pk suffices
+                                  age_60=Sum(
+                                    Case(
+                                      When(employee__age__gte=60, then=1),
+                                      default=0),
+                                    output_field=IntegerField()
+                                  ),
+                                  # join to age already created so pk suffices
+                                  headcount_with_age=Sum(
+                                      Case(
+                                        When(employee__age__isnull=False, then=1),
+                                        default=0),
+                                      output_field=IntegerField()
+                                  ),
+                                  yos=Sum("employee__years_of_service"),
+                                  # join to yos already created so pk suffices
+                                  headcount_with_yos=Sum(
+                                      Case(
+                                        When(employee__years_of_service__isnull=False,
+                                          then=1),
+                                        defaul_value=0),
+                                      output_field=IntegerField()
+                                  ),
+                                  male=Sum(
+                                      Case(
+                                        When(gender=Person.MALE, then=1),
+                                        default=0),
+                                      output_field=IntegerField()
+                                  ),
+                                  female=Sum(
+                                      Case(
+                                        When(gender=Person.FEMALE, then=1),
+                                        default=0),
+                                      output_field=IntegerField()
+                                  ),
+                                  talent=Sum(
+                                    Case(
+                                      When(employee__talent_status__score__gt=0,
+                                      then=1
+                                      ),
+                                    default=0
+                                    ),
+                                    output_field=IntegerField()
+                                  )
+                              )
+                       )
+  multipos_aggregates = (multipos
+                         .aggregate(headcount=Sum("headcount"),
+                                    age=Sum(F('age_average') * F('headcount'),
+                                        output_field=DecimalField()
+                                    ),
+                                    age_60=Sum(
+                                        Case(
+                                          When(age_average__gte=60, then=F('headcount')),
+                                          default=0),
+                                        output_field=IntegerField()
+                                    ),
+                                    headcount_with_age=Sum(
+                                        Case(
+                                          When(age_average__isnull=False, then=F('headcount')),
+                                          default=0),
+                                        output_field=IntegerField()
+                                    ),
+                                    yos=Sum(F('years_of_service_avg') * F('headcount'),
+                                      output_field=DecimalField()
+                                    ),
+                                    headcount_with_yos=Sum(
+                                        Case(
+                                          When(years_of_service_avg__isnull=False, then=F('headcount')),
+                                          default=0),
+                                        output_field=IntegerField()
+                                    ),
+                                    years_in_pos=Sum(F('years_in_position_avg') * F('headcount'),
+                                      output_field=DecimalField()),
+                                    headcount_with_years_in_pos=Sum(
+                                        Case(
+                                          When(years_in_position_avg__isnull=False,then=F('headcount')),
+                                          default=0),
+                                        output_field=IntegerField()
+                                    ),
+                                    male=Sum('gender_count_male', output_field=IntegerField()),
+                                    female=Sum('gender_count_female', output_field=IntegerField()))
+                         )
+
+  headcount = (person_aggregates.get("headcount") or 0) + (multipos_aggregates.get("headcount") or 0)
+
+  headcount_with_age = (person_aggregates.get("headcount_with_age") or 0) + (multipos_aggregates.get("headcount_with_age") or 0)
+  avg_age = ((person_aggregates.get("weighted_age") or Decimal(0.0)) + Decimal((multipos_aggregates.get("age") or 0.0))) / (headcount_with_age or 1)
+  age_60_percentage = Decimal(((person_aggregates.get("age_60") or 0) + (multipos_aggregates.get("age_60") or 0))
+              / (headcount_with_age or 1))
+
+  # Check for division with zero
+  if (headcount_with_age == 0):
+    avg_age = Decimal(-1.0)
+    age_60_percentage = Decimal(-1.0)
+
+  yos = Decimal(person_aggregates.get("yos") or 0.0) + Decimal(multipos_aggregates.get("yos") or 0.0)
+  headcount_with_yos = (person_aggregates.get("headcount_with_yos") or 0) + (multipos_aggregates.get("headcount_with_yos") or 0)
+  avg_yos = yos / (headcount_with_yos or 1)
+
+  # Check for division with zero
+  if (headcount_with_age == 0):
+    avg_yos = Decimal(-1.0)
+
+  years_in_position = (job_aggregates.get("years_in_pos") or Decimal(0.0)) + Decimal((multipos_aggregates.get("years_in_pos")) or 0.0)
+  headcount_with_years_in_position = (job_aggregates.get("headcount_with_years_in_pos") or 0) + (multipos_aggregates.get("headcount_with_years_in_pos") or 0)
+  avg_years_in_position = years_in_position / (headcount_with_years_in_position or 1)
+
+  # Check for division with zero
+  if (headcount_with_years_in_position == 0):
+    avg_years_in_position = Decimal(-1.0)
+
+  female = (person_aggregates.get("female") or 0) + (multipos_aggregates.get("female") or 0)
+  sum_male_female = female + (person_aggregates.get("male") or 0) + (multipos_aggregates.get("male") or 0)
+  female_percentage = Decimal(female) / Decimal(sum_male_female or 1)
+
+  # Check for division with zero
+  if (sum_male_female == 0):
+    female_percentage = Decimal(-1.0)
+
+  talent_percentage = Decimal((person_aggregates.get("talent") or 0) / (headcount or 1))
+
+  # Check for division with zero
+  if (headcount == 0):
+    talent_percentage = Decimal(-1.0)
+
+
+  # Turnover calculation
+  # TODO implement turnover calculations. This requires multiple data uploads.
+  turnover = Decimal(0)
+
+  # Will stay calculation
+  # TODO Implement will-stay calculations. This requires multiple data uploads.
+  will_stay = Decimal(0)
+
+  return [
+      [headcount, fo_format(headcount)],
+      [avg_age, fo_format_average(avg_age)],
+      [age_60_percentage, fo_format_percentage(age_60_percentage)],
+      [avg_yos, fo_format_average(avg_yos)],
+      [avg_years_in_position, fo_format_average(avg_years_in_position)],
+      [female_percentage, fo_format_percentage(female_percentage)],
+      [talent_percentage, fo_format_percentage(talent_percentage)],
+  ]
+
+def headcount_overview(request):
+  """Returns two datatables, one with the sum of FTE and headcount and one with the historic FTE data.
+
+  This view returns two datatables. The first has one row with two column for the two statistics.
+
+  The second datatable contains rows for all historic data uploads, every row has two columns:
+  the dates and the amount of FTE.
+
+  Arguments:
+
+  * request -- The Django request object.
+  """
+
+  start_timeslice_id = request.attrs.get("startTimeslice")[0]
+  end_timeslice_id = request.attrs.get("endTimeslice")[0]
+
+  try:
+    start_timeslice = Timeslice.objects.get(pk=start_timeslice_id)
+  except start_timeslice.DoesNotExist:
+    msg = WRONG_TIMESLICE_ERROR_MSG.format("start", start_timeslice_id)
+    logger.error(msg)
+    return HttpResponseBadRequest(msg)
+
+  try:
+    end_timeslice = Timeslice.objects.get(pk=end_timeslice_id)
+  except end_timeslice.DoesNotExist:
+    msg = WRONG_TIMESLICE_ERROR_MSG.format("end", end_timeslice_id)
+    logger.error(msg)
+    return HttpResponseBadRequest(msg)
+    
+  # Get statistic type from front-end
+  if request.attrs.get("view") == "headcount":
+    statistic_type = StatisticType.HEADCOUNT
+  else:
+    statistic_type = StatisticType.FTE
+
+  # Compute historic FTE development for the waterfall chart
+  history = _compute_historic_fte_development(request, start_timeslice, end_timeslice,
+        statistic_type)
+
+  # Compute 'actual' and annual turnover and add them to a statistics table
+  start_value = history.get_value(0, 1)
+  leavers_value = history.get_value(0, 8)
+
+  [actual_turnover, annual_turnover] = _compute_turnover(start_timeslice,
+      end_timeslice, start_value, leavers_value)
+
+  statistics = DataTable()
+  statistics.set_title("Current Headcount and FTE")
+  statistics.add_column(float, "Actual Turnover", "actual-turnover")
+  statistics.add_column(float, "Annual Turnover", "annual-turnover")
+
+  statistics.add_row([
+      [actual_turnover, fo_format_percentage(actual_turnover)],
+      [annual_turnover, fo_format_percentage(annual_turnover)]
+  ])
+
+  # Create a datatable for the front-end table next to the waterfall chart. It contains the same
+  # data as the history datatable. We do not need the second row as this is only needed for the
+  # waterfall chart in the front-end to display the data correctly
+  history_stats = deepcopy(history)
+  history_stats.set_title("Bucket statistics")
+  history_stats.remove_row(history_stats.get_number_of_rows() - 1)
+
+  result = [statistics.to_JSON(), history.to_JSON(), history_stats.to_JSON()]
+  response = {'dataTables' : result}
+  return HttpResponse(json.dumps(response), content_type="application/json")
+
+def _compute_historic_fte_development(request, start_timeslice, end_timeslice,
+  statistic_type):
+  """Returns a table containing data for the historic FTE/headcount waterfall chart in
+  organisation/headcount/overview
+
+  Arguments:
+
+  * request -- The Django request object.
+  """
+
+  start_timeslice_capture_month = start_timeslice.capture_month
+  end_timeslice_capture_month = end_timeslice.capture_month
+
+  start_timeslice_id = start_timeslice.id
+  end_timeslice_id = end_timeslice.id
+
+  # Generate string representation of timeslices
+  start_timeslice_string = start_timeslice_capture_month.strftime("%m/%Y")
+  end_timeslice_string = end_timeslice_capture_month.strftime("%m/%Y")
+
+  # Create reusable Q objects
+  qf = QFactory(Person)
+
+  timeslice_1_q = qf.in_timeslice(start_timeslice_id)
+  timeslice_2_q = qf.in_timeslice(end_timeslice_id)
+
+  q_active = qf.get_q_node("active", True)
+  q_auth = qf.auth(request.user)
+  q_auth_filtered = qf.auth_filtered(request.user, request.global_filter, ignore_timeslice=True)
+
+  # Create unfiltered, inactive filtered and filtered sets that can be reused
+  unfiltered_persons_ts_1 = Person.objects.filter(q_auth & timeslice_1_q).distinct()
+  unfiltered_persons_ts_2 = Person.objects.filter(q_auth & timeslice_2_q).distinct()
+
+  filtered_persons_ts_1 = Person.objects.filter(q_auth_filtered & timeslice_1_q)
+  filtered_persons_ts_2 = Person.objects.filter(q_auth_filtered & timeslice_2_q)
+
+  active_filtered_persons_ts_1 = Person.objects.filter(q_auth_filtered & q_active & timeslice_1_q)
+  active_filtered_persons_ts_2 = Person.objects.filter(q_auth_filtered & q_active & timeslice_2_q)
+
+  # Tuples
+  unfiltered_persons = (unfiltered_persons_ts_1, unfiltered_persons_ts_2)
+  filtered_persons = (filtered_persons_ts_1, filtered_persons_ts_2)
+  active_filtered_persons = (active_filtered_persons_ts_1, active_filtered_persons_ts_2)
+
+  # FTE/headcount in start timeslice and end timeslice
+  if statistic_type == StatisticType.FTE:
+    start_value = active_filtered_persons_ts_1.aggregate(
+        Sum("employee__job__fte"))['employee__job__fte__sum'] or 0
+    end_value = active_filtered_persons_ts_2.aggregate(
+        Sum("employee__job__fte"))['employee__job__fte__sum'] or 0
+  elif statistic_type == StatisticType.HEADCOUNT:
+    start_value = active_filtered_persons_ts_1.count()
+    end_value = active_filtered_persons_ts_2.count()
+
+  # New hires / leavers
+  (new_hires, leavers) = _compute_new_hires_leavers_statistic(unfiltered_persons,
+      active_filtered_persons, statistic_type)
+
+  # Becoming active / FTE change
+  (becoming_active, becoming_inactive, fte_increase, fte_decrease) = \
+      _compute_job_activity_fte_change_statistic(unfiltered_persons,
+      filtered_persons, statistic_type)
+
+  # Transfer in/out
+  (transfer_in, transfer_out) = _compute_transfer_statistic(unfiltered_persons,
+      filtered_persons, active_filtered_persons, new_hires, leavers,
+      becoming_active, becoming_inactive, statistic_type)
+
+  # Divide FTE variables by 100
+  if statistic_type == StatisticType.FTE:
+    start_value = start_value / 100
+    end_value = end_value / 100
+    new_hires = new_hires / 100
+    leavers = leavers / 100
+    becoming_active = becoming_active / 100
+    becoming_inactive = becoming_inactive / 100
+    fte_increase = fte_increase / 100
+    fte_decrease = fte_decrease / 100
+    transfer_in = transfer_in / 100
+    transfer_out = transfer_out / 100
+
+  # Create datatable
+  history = DataTable()
+  history.set_title("Historic FTE Development")
+
+  history.add_column(str, "Period", "period")
+  history.add_column(float, "Initial value", "initial-value")
+
+  history.add_column(float, "Becoming active", "becoming-active")
+  history.add_column(float, "Transfer in", "transfer-in")
+  history.add_column(float, "New hire", "new-hire")
+  history.add_column(float, "FTE increase", "fte-increase")
+
+  history.add_column(float, "Becoming inactive", "becoming-inactive")
+  history.add_column(float, "Transfer out", "transfer-out")
+  history.add_column(float, "Leaver", "leaver")
+  history.add_column(float, "FTE decrease", "fte-decrease")
+
+  history.add_row([
+    start_timeslice_string,
+    [float(start_value), fo_format(start_value, number_of_decimals=2)],
+
+    [float(becoming_active), fo_format(becoming_active, number_of_decimals=2)],
+    [float(transfer_in), fo_format(transfer_in, number_of_decimals=2)],
+    [float(new_hires), fo_format(new_hires, number_of_decimals=2)],
+    [float(fte_increase), fo_format(fte_increase, number_of_decimals=2)],
+
+    [float(becoming_inactive), fo_format(becoming_inactive, number_of_decimals=2)],
+    [float(transfer_out), fo_format(transfer_out, number_of_decimals=2)],
+    [float(leavers), fo_format(leavers, number_of_decimals=2)],
+    [float(fte_decrease), fo_format(fte_decrease, number_of_decimals=2)]
+  ])
+
+  # Second row is needed for the front-end to display the waterfall chart correctly
+  # This row only contains the initial value of the end timeslice
+  history.add_row([
+    end_timeslice_string,
+    [float(end_value), fo_format(end_value)],
+
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ])
+
+  history.set_table_property("numPositiveColumns", 4)
+  history.set_table_property("numNegativeColumns", 4)
+
+  return history
+
+def _compute_turnover(start_timeslice, end_timeslice, start_value, leavers_value):
+  """Computes the 'actual' turnover (i.e. turnover between two timeslices) and a scaled annual
+  turnover
+
+  Arguments:
+
+  * start_timeslice -- Start Timeslice, in order to retrieve month/year
+  * end_timeslice -- End Timeslice, in order to retrieve month/year
+  * start_value -- The initial value at the starting month (FTE or headcount)
+  * leavers_value -- The FTE or headcount of the people who have left the organisation between
+                     the two timeslices
+  """
+  try:
+    actual_turnover = leavers_value / start_value
+  except ZeroDivisionError:
+    actual_turnover = 0.0
+
+  start_month = start_timeslice.capture_month
+  end_month = end_timeslice.capture_month
+
+  month_difference = (end_month.year - start_month.year) * 12 + (end_month.month - start_month.month)
+
+  try:
+    annual_turnover = pow((1 + actual_turnover), (12 / month_difference)) - 1
+  except ZeroDivisionError:
+    annual_turnover = 0.0
+
+  return [actual_turnover, annual_turnover]
+
+class StatisticType(Enum):
+  HEADCOUNT = 1
+  FTE = 2
+
+def _compute_new_hires_leavers_statistic(unfiltered_persons, active_filtered_persons, statistic_type):
+  """Compute the total FTE or headcount of newly hired people and the total FTE or headcount of
+  people who left the organisation"""
+  new_hires = _get_new_hires(unfiltered_persons[0], active_filtered_persons[1])
+  leavers = _get_leavers(unfiltered_persons[1], active_filtered_persons[0])
+
+  if statistic_type == StatisticType.FTE:
+    return [new_hires.aggregate(Sum("employee__job__fte"))['employee__job__fte__sum'] or 0,
+            leavers.aggregate(Sum("employee__job__fte"))['employee__job__fte__sum'] or 0]
+  elif statistic_type == StatisticType.HEADCOUNT:
+    return [new_hires.count(), leavers.count()]
+
+def _compute_job_activity_fte_change_statistic(unfiltered_persons, filtered_persons,
+        statistic_type):
+  """Compute the FTE or headcount of people whose job activity changed to active/inactive and the
+   FTE or headcount of people whose FTE changed"""
+  rows = _get_persons_whose_activity_or_fte_changed(unfiltered_persons[0], unfiltered_persons[1],
+      filtered_persons[0], filtered_persons[1])
+
+  becoming_active = 0
+  becoming_inactive = 0
+  fte_increase = 0
+  fte_decrease = 0
+
+  # The 'rows' variable contains people who belong to four classes/buckets.
+  # They can be put into the right buckets by looking at the 'activity_change' and 'change_sign'
+  # variables
+  for row in rows:
+    activity_change = row["activity_change"]
+    change_sign = row["fte_change"]
+
+    if statistic_type == StatisticType.FTE:
+      change = abs(row["fte_change"])
+    elif statistic_type == StatisticType.HEADCOUNT:
+      change = 1
+
+     # Note: FTE increase/decrease is always zero when statistic type is 'headcount'
+    if activity_change == 0 and statistic_type == StatisticType.FTE:
+      if change_sign > 0:
+        fte_increase = fte_increase + change
+      elif change_sign < 0:
+        fte_decrease = fte_decrease + change   # Positive because buckets have positive values
+    elif activity_change != 0:
+      if change_sign > 0:
+        becoming_active = becoming_active + change
+      elif change_sign < 0:
+        becoming_inactive = becoming_inactive + change
+
+  return [becoming_active, becoming_inactive, fte_increase, fte_decrease]
+
+def _compute_transfer_statistic(unfiltered_persons, filtered_persons, active_filtered_persons,
+        new_hires, leavers, becoming_active, becoming_inactive, statistic_type):
+  """Compute the total FTE or headcount of people who transfered in (i.e. people who were visible
+  in the filtered dataset in the previous timeslice, but not visible in the current timeslice) and
+  the total FTE or headcount of people who transfered out
+  """
+
+  transfer_in_persons = _get_transfer_in(unfiltered_persons[0], unfiltered_persons[1],
+      filtered_persons[0], filtered_persons[1], active_filtered_persons[0],
+      active_filtered_persons[1], statistic_type)
+
+  transfer_out_persons = _get_transfer_out(unfiltered_persons[0], unfiltered_persons[1],
+      filtered_persons[0], filtered_persons[1], active_filtered_persons[0],
+      active_filtered_persons[1], statistic_type)
+
+  if statistic_type == StatisticType.FTE:
+    transfer_in_value = 0
+    transfer_out_value = 0
+
+    for person in transfer_in_persons:
+      transfer_in_value = transfer_in_value + abs(person['employee__job__fte'])
+    for person in transfer_out_persons:
+      transfer_out_value = transfer_out_value + abs(person['employee__job__fte'])
+  elif statistic_type == StatisticType.HEADCOUNT:
+    transfer_in_value = len(transfer_in_persons)
+    transfer_out_value = len(transfer_out_persons)
+
+  return [transfer_in_value, transfer_out_value]
+
+def _get_new_hires(unfiltered_persons_ts_1, active_filtered_persons_ts_2):
+  """Get a list of newly hired people. Returns a queryset"""
+  return active_filtered_persons_ts_2.exclude(pk__in = unfiltered_persons_ts_1)
+
+def _get_leavers(unfiltered_persons_ts_2, active_filtered_persons_ts_1):
+  """Get a list of people who left the organisation. Returns a queryset"""
+  return active_filtered_persons_ts_1.exclude(pk__in = unfiltered_persons_ts_2)
+
+def _get_becoming_active(unfiltered_persons_ts_1, unfiltered_persons_ts_2,
+    filtered_persons_ts_1, filtered_persons_ts_2):
+  """Get a list of people who became active in the second timeslice (i.e. they were inactive in the
+  previous timeslice, and active in the current timeslice). Returns a list of dictionaries"""
+  rows = _get_persons_whose_activity_or_fte_changed(unfiltered_persons_ts_1, unfiltered_persons_ts_2,
+      filtered_persons_ts_1, filtered_persons_ts_2)
+  return [person for person in rows if person['activity_change'] > 0]
+
+def _get_becoming_inactive(unfiltered_persons_ts_1, unfiltered_persons_ts_2,
+    filtered_persons_ts_1, filtered_persons_ts_2):
+  """Get a list of people who became inactive in the second timeslice (i.e. they were active in the
+  previous timeslice, and inactive in the current timeslice). Returns a list of dictionaries"""
+  rows = _get_persons_whose_activity_or_fte_changed(unfiltered_persons_ts_1, unfiltered_persons_ts_2,
+      filtered_persons_ts_1, filtered_persons_ts_2)
+  return [person for person in rows if person['activity_change'] < 0]
+
+def _get_fte_increase_employees(unfiltered_persons_ts_1, unfiltered_persons_ts_2,
+    filtered_persons_ts_1, filtered_persons_ts_2):
+  """Get a list of people whose FTE increased between the first and second timeslice. Returns a list
+  of dictionaries"""
+  rows = _get_persons_whose_activity_or_fte_changed(unfiltered_persons_ts_1, unfiltered_persons_ts_2,
+      filtered_persons_ts_1, filtered_persons_ts_2)
+  return [person for person in rows if person['activity_change'] == 0 and person['fte_change'] > 0]
+
+def _get_fte_decrease_employees(unfiltered_persons_ts_1, unfiltered_persons_ts_2,
+    filtered_persons_ts_1, filtered_persons_ts_2):
+  """Get a list of people whose FTE decreased between the first and second timeslice. Returns a list
+  of dictionaries"""
+  rows = _get_persons_whose_activity_or_fte_changed(unfiltered_persons_ts_1, unfiltered_persons_ts_2,
+      filtered_persons_ts_1, filtered_persons_ts_2)
+  return [person for person in rows if person['activity_change'] == 0 and person['fte_change'] < 0]
+
+def _contains_person(person_list, person_id):
+  """Returns whether a list of person dictionaries contains a person with a specified person id"""
+  for person in person_list:
+    if person['person_id'] == person_id:
+      return True
+  return False
+
+def _get_transfer_in(unfiltered_persons_ts_1, unfiltered_persons_ts_2,
+    filtered_persons_ts_1, filtered_persons_ts_2, active_filtered_persons_ts_1,
+    active_filtered_persons_ts_2, statistic_type):
+  """Get a list of people who transfered in (i.e. people who were not visible in the filtered
+  dataset in the first timeslice, but are visible in the filtered dataset in the second timeslice)
+  """
+  transfer_in_and_becoming_active = active_filtered_persons_ts_2.exclude(pk__in = active_filtered_persons_ts_1) \
+      .filter(pk__in=unfiltered_persons_ts_1) \
+      .values("id", "first_name", "last_name", "employee__job__fte")
+
+  becoming_active = _get_becoming_active(unfiltered_persons_ts_1, unfiltered_persons_ts_2,
+      filtered_persons_ts_1, filtered_persons_ts_2)
+
+  transfer_in = []
+
+  for transfer_person in transfer_in_and_becoming_active:
+    if not _contains_person(becoming_active, transfer_person['id']):
+      transfer_in.append(transfer_person)
+
+  return transfer_in
+
+def _get_transfer_out(unfiltered_persons_ts_1, unfiltered_persons_ts_2,
+    filtered_persons_ts_1, filtered_persons_ts_2, active_filtered_persons_ts_1,
+    active_filtered_persons_ts_2, statistic_type):
+  """Get a list of people who transfered out (i.e. people who were visible in the filtered dataset
+  in the first timeslice, but are not visible in the filtered dataset in the second timeslice)
+  """
+  transfer_out_and_becoming_inactive = active_filtered_persons_ts_1.exclude(
+      pk__in=active_filtered_persons_ts_2).filter(pk__in=unfiltered_persons_ts_2) \
+      .values("id", "first_name", "last_name", "employee__job__fte")
+
+  becoming_inactive = _get_becoming_inactive(unfiltered_persons_ts_1,
+      unfiltered_persons_ts_2, filtered_persons_ts_1,
+      filtered_persons_ts_2)
+
+  transfer_out = []
+
+  for transfer_person in transfer_out_and_becoming_inactive:
+    if not _contains_person(becoming_inactive, transfer_person['id']):
+      transfer_out.append(transfer_person)
+
+  return transfer_out
+
+def _get_persons_whose_activity_or_fte_changed(unfiltered_persons_ts_1, unfiltered_persons_ts_2, filtered_persons_ts_1,
+    filtered_persons_ts_2):
+  """Retrieve persons whose job activity or FTE changed between the first and the second timeslice.
+  Returns a list of dictionaries"""
+
+  # Queries that return the so-called 'active-count' and the sum of FTE for each person, and for
+  # inactive jobs and active jobs seperately. The unfiltered dataset per timeslice is considered.
+  # The 'active count' is the number of active jobs or the number of inactive jobs a person has.
+  unfiltered_subquery_1 = unfiltered_persons_ts_1 \
+      .values("id", "first_name", "last_name", "employee__job__status__active", "employee__job__data_source__timeslice__id") \
+      .annotate(active_count=Count("employee__job__status__active"), fte_sum=Sum("employee__job__fte"))
+  unfiltered_subquery_2 = unfiltered_persons_ts_2 \
+      .values("id", "first_name", "last_name", "employee__job__status__active", "employee__job__data_source__timeslice__id") \
+      .annotate(active_count=Count("employee__job__status__active"), fte_sum=Sum("employee__job__fte"))
+
+  # Queries that return the so-called 'active-count' and the sum of FTE for each person, and for
+  # inactive jobs and active jobs seperately. Here, only the filtered dataset, including inactive
+  # jobs, per timeslice is considered. The 'active count' is the number of active jobs or the number
+  # of inactive jobs a person has.
+  subquery_1 = filtered_persons_ts_1 \
+      .values("id", "first_name", "last_name", "employee__job__status__active", "employee__job__data_source__timeslice__id") \
+      .annotate(active_count=Count("employee__job__status__active"), fte_sum=Sum("employee__job__fte"))
+  subquery_2 = filtered_persons_ts_2 \
+      .values("id", "first_name", "last_name", "employee__job__status__active", "employee__job__data_source__timeslice__id") \
+      .annotate(active_count=Count("employee__job__status__active"), fte_sum=Sum("employee__job__fte"))
+
+  # Queries that returns the number of jobs that each person has, one for the first timeslice and
+  # one for the second timeslice
+  subquery_job_count_ts_1 = unfiltered_persons_ts_1.values("id") \
+      .annotate(job_count=Count("employee__job__id"))
+  subquery_job_count_ts_2 = unfiltered_persons_ts_2.values("id") \
+      .annotate(job_count=Count("employee__job__id"))
+
+  # This subquery results in a table with a column that indicates whether the number of active
+  # jobs for each person has changed between the two timeslices. It also has a column which
+  # contains the FTE change
+  subquery = """SELECT *
+  FROM (
+  SELECT COALESCE(A.id, B.id) as person_id,
+         COALESCE(A.firstname, B.firstname) as first_name,
+         COALESCE(A.lastname, B.lastname) as last_name,
+         COALESCE(A.active, B.active) as active,
+         COALESCE(B.active_count, 0) - COALESCE(A.active_count, 0) as activity_change,
+         A.fte_sum as fte_ts_1,
+         B.fte_sum as fte_ts_2,
+         COALESCE(B.fte_sum, 0) - COALESCE(A.fte_sum, 0) as fte_change
+  FROM   ({sub_subquery_1}) as A
+         FULL OUTER JOIN ({sub_subquery_2}) as B ON A.id = B.id AND A.active = B.active
+  ORDER BY A.id
+  ) as C
+  WHERE C.fte_change != 0"""
+
+  # The results of the subquery above is joined to a virtual table that contains the number of jobs
+  # a person has in the unfiltered datasets, to make sure all jobs are included. If we don't do this,
+  # we might not see an activity change of a person who has multiple jobs when a one of the jobs is
+  # outside of the filter in either or both of the timeslices)
+  main_query = """SELECT *
+  FROM ({subquery}) as C
+    INNER JOIN (
+    SELECT person_id, COUNT(person_id) as person_id_count FROM ({unfiltered_subquery}) as F
+  	  GROUP BY person_id
+    ) as D ON C.person_id = D.person_id
+    INNER JOIN ({subquery_job_count_ts_1}) as G ON C.person_id=G.id
+    INNER JOIN ({subquery_job_count_ts_2}) as H ON D.person_id=H.id
+  WHERE active = TRUE
+  """
+
+  # Create the complete query in two steps
+  formatted_subquery = subquery.format(sub_subquery_1=subquery_1.query, sub_subquery_2=subquery_2.query)
+  formatted_unfiltered_subquery = subquery.format(sub_subquery_1=unfiltered_subquery_1.query,
+      sub_subquery_2=unfiltered_subquery_2.query)
+
+  formatted_main_query = main_query.format(subquery=formatted_subquery,
+      unfiltered_subquery=formatted_unfiltered_subquery,
+      subquery_job_count_ts_1=subquery_job_count_ts_1.query,
+      subquery_job_count_ts_2=subquery_job_count_ts_2.query)
+
+  # And execute the query
+  cursor = connection.cursor()
+
+  try:
+    cursor.execute(str(formatted_main_query))
+    return _dictfetchall(cursor)
+  finally:
+    cursor.close()
+
+def _dictfetchall(cursor):
+  "Returns all rows from a cursor as a dict"
+  desc = cursor.description
+  return [
+      dict(zip([col[0] for col in desc], row))
+      for row in cursor.fetchall()
+  ]
+
+def headcount_overview_bucket_details(request):
+  """Returns a list of people who are in one of the waterfall chart bucket
+
+  Arguments:
+
+  * request -- The Django request object.
+
+  POST Arguments:
+
+  * startTimeslice -- The Timeslice table ID of the timeslice that is used as the starting timeslice
+  * endTimeslice -- The Timeslice table ID of the timeslice that is used as the end timeslice
+  * bucketId -- A string ID representing the bucket from which a list of people should be retrieved
+  """
+
+  # Check optional parameters excludeChildren, page, orderBy & descending
+  page = request.attrs.get("page")
+  exclude_children = request.attrs.get("excludeChildren", False)
+  order = order_by_mapping.job.get(request.attrs.get("orderBy", "lastName"), False)
+  #order = order_by_mapping.position.get(order, False)
+  descending = request.attrs.get("descending", False)
+
+  if not order:
+    return HttpResponseBadRequest("This ordering ({}) does not exist!".format(request.attrs['orderBy']))
+
+  if descending:
+    order = "-" + order
+
+  start_timeslice_id = request.attrs.get("startTimeslice")
+  end_timeslice_id = request.attrs.get("endTimeslice")
+
+  bucket_id = request.attrs.get("bucketId")
+
+  # Get statistic type from front-end
+  if request.attrs.get("view") == "headcount":
+    statistic_type = StatisticType.HEADCOUNT
+  else:
+    statistic_type = StatisticType.FTE
+
+  # Create reusable Q objects
+  qf = QFactory(Person)
+
+  timeslice_1_q = qf.in_timeslice(start_timeslice_id)
+  timeslice_2_q = qf.in_timeslice(end_timeslice_id)
+
+  q_active = qf.get_q_node("active", True)
+  q_auth = qf.auth(request.user)
+  q_auth_filtered = qf.auth_filtered(request.user, request.global_filter, ignore_timeslice=True)
+
+  # Create unfiltered, inactive filtered and filtered sets that can be reused
+  unfiltered_persons_ts_1 = Person.objects.filter(q_auth & timeslice_1_q).distinct()
+  unfiltered_persons_ts_2 = Person.objects.filter(q_auth & timeslice_2_q).distinct()
+
+  filtered_persons_ts_1 = Person.objects.filter(q_auth_filtered & timeslice_1_q)
+  filtered_persons_ts_2 = Person.objects.filter(q_auth_filtered & timeslice_2_q)
+
+  active_filtered_persons_ts_1 = Person.objects.filter(q_auth_filtered & q_active & timeslice_1_q)
+  active_filtered_persons_ts_2 = Person.objects.filter(q_auth_filtered & q_active & timeslice_2_q)
+
+  # Create data table
+  result = DataTable.with_title("People in bucket '" + bucket_id.replace('-', ' ').title() + "'")
+
+<<<<<<< HEAD
+  result.add_column(str, "First Name", "first-name")
+  result.add_column(str, "Last Name", "last-name")
+=======
+  result.add_column(str, "First Name", "firstName")
+  result.add_column(str, "Last Name", "lastName")
+  result.add_column(str, "Job Title", "title") # ordering doesn't for job title, but it will change
+>>>>>>> 01d2266... added pagination to the waterfall bucket datatable. To do so, a new childstate was needed for organisation/headcount/overview
+
+  result.set_column_groups(["Start", "End"])
+
+  # Retrieve the people that belong to the requested bucket
+  persons = []
+
+  if bucket_id == "new-hire":
+    persons = _get_new_hires(unfiltered_persons_ts_1, active_filtered_persons_ts_2).values()
+  elif bucket_id == "leaver":
+    persons = _get_leavers(unfiltered_persons_ts_2, active_filtered_persons_ts_1).values()
+  elif bucket_id == "becoming-active":
+    persons = _get_becoming_active(unfiltered_persons_ts_1, unfiltered_persons_ts_2,
+        filtered_persons_ts_1, filtered_persons_ts_2)
+  elif bucket_id == "becoming-inactive":
+    persons = _get_becoming_inactive(unfiltered_persons_ts_1, unfiltered_persons_ts_2,
+        filtered_persons_ts_1, filtered_persons_ts_2)
+  elif bucket_id == "transfer-in":
+    persons = _get_transfer_in(unfiltered_persons_ts_1, unfiltered_persons_ts_2,
+        filtered_persons_ts_1, filtered_persons_ts_2, active_filtered_persons_ts_1,
+        active_filtered_persons_ts_2, statistic_type)
+  elif bucket_id == "transfer-out":
+    persons = _get_transfer_out(unfiltered_persons_ts_1, unfiltered_persons_ts_2,
+        filtered_persons_ts_1, filtered_persons_ts_2, active_filtered_persons_ts_1,
+        active_filtered_persons_ts_2, statistic_type)
+  elif bucket_id == "fte-increase":
+    persons = _get_fte_increase_employees(unfiltered_persons_ts_1, unfiltered_persons_ts_2,
+        filtered_persons_ts_1, filtered_persons_ts_2)
+  elif bucket_id == "fte-decrease":
+    persons = _get_fte_decrease_employees(unfiltered_persons_ts_1, unfiltered_persons_ts_2,
+        filtered_persons_ts_1, filtered_persons_ts_2)
+
+  persons = persons.order_by(order)
+
+  n_persons = persons.count()
+  result.set_table_property("length", n_persons)
+
+  # Check if rows per page is selected. If not, give a default value of 10
+  if request.attrs.get("rowsPerPage"):
+    if (request.attrs.get("rowsPerPage") == 'all'):
+      rowsPerPage = n_persons;
+    else:
+      rowsPerPage = int(request.attrs.get("rowsPerPage"))
+  else:
+    rowsPerPage = 10
+
+  # If URL request has parameter page, return only 10 talents
+  if page is not None:
+    page_size = rowsPerPage
+    start = max(0, page - 1) * page_size
+    persons = persons[start:start + page_size]
+
+  for person in persons:
+    result.add_row([
+        person['first_name'],
+        person['last_name'],
+    ])
+
+  response = {'dataTables' : [result.to_JSON()]}
+  return HttpResponse(json.dumps(response), content_type="application/json")
+
+def _get_parent(element, hierarchy):
+  """
+  Returns the parent element for any element.
+  Throws an Exception if the parent is not in the
+  hierarchy.
+  """
+  for elm in hierarchy:
+    if elm.id == element.parent_id:
+      return elm
+  raise Exception("The parent of {} ({}) was not in the hierarchy".format(element, element.parent_id))
+
+
+def _get_depth(element, hierarchy):
+  """
+  Returns the depth of an element within a hierarchy.
+  """
+
+  # TODO can be made much more efficient by storing the
+  # depth of the parent and simply returning this plus one.
+
+  if element.parent_id is None:
+    return 0
+  else:
+    return 1 + _get_depth(_get_parent(element, hierarchy), hierarchy)
+
+
+def headcount(request, hierarchy, based_on="fte"):
+  """Returns the hierarchal headcount or fte of one of the three hierarchal filters
+
+  This view returns one datatable, containing rows with a hierarchy element (both id and name),
+  headcount of that hierarchy element and its parent id.
+  With hierarchy element, a value of one of the hierarchal filters
+  is meant, e.g. 'Asia' in case of Locations.
+
+  Furthermore, every row's depth, id and parentId are returned as row properties.
+
+  This view can either be based on FTE or headcount, it defaults to FTE.
+
+  Arguments:
+
+  * request -- The Django request object.
+  * hierarchy -- The type of the hierarchal grouping. Can either be *location*, *function* or *business*.
+  * based_on -- String representing on what unit the view should be based on, defaults to fte
+
+  """
+  based_on_fte = based_on == "fte"
+  hierarchy_is_function = hierarchy == 'function'
+
+  # Determine which hierarchy to build
+  if hierarchy == "location":
+    hierarchy_name = "Location"
+    hierarchy_elements = Location.authorized_branches(request.user, order_by="name")
+  elif hierarchy_is_function:
+    hierarchy_name = "Functional Area"
+    hierarchy_elements = FunctionalArea.authorized_branches(request.user, order_by="name")
+  else: # hierarchy == "business"
+    hierarchy_name = "Business Unit"
+    hierarchy_elements = BusinessUnit.authorized_branches(request.user, order_by="name")
+
+  related_field = hierarchy_name.lower().replace(" ", "_")
+
+  # Create Q object for Employee model which is
+  # - authorized and filtered
+  # - contains only employees with at least 1 active job
+  q_employee = (QFactory(Employee).auth_filtered(request.user, request.global_filter)
+                & Q(job__status__active=True))
+
+  # Depending on the chosen stat (fte/headcount), create the
+  # appropriate filters and aggregators to be used later.
+  if based_on_fte:
+    filtered_emps = Employee.objects.filter(q_employee).distinct()
+
+    stat_field = F("fte")
+    multipos_stat_field = "total_fte"
+    function = multipos_function = "0.01*SUM"
+  else:
+    # For headcount, first retrieve all the authorized employees
+    # with at least one active job,
+    # Then filter out any employees with more than one active job
+    filtered_emps = (Employee.objects
+                             .filter(q_employee)
+                             .annotate(num_jobs=Count('job'))
+                             .filter(num_jobs=1)
+                             .distinct())
+
+    stat_field = F("employee")
+    multipos_stat_field = "headcount"
+    function = "COUNT"
+    multipos_function = "SUM"
+
+  #  # Create Q object for Job model which is
+  #   - authorized and filtered
+  #   - active
+  q_job = (QFactory(Job).auth_filtered(request.user, request.global_filter)
+          & Q(status__active=True))
+
+  # Get the stat by related_field (one of the hierarchies).
+  # Only sum the stats for jobs which are
+  #  - authorized and filtered
+  #  - active
+  #  - belonging to an employee that
+  #      - only has one active job, if it's based on headcount
+  #      - has at least one active job, if it's based on fte
+  stat = (Job.objects
+             .filter(q_job,
+                     employee__in=filtered_emps)
+             .values('position__' + related_field)
+             .annotate(stat=Aggregate(stat_field, function=function, output_field=FloatField()))
+             .order_by())
+
+  # Get the fte for multipositions by
+  # related_field (one of the hierarchies).
+  # Jobs linked to multipositions are ALWAYS active,
+  # so no need to filter.
+  multipos_stat = (MultiPosition.objects
+                        .auth_filtered(request)
+                        .values(related_field)
+                        .annotate(stat=Aggregate(multipos_stat_field, function=multipos_function, output_field=FloatField()))
+                        .order_by())
+
+  # Create a dictionary with the hierarchy id's as keys, and the stat as value
+  grouped_stat = {
+      entry['position__' + related_field]: entry["stat"] for entry in stat
+  }
+
+  # Add the multiposition FTE to the dictionary
+  for entry in multipos_stat:
+    key = entry[related_field]
+    # get(key, 0) returns 0 instead of none if the key has not been set
+    grouped_stat[key] = grouped_stat.get(key, 0) + entry["stat"]
+
+  # Loop over all hierarchy elements. For each
+  # element, get all children IDs. Then, sum
+  # the statistic (FTE or headcount) for all children to get the
+  # final statistic for a hierarchy element.
+  cumulative_stat = {}
+  for element in hierarchy_elements:
+    child_ids = element.child_ids()
+    child_ids.append(element.id)
+
+    stat = 0.0
+    for child in child_ids:
+      stat += grouped_stat.get(child, 0.0)
+
+    cumulative_stat[element.id] = stat
+
+
+  # If it is based on headcount,
+  # fetch all employees which haven't been included in the cumulative_stat yet:
+  # these are employees with at least 2 active jobs
+  if not based_on_fte:
+    mult_job_emps = (Employee.objects
+                             .filter(q_employee)
+                             .exclude(id__in=filtered_emps)
+                             .distinct())
+
+    # Make sure the hierarchy elements in which this
+    # employee has jobs is incremented by (a maximum of) 1
+    for emp in mult_job_emps:
+      jobs = emp.job_set.filter(q_job)
+
+      # We need to save which nodes have been incremented by 1
+      # for this specific employee.
+      nodes_incremented = []
+
+      # Add all jobs of this employee to the cumulative_stat
+      for job in jobs:
+        hierarchy_elem = getattr(job.position, related_field)
+
+        # Increment node and parents up to root
+        # but stop if one of them has already been
+        # incremented for this employee
+        while (hierarchy_elem is not None
+               and hierarchy_elem.id not in nodes_incremented):
+          cumulative_stat[hierarchy_elem.id] += 1
+
+          nodes_incremented.append(hierarchy_elem.id)
+
+          hierarchy_elem = hierarchy_elem.parent
+
+  # In order to calculate the percentage and ratio's,
+  # the total sum of fte's or headcount is required
+  total = sorted(cumulative_stat.values(), reverse=True)[0]
+
+  # Create the datatable
+  result = DataTable.with_title(hierarchy_name)
+  result.add_column(str, hierarchy_name, "id")
+  result.add_column(float, based_on, "stat")
+
+  # Ratio should only be shown on the functional area page.
+  if hierarchy_is_function:
+    result.add_column(float, "Ratio", "ratio")
+
+  result.add_column(float, "Percent", "percentage")
+
+
+  # Fill datatable with definitive results
+  for element in hierarchy_elements:
+    stat = cumulative_stat[element.id]
+
+    percentage = stat / (total or 1)
+
+    row = [
+        element.name,
+        [float(stat), fo_format(stat, trailing_zeros=based_on_fte)],
+        [percentage, fo_format_percentage(percentage)]
+    ]
+
+    # if the hierarchy is functional area
+    # add the ratio number as well
+    if hierarchy_is_function:
+      if stat == total:
+        ratio = 1.0
+      elif stat == 0:
+        ratio = 0.0
+      else:
+        ratio = (total - stat) / stat
+
+      formatted_ratio = "-" if ratio < 0.01 else "1:" + fo_format(ratio)
+
+      row.insert(2, [ratio, formatted_ratio])
+
+
+    result.add_row(row, {
+      'id': element.id,
+      # If element has no parent, print its own id
+      'parentId': element.parent_id or element.id,
+      'depth': _get_depth(element, hierarchy_elements)
+    })
+
+  response = {'dataTables': [result.to_JSON()]}
+  return HttpResponse(json.dumps(response), content_type="application/json")
+
+
+def headcount_detail(request, hierarchy, id):
+  """Returns the detailed view of an element of one of the three hierarchal types.
+
+  This view returns one datatable containing a row for each position in the given id.
+  In every row, 10 columns are present with information about the position including its position id.
+  The view can respond to a POST request with a given *orderby* and can also respond with a
+  paginated result (of 10 positions) by including a *page* POST parameter.
+
+  Angular Routing should support the following URL structure for front-end::
+
+    /talent/distribution/<hierarchy>/detail/<id>/<page>
+
+  By default, all children of the element are included, the rows are sorted by first name and FTE (ascending).
+  The optional URL parameters *?excludeChildren*, *?orderBy* and *?descending* change these things.
+
+  An example of an extended request might be::
+
+      .../<id>/<page>?excludeChildren=true&orderBy=years_of_service&descending=true
+
+  Arguments:
+
+  * request -- The Django request object.
+  * hierarchy -- The type of the hierarchal grouping. Can either be *location*, *function* or *business*.
+  * id -- The id of one of the elements of the hierarchal grouping.
+  """
+
+  # Check optional parameters excludeChildren, page, orderBy & descending
+  page = request.attrs.get("page")
+  exclude_children = request.attrs.get("excludeChildren", False)
+  request_order = request.attrs.get("orderBy", "lastName")
+  order = order_by_mapping.position.get(request_order, False)
+  mp_order = order_by_mapping.multiposition.get(request_order, False)
+  descending = request.attrs.get("descending", False)
+
+  if not order or not mp_order:
+    return HttpResponseBadRequest("This ordering ({}) does not exist!".format(request_order))
+
+  if descending:
+    order = "-" + order
+    mp_order = "-" + mp_order
+
+  if hierarchy == "location":
+    hierarchy_name = "Location"
+    element = get_object_or_404(Location, id=id)
+  elif hierarchy == "function":
+    hierarchy_name = "Functional Area"
+    element = get_object_or_404(FunctionalArea, id=id)
+  else: #hierarchy == "business":
+    hierarchy_name = "Business Unit"
+    element = get_object_or_404(BusinessUnit, id=id)
+
+
+  related_field = hierarchy_name.lower().replace(" ", "_")
+
+  ids = [element.id]
+  if not exclude_children:
+    ids.extend(element.child_ids())
+
+
+  positions = (Position.objects
+               .auth_filtered(request,
+                              active=True,
+                              **{related_field + "__in": ids})
+               .values("job__employee__person__first_name", "job__employee__person__last_name",
+                      "job__employee__person__gender", "title__title",
+                      "solid_line_layer", "solid_line_direct_span",
+                      "location__name", "functional_area__name", "business_unit__name",
+                      "title__title", "job__id")
+               .order_by(order))
+
+
+  multi_positions = (MultiPosition.objects
+               .auth_filtered(request,
+                              **{related_field + "__in": ids})
+               .values("title__title", "solid_line_layer",
+                      "location__name", "functional_area__name", "business_unit__name",
+                      "title__title", "id")
+               .order_by(mp_order)
+               )
+
+  result = DataTable.with_title("Positions in " + element.name)
+  result.set_table_property("length", positions.count() + multi_positions.count())
+  result.add_column(str, "First Name", "firstName")
+  result.add_column(str, "Last Name", "lastName")
+  result.add_column(str, "Gender", "gender")
+  result.add_column(str, "Job Title", "title")
+  result.add_column(int, "Layer", "layer")
+  result.add_column(float, "Span of control", "span")
+  result.add_column(str, "Location", "location")
+  result.add_column(str, "Functional Area", "function")
+  result.add_column(str, "Business Unit", "business")
+
+  # Check if rows per page is selected. If not, give a default value of 10
+  if request.attrs.get("rowsPerPage"):
+    if (request.attrs.get("rowsPerPage") == 'all'):
+      rowsPerPage = positions.count();
+    else:
+      rowsPerPage = int(request.attrs.get("rowsPerPage"))
+  else:
+    rowsPerPage = 10
+
+  # If URL request has parameter page, return only 10 positions
+  if page is not None:
+    page_size = rowsPerPage
+    start = max(0, page - 1) * page_size
+
+    multipos_count = multi_positions.count()
+
+    # Always show multipositions first
+    end = start + page_size
+    multi_positions = multi_positions[start:end]
+    rest = page_size - len(multi_positions)
+
+    # Add normal positions
+    start = max(start - multipos_count, 0)
+    end = start + rest
+    positions = positions[start:end]
+
+  for multi_pos in multi_positions:
+    layer = multi_pos["solid_line_layer"]
+
+    result.add_row([
+        "",
+        "(Multiple positions)",
+        "",
+        multi_pos["title__title"],
+        [layer, (layer or "-")],
+        [float(0), fo_format(float(0))],
+        multi_pos["location__name"],
+        multi_pos["functional_area__name"],
+        multi_pos["business_unit__name"]
+    ], {
+        "jobId": multi_pos["id"],
+        "isMultiPosition": True
+    })
+
+  for pos in positions:
+    layer = pos["solid_line_layer"]
+    span = float(pos["solid_line_direct_span"])
+
+    result.add_row([
+        pos["job__employee__person__first_name"],
+        pos["job__employee__person__last_name"],
+        pos["job__employee__person__gender"],
+        pos["title__title"],
+        [layer, (layer or "-")],
+        [span, fo_format(span)],
+        pos["location__name"],
+        pos["functional_area__name"],
+        pos["business_unit__name"]
+    ], {
+        "jobId": pos["job__id"],
+        "isMultiPosition": False
+    })
+
+  response = {'dataTables': [result.to_JSON()]}
+  return HttpResponse(json.dumps(response), content_type="application/json")
+
+
+def structure_overview(request):
+  """Returns a datatable with the amount of active positions and average span of control per layer.
+
+  Requires the hierarchy tables in the DB to have been populated. This can be achieved by
+  visiting the url '/layercheck/run' or by running the command ./manage.py layer.
+
+  This view returns one datatable having rows for each layer in the current (filtered) set.
+  Each row has three columns: the layer, the amount of positions and the average span of control.
+
+  Arguments:
+
+  * request -- The Django request object.
+  """
+
+  result = DataTable.with_title("Overview")
+
+  result.add_column(int, "Layer", "layer")
+  result.add_column(int, "Positions", "positions")
+  result.add_column(float, "Span of Control", "span")
+
+  annotates = (Position.objects
+                       .auth_filtered(request,
+                                      active=True,
+                                      solid_line_layer__isnull=False)
+                       .values("solid_line_layer")
+                       .annotate(count=Count("id"), # This counts the positions per layer
+                                 span=Avg(
+                                      Case( #exclude direct_span=0 from Avg
+                                         When(solid_line_direct_span=0, then=None),
+                                         default=F('solid_line_direct_span')
+                                         ),
+                                     )
+                                 )
+                       .order_by("solid_line_layer"))
+  multipos_annotate = (MultiPosition.objects
+                                    .auth_filtered(request,
+                                                   solid_line_layer__isnull=False)
+                                    .values("solid_line_layer")
+                                    .annotate(count=Sum("headcount"))
+                                    .order_by("solid_line_layer")
+                      )
+  # Create an ordered dictionary with the layer number as key,
+  # and the position count as value
+  count_per_layer = OrderedDict(
+      (entry["solid_line_layer"], entry["count"]) for entry in annotates
+  )
+
+  # Sets max_layer to last layer in count_per_layer ordered dict. If it is empty, set it to zero.
+  max_layer = list(count_per_layer)[-1] if len(count_per_layer) > 0 else 0
+
+  # Add the multiposition headcounts per layer to the dictionary
+  for entry in multipos_annotate:
+    key = entry["solid_line_layer"]
+    count_per_layer[key] = count_per_layer.get(key, 0) + entry["count"]
+
+  # Update max layer if multi positions would have had a higher maximum layer
+  max_layer = max(max_layer, list(count_per_layer)[-1]) if count_per_layer else 0
+
+  # Create a dictionary with the layer number as key and the span as value.
+  # Since the layer could contain no managers, entry["span"] might be None.
+  span_per_layer = {
+      entry["solid_line_layer"]: (entry["span"] or 0.0) for entry in annotates
+  }
+
+  for layer in range(1, max_layer + 1):
+    result.add_row([
+        [layer, fo_format(layer)],
+        [count_per_layer.get(layer, 0), fo_format(count_per_layer.get(layer, 0))],
+        [span_per_layer.get(layer, 0.0), fo_format(span_per_layer.get(layer, 0.0))]
+    ])
+
+  response = {'dataTables': [result.to_JSON()]}
+  return HttpResponse(json.dumps(response), content_type="application/json")
+
+
+def _get_number_of_layers(request):
+  """ Retrieves the maximum number of layers for filtered Positions, filtered Multipositions and
+  the global (non filtered) maximum layer of both models.
+
+  Arguments:
+
+  * request -- The Django request object.
+  """
+  pos_q = QFactory(Position)
+  pos_auth_q = pos_q.auth(request.user) & Q(job__status__active=True)
+  pos_filtered_q = pos_q.filtered(request.global_filter)
+
+  multipos_q = QFactory(MultiPosition)
+  multipos_auth_q = multipos_q.auth(request.user)
+  multipos_filtered_q = multipos_q.filtered(request.global_filter)
+
+  return {
+      "position": (Position.objects
+                  .filter(pos_auth_q & pos_filtered_q)
+                  .aggregate(Max('solid_line_layer'))
+                  .get("solid_line_layer__max")) or 0,
+      "multi_position": (MultiPosition.objects
+                        .filter(multipos_auth_q & multipos_filtered_q)
+                        .aggregate(Max('solid_line_layer'))
+                        .get('solid_line_layer__max')) or 0,
+      "global": max(
+                    (Position.objects.filter(pos_auth_q)
+                                     .aggregate(Max("solid_line_layer"))
+                                     .get("solid_line_layer__max") or 0),
+                    (MultiPosition.objects.filter(multipos_auth_q)
+                                          .aggregate(Max("solid_line_layer"))
+                                          .get("solid_line_layer__max") or 0)
+                )
+  }
+
+
+# TODO Add total number of results if table is paginated
+def structure_overview_layer(request, layer):
+  """Returns a datatable with the active positions in a certain layer, and the number of layers.
+
+  This view returns a dictionary with two keys: max_layer and the usual datatables.
+  datatables points to a datatable having rows for each active position in the given layer.
+  Each row has five columns: the position's id, the position person's first name,
+  last name, direct span and indirect span. If a position does not contain an employee,
+  first and last name will be null. Result is ordered by direct span (descending)
+  and the person's last name.
+  If the requested layer contains a multiposition, the first name column will contain
+  the title of the multiposition. The spans of control are always 0, and the person
+  ID will be null, as there is no person linked to any multiposition.
+  max_layer points to an integer with the number of the highest layer.
+
+  Can also respond with a paginated result (of (first 24, then) 25 positions) by sending
+  the POST parameter 'page'.
+
+  Arguments:
+
+  * request -- The Django request object.
+  * layer -- The layer to retrieve the positions of. Must be >= 1.
+
+  POST Arguments:
+
+  * page -- A postive integer representing the page to retrieve the positions of
+  """
+
+  max_layer = _get_number_of_layers(request)
+
+  # Check if the requested layer is within bounds
+  if int(layer) < 1:
+    return HttpResponseBadRequest("Please request a layer between 1 and %d" % (max_layer["global"]))
+
+  if int(layer) > max_layer["global"]:
+    return HttpResponseBadRequest("""There are only %d layers in the authorized data set.\
+        The layer you have requested does not exists.""" % max_layer["global"])
+
+  # Create the datatable and necessary columns
+  dt = DataTable.with_title("Layer " + layer)
+  dt.add_column(str, "First Name", "first-name")
+  dt.add_column(str, "Last Name", "last-name")
+  dt.add_column(int, "Direct Span", "direct-span")
+  dt.add_column(int, "Indirect Span", "indirect-span")
+
+  dt2 = DataTable.with_title("Layer " + layer)
+  dt2.add_column(str, "First Name", "first-name")
+  dt2.add_column(str, "Last Name", "last-name")
+  dt2.add_column(int, "Direct Span", "direct-span")
+  dt2.add_column(int, "Indirect Span", "indirect-span")
+
+  # Retrieve the necessary information for all positions
+  # within the requested layer
+  positions = (Position.objects
+              .auth_filtered(request, active=True, solid_line_layer=layer)
+              .values("job__employee__person__first_name",
+                      "job__employee__person__last_name",
+                      "solid_line_direct_span",
+                      "solid_line_indirect_span",
+                      "id",
+                      "job__id")
+              .order_by("job__employee__person__first_name",
+                        "job__employee__person__last_name"))
+  multi_positions = (MultiPosition.objects
+                    .auth_filtered(request, solid_line_layer=layer)
+                    .values('title__title', 'id')
+                    .order_by("title__title"))
+
+  job_id = request.attrs.get("jobId")
+
+  # put highlighted position in second datatable
+  if job_id is not None:
+    p = (Position.objects
+      .auth_filtered(request, active=True, solid_line_layer=layer, job__id=job_id)
+      .values("job__employee__person__first_name",
+              "job__employee__person__last_name",
+              "solid_line_direct_span",
+              "solid_line_indirect_span",
+              "id",
+              "job__id"))
+    if p.count() == 1:
+      dt2.add_row([
+          p[0]["job__employee__person__first_name"],
+          p[0]["job__employee__person__last_name"],
+          p[0]["solid_line_direct_span"],
+          p[0]["solid_line_indirect_span"]
+      ], {
+          "jobId": p[0]["job__id"],
+          "isMultiPosition": False
+      })
+    else:
+      return HttpResponseBadRequest("Highlighted position does not exist")
+
+
+  # If URL POST request has parameter page, return 24 positions
+  page = request.attrs.get("page")
+
+  if page is not None:
+    if job_id is not None:
+      initial_page_size = 23
+    else:
+      initial_page_size = 24
+
+    if page > 0:
+      page_size = 25
+    else:
+      page_size = initial_page_size
+
+    multipos_count = multi_positions.count()
+    total_count = positions.count() + multipos_count
+    dt.add_properties({
+        "length": total_count,
+        "lastPage": int(total_count / page_size) - 1
+    })
+
+    # The first page shows 24 positions, the next pages 25.
+    start = (int(page) - 1) * page_size + initial_page_size
+    end = start + page_size
+    multi_positions = multi_positions[start:end]
+    rest = page_size - len(multi_positions)
+
+    start = max(start - multipos_count, 0)
+    end = start + rest
+    positions = positions[start:end]
+
+
+  for mp in multi_positions:
+    dt.add_row([
+      mp["title__title"],
+      None,
+      0,
+      0
+    ], {
+      "jobId": mp["id"],
+      "isMultiPosition": True
+    })
+
+  for pos in positions:
+    dt.add_row([
+        pos["job__employee__person__first_name"],
+        pos["job__employee__person__last_name"],
+        pos["solid_line_direct_span"],
+        pos["solid_line_indirect_span"]
+    ], {
+      "jobId": pos["job__id"],
+      "isMultiPosition": False
+    })
+
+
+  # Max layer to navigate to is limited to the maximum of the filtered data set
+
+  if job_id is not None:
+    data_tables = [dt.to_JSON(), dt2.to_JSON()]
+  else:
+    data_tables = [dt.to_JSON()]
+
+  response = {
+      'dataTables': data_tables,
+      'maxLayer': max(max_layer["position"], max_layer["multi_position"])
+  }
+
+
+  return HttpResponse(json.dumps(response), content_type="application/json")
+
+def structure_layers_path(request, path_origin=False):
+  """Returns two datatables, one representing a reporting path from a certain position onwards
+  to the CEO, the second one is just the maximum layer in the set.
+
+  This view returns a dictionary with two keys: max_layer and datatables.
+  datatables points to a datatable that has rows for each active position in
+  the reporting path. By default, the last row contains a random position in the last layer
+  (if possible a position containing an employee), the second-last row contains its manager.
+  This continues towards the CEO (first row, layer 1). If a position doesn't contain an employee,
+  its name will consist of null values. If a path_origin position id is given,
+  the last row contains that position and follows the same path towards the CEO. If this position
+  does not exist or the user is not authorized to see, a status code 400 (Bad Request) is returned.
+  max_layer points to the total number of layers in the filtered set.
+
+  Arguments:
+
+  * request -- The Django request object.
+  * path_origin -- The optional job id to retrieve the reporting path of.
+  """
+
+  # Get the number of layers
+  max_layers = _get_number_of_layers(request)
+
+  # Get a random origin from the max layer (or specified layer),
+  # if the parameter path_origin isn't already given.
+  if not path_origin:
+    # Force use_mp = False if the max_layer only has multi_positions
+    if max_layers["position"] > max_layers["multi_position"]:
+      use_mp = False
+    # Force use_mp = True if the max_layer only has positions
+    elif max_layers["multi_position"] > max_layers["position"]:
+      use_mp = True
+    # Else, randomly decide if we want to use multi_positions or positions
+    else:
+      use_mp = random.random() < 0.5
+
+    # If multi_position has max layer, form path from multi_position
+    if use_mp:
+      max_layer = max_layers["multi_position"]
+
+      path_origin = (MultiPosition.objects
+                                  # Distinct cannot be used with order by random
+                                  .auth_filtered(request,
+                                                 distinct=False,
+                                                 solid_line_layer=max_layer)
+                                  .order_by("?").values("id",
+                                                        "solid_line_layer",
+                                                        "title__title",
+                                                        "solid_line")
+                                  .first())
+
+    # Otherwise path will be formed from max position layer
+    else:
+      max_layer = max_layers["position"]
+
+      shuffled_max_layer = (Position.objects
+                            # Distinct cannot be used with order by random
+                            .auth_filtered(request,
+                                           distinct=False,
+                                           active=True,
+                                           solid_line_layer=max_layer)
+                            .order_by("?"))
+
+      max_layer_with_person = shuffled_max_layer.exclude(job__employee__isnull=True)
+
+      if max_layer_with_person.exists():
+        path_origin = (max_layer_with_person.values("id",
+                                                    "solid_line_layer",
+                                                    "job__employee__person__first_name",
+                                                    "job__employee__person__last_name",
+                                                    "title__title",
+                                                    "solid_line",
+                                                    "job__id"
+                                                   ).first())
+      else:
+        path_origin = (shuffled_max_layer.values("id",
+                                                 "solid_line_layer",
+                                                 "job__employee__person__first_name",
+                                                 "job__employee__person__last_name",
+                                                 "title__title",
+                                                 "solid_line",
+                                                 "job__id"
+                                                ).first())
+
+  # If the path origin IS given, check if it actually exists
+  # and retrieve the necessary information from the database
+  else:
+    max_layer = max(max_layers["position"], max_layers["multi_position"])
+    try:
+      path_origin = (Position.objects.authorized(request.user, job__status__active=True)
+                                    .values("id",
+                                            "solid_line_layer",
+                                            "job__employee__person__first_name",
+                                            "job__employee__person__last_name",
+                                            "title__title",
+                                            "solid_line",
+                                            "job__id"
+                                           ).get(job=path_origin))
+    except Position.DoesNotExist:
+      return HttpResponseBadRequest("The requested path origin ({}) does not exist!".format(path_origin))
+
+  max_path = _build_path(path_origin)
+  max_path.reverse()
+
+  result = {'dataTables': [max_path.to_JSON()], 'maxLayer': max_layer}
+
+  return HttpResponse(json.dumps(result), content_type="application/json")
+
+
+def _build_path(position):
+  """Private method to build the reporting path as described in structure_layers_path().
+
+  Arguments:
+
+  * position -- The Position object representing the starting position to retrieve the reporting
+  path of in a dictionary
+  """
+
+  result = DataTable.with_title("Maximal reporting path")
+  result.add_column(str, "First Name", "first-name")
+  result.add_column(str, "Last Name", "last-name")
+  result.add_column(str, "Job Title", "job-title")
+  result.add_column(int, "Layer", "layer")
+
+  # If there is no valid position to retrieve the path of, return empty path
+  if not position:
+    return result
+
+  if "job__id" in position:
+    # position is a regular position
+    result.add_row([
+        position["job__employee__person__first_name"],
+        position["job__employee__person__last_name"],
+        position["title__title"],
+        position["solid_line_layer"],
+    ], {
+        "jobId": position["job__id"],
+        "isMultiPosition": False
+    })
+  else:
+    # position is a multiposition
+    # multipositions do not have a job id
+    result.add_row([
+        position["title__title"],
+        None,
+        "(multiple positions)",
+        position["solid_line_layer"],
+    ], {
+        "jobId": position["id"],
+        "isMultiPosition": True
+    })
+
+  # Iterate towards the CEO using the solid reporting lines
+  solid_line = position["solid_line"]
+  while solid_line != None:
+    # Get the required information about the solid_line supervisor
+    position = Position.objects.values("solid_line_layer",
+                                       "job__employee__person__first_name",
+                                       "job__employee__person__last_name",
+                                       "title__title",
+                                       "solid_line",
+                                       "job__id"
+                                       # using -job_status_active to get the active jobs first
+                                      ).filter(pk=solid_line).order_by('-job__status__active').first()
+    # Add supervisor to datatable
+    result.add_row([
+        position["job__employee__person__first_name"],
+        position["job__employee__person__last_name"],
+        position["title__title"],
+        position["solid_line_layer"],
+    ], {
+        "jobId": position["job__id"],
+        "isMultiPosition": False
+    })
+    # Continue with the next supervisor
+    solid_line = position["solid_line"]
+
+  return result
+
+
+def is_valid_compare_object(compare):
+  """Method to check whether the compare arguments is a valid POST parameter needed by
+  views which can compare data. Returns true when the object contains keys
+
+  * 'attrib' which is a valid attribute to filter on
+  * 'attribValueSets' which is an array of value sets (the ids to filter the attrib on)
+
+  Arguments:
+
+  * compare -- the compare object to validate
+  """
+  if compare.get("attrib") is None:
+    return (False, "Compare object does not contain key 'attrib'")
+  elif compare.get("attribValueSets") is None:
+    return (False, "Compare object does not contain key 'attribValueSets'")
+  elif compare['attrib'] not in list(QFactory._filter_attributes):
+    return (False, "Given attrib is not a valid attribute")
+  else:
+    return (True, "Valid object")
+
+# def age_distribution(request):
+#   """
+#   Returns one datatable with the age distribution of the current filtered subset of the workforce
+#   Totally, it will contain 10 entries for the age buckets:
+#   <20, 20-25, 25-30, 30-35, 35-40, 40-45, 45-50, 50-55, 55-60, >60
+#
+#   """
+#
+#   age_result = DataTable.with_title("age per class")
+#
+#   age_result.add_column(str, "Age Range", "ageRange")
+#   age_result.add_column(int, "Headcount", "headCount")
+#
+#   auth_filtered_emps = Employee.objects.auth_filtered(request, active=True)
+#
+#   test = Employee.objects.filter(id__in=auth_filtered_emps).aggregate(
+#               b1=Count(Case(When(age__lt=20, then=1))),
+#               b2=Count(Case(When(age__range=(20, 25), then=1))),
+#               b3=Count(Case(When(age__range=(25, 30), then=1))),
+#               b4=Count(Case(When(age__range=(30, 35), then=1))),
+#               b5=Count(Case(When(age__range=(35, 40), then=1))),
+#               b6=Count(Case(When(age__range=(40, 45), then=1))),
+#               b7=Count(Case(When(age__range=(45, 50), then=1))),
+#               b8=Count(Case(When(age__range=(50, 55), then=1))),
+#               b9=Count(Case(When(age__range=(55, 60), then=1))),
+#               b10=Count(Case(When(age__gt=60, then=1))))
+#
+#   age_result.add_row(['0-20', [test['b1'], fo_format(test['b1'])] ])
+#   age_result.add_row(['20-25', [test['b2'], fo_format(test['b2'])] ])
+#   age_result.add_row(['25-30', [test['b3'], fo_format(test['b3'])] ])
+#   age_result.add_row(['30-35', [test['b4'], fo_format(test['b4'])] ])
+#   age_result.add_row(['35-40', [test['b5'], fo_format(test['b5'])] ])
+#   age_result.add_row(['40-45',  [test['b6'], fo_format(test['b6'])] ])
+#   age_result.add_row(['45-50', [test['b7'], fo_format(test['b7'])] ])
+#   age_result.add_row(['50-55', [test['b8'], fo_format(test['b8'])] ])
+#   age_result.add_row(['55-60', [test['b9'], fo_format(test['b9'])] ])
+#   age_result.add_row(['>60', [test['b10'], fo_format(test['b10'])] ])
+#
+#   result=[age_result.to_JSON()]
+#   response = {'dataTables' : result}
+#
+#   return HttpResponse(json.dumps(response), content_type="application/json")
+
+def structure_layers_fte(request):
+  """Returns one datatable with the fte per layer and one with the cumulative percentage of fte per layer.
+
+  This view returns two datatables, both having rows for each layer (first column).
+  If the POST parameter compare is not given, there's only a second column with the amount of FTE
+  in that layer and in the second datatable the cumulative percentage of the fte.
+  If the POST parameter is given and valid, there's a column for each given attrib_value_set to compare.
+
+  The compare functionality can be used by sending for example the following POST parameter:
+
+  {
+      'compare': {
+          'attrib': "location",
+          'attribValueSets': [
+              {label:'compare1', values: [1,3,5]},
+              {label:'compare2': values: [10]}
+          ]
+      }
+  }
+
+  Where attrib is a valid filterable column of a position, employee or person.
+  At least one valid value should be given. If not, the view just returns the result
+  as if compare would not be requested.
+
+
+  Arguments:
+
+  * request -- The Django request object.
+
+  POST Arguments:
+  * compare -- The compare object to base the comparison on
+  """
+  compare = request.attrs.get("compare")
+
+  if compare is not None:
+    valid = is_valid_compare_object(compare)
+    if valid[0]:
+      fte = _get_fte_per_layer_compared(request, compare["attrib"], compare["attribValueSets"])
+    else:
+      return HttpResponseBadRequest(valid[1])
+  else:
+    fte = _get_fte_per_layer(request)
+
+  cumulative_fte = _get_cumulative_fte_per_layer(fte)
+
+  result = [fte.to_JSON(), cumulative_fte.to_JSON()]
+  response = {'dataTables' : result}
+  return HttpResponse(json.dumps(response), content_type="application/json")
+
+
+def _get_fte_per_layer(request):
+  """Private method to return the datatable with FTE per layer as described in structure_layers_fte()."""
+
+  result = DataTable.with_title("FTE per layer")
+
+  result.add_column(int, "Layer", "layer")
+  result.add_column(float, "FTE", "fte")
+
+  grouped_fte = (Position.objects
+                .auth_filtered(request, solid_line_layer__isnull=False, active=True)
+                .values("solid_line_layer")
+                .annotate(fte=Sum("job__fte"))
+                .order_by("solid_line_layer"))
+
+  multipos_grouped_fte = (MultiPosition.objects
+                         .auth_filtered(request, solid_line_layer__isnull=False)
+                         .values("solid_line_layer")
+                         .annotate(fte=Sum("total_fte"))
+                         .order_by("solid_line_layer"))
+
+  # Create a dictionary with the layer as keys, and the FTE as values
+  fte_per_layer = OrderedDict(
+      (entry["solid_line_layer"], entry["fte"]) for entry in grouped_fte
+  )
+
+  # Sets max_layer to last layer in fte_per_layer ordered dict. If it is empty, set it to zero.
+  max_layer = list(fte_per_layer)[-1] if fte_per_layer else 0
+
+  # Add the FTE's of multipositions to the dictionary
+  for entry in multipos_grouped_fte:
+    key = entry["solid_line_layer"]
+    fte_per_layer[key] = fte_per_layer.get(key, 0) + entry["fte"]
+
+
+  # Update max layer if multi positions would have had a higher maximum layer
+  max_layer = max(max_layer, list(fte_per_layer)[-1]) if fte_per_layer else 0
+
+  # Add the results to the datatable
+  for layer in range(1, max_layer + 1):
+    # Divide by hundred, as FTE is stored as an int in the DB, with 100 representing 1 FTE
+    fte = fte_per_layer.get(layer, 0.0) / 100
+    result.add_row([
+        layer,
+        [fte, fo_format(fte)]
+    ])
+  return result
+
+
+def _get_fte_per_layer_compared(request, attrib, attrib_value_sets):
+  """Private method to return the datatable with FTE per layer
+  per attrib_value_set as described in structure_layers_fte().
+
+  Arguments:
+
+  * request -- The Django request object
+  * attrib -- Attribute to group the data on
+  * attrib_value_sets -- Attribute value sets to compare against each other
+  """
+
+  # Create the datatable and column for x-axis
+  result = DataTable.with_title("FTE per layer")
+  result.add_column(int, "Layer", "layer")
+
+  # Initialize variables
+  fte_per_layer_per_value_set = {}
+  max_layer = 0
+
+  # Do calculations for each value set
+  for set in attrib_value_sets:
+    # Create column for value set
+    result.add_column(float, str(set["label"]), str(set["label"]))
+
+    # Create filter q object for value set
+    attrib_filter_q = QFactory(Position).get_q_node(attrib, set["values"])
+
+    # Get the FTE per layer filtered on the current set of values
+    fte_per_layer = (Position.objects
+                             .auth_filtered(request,
+                                            attrib_filter_q,
+                                            active=True,
+                                            solid_line_layer__isnull=False)
+                             .values("solid_line_layer")
+                             .annotate(fte=Sum("job__fte"))
+                             .order_by("solid_line_layer"))
+
+    # Add the results to the dictionary, with layer and set as key and FTE as value
+    for entry in fte_per_layer:
+      key = (entry["solid_line_layer"], str(set["label"]))
+      fte_per_layer_per_value_set[key] = entry["fte"]
+
+      # Update max_layer if occured layer is higer than previous result
+      if entry["solid_line_layer"] > max_layer:
+        max_layer = entry["solid_line_layer"]
+
+    try:
+      # Create filter q object for value set for multipositions
+      multipos_attrib_filter_q = QFactory(MultiPosition).get_q_node(attrib, set["values"])
+
+      # Get the FTE per layer filtered on the current set of values
+      multipos_fte_per_layer = (MultiPosition.objects
+                                .auth_filtered(request,
+                                               multipos_attrib_filter_q,
+                                               solid_line_layer__isnull=False)
+                                .values("solid_line_layer")
+                                .annotate(fte=Sum("total_fte"))
+                                .order_by("solid_line_layer"))
+
+      # Add multi_positions to ordered dictionary
+      for entry in multipos_fte_per_layer:
+        key = (entry["solid_line_layer"], str(set["label"]))
+        fte_per_layer_per_value_set[key] = fte_per_layer_per_value_set.get(key, 0) + entry["fte"]
+
+        # Update max_layer if occured layer is higher than previous result
+        if entry["solid_line_layer"] > max_layer:
+          max_layer = entry["solid_line_layer"]
+
+    except InvalidAttributeError:
+      logger.info(MULTIPOS_EXCLUDED_BY_ATTRIBUTE )
+
+
+  # Create row for every layer until the last which still has employee's for one or more value sets
+  for layer in range(1, max_layer + 1):
+    row = [layer]
+
+    for set in attrib_value_sets:
+      key = (layer, str(set["label"]))
+      fte = fte_per_layer_per_value_set.get(key, 0.0) / 100
+      row.append([fte, fo_format(fte)])
+
+    result.add_row(row)
+
+  return result
+
+def _get_cumulative_fte_per_layer(fte):
+  """Private method to return the datatable with cumulative FTE percentage per layer
+  as described in structure_layers_fte().
+
+  Arguments:
+
+  * fte -- The datatable containing the sum of FTE per layer
+  """
+
+  result = DataTable.with_columns(fte)
+  result.title = "Cumulative FTE over all layers"
+
+  # If no results, return no rows
+  if fte.get_number_of_rows() == 0:
+    return result
+
+  total_fte = 0
+
+  for row in range(fte.get_number_of_rows()):
+    fte_row_values = fte.get_row_values(row)
+
+    total_fte += sum(fte_row_values[1:])
+    result.add_row(fte_row_values)
+
+    # From second row onwards, previous values should be added to get the cumulative count
+    if row > 0:
+      for col in range(1, fte.get_number_of_columns()):
+        result.increment_cell(row, col, result.get_value(row - 1, col))
+
+  # Divide all values by the total_fte and multiply by 100 to get the percentage
+  result.scale_columns(range(1, result.get_number_of_columns()), 100 / total_fte, format_perc=True)
+
+  return result
+
+
+def structure_span_avg(request):
+  """Returns one datatable with two columns. The first contains the  average span of control
+  for employees with one or more subordinates (i.e. all employees that do not have anyone reporting
+  to them are left out of the calculations) of the (filtered) set.
+  This number reflects the average amount of people a manager is commanding.
+  The second column contains the percentage of managers within the organisation.
+
+  This view returns one datatable with one row containing one column with the average
+  span of control of the (filtered) set and another one for the percentage whom is manager.
+
+  Arguments:
+
+  * request -- The Django request object.
+  """
+
+  result = DataTable.with_title("Average span of control")
+  result.add_column(float, "Span", "avg-span")
+  result.add_column(float, "Manager", "avg-percentage-manager")
+
+  aggregates = (Position.objects
+                        .auth_filtered(request, ~Q(solid_line_direct_span=0), active=True)
+                        .aggregate(span=Avg("solid_line_direct_span"),
+                                   managers=Count("position_id"))
+                        )
+
+
+  span_avg = (aggregates.get("span") or 0.0)
+
+
+  n_pos      = ((Position.objects
+                         .auth_filtered(request, active=True)
+                         .count()
+               ) +
+               (MultiPosition.objects
+                             .values('id')
+                             .auth_filtered(request)
+                             .aggregate(Sum('headcount'))
+                             .get('headcount__sum')
+                or 0))
+
+  percentage_manager = (aggregates.get("managers") or 0) / (n_pos or 1)
+
+  result.add_row([
+      [span_avg, fo_format(span_avg)],
+      [percentage_manager, fo_format_percentage(percentage_manager)]
+  ])
+
+  response = {'dataTables': [result.to_JSON()]}
+  return HttpResponse(json.dumps(response), content_type="application/json")
+
+
+def structure_span(request):
+  """Returns one datatable with the average span of control for managers,
+  so only employees who indeed have one or more subordinates, per layer.
+  Layers up untill the last (filtered) layer are included in the result.
+
+  This view returns one datatable having rows for each layer (first column).
+  If the POST parameter compare is not given, there's only a second column with the amount of FTE
+  in that layer and in the second datatable the cumulative percentage of the fte.
+  If the POST parameter is given and valid, there's a column for each given attrib_value_set to compare.
+  In addition, only layers up untill the maximum layer of the compare filtered sets are included.
+
+  The compare functionality can be used by sending for example the following POST parameter:
+
+  {
+      'compare': {
+          'attrib': "location",
+          'attribValueSets': [
+              {label:'compare1', values: [1,3,5]},
+              {label:'compare2': values: [10]}
+          ]
+      }
+  }
+
+  Where attrib is a valid filterable column of a position, employee or person.
+  At least one valid value should be given. If not, the view just returns the result
+  as if compare would not be requested.
+
+
+  Arguments:
+
+  * request -- The Django request object.
+
+  POST Arguments:
+
+  * compare -- The compare object to base the comparison on
+  """
+  compare = request.attrs.get("compare")
+
+  if compare is not None:
+    valid = is_valid_compare_object(compare)
+    if valid[0]:
+      result = _get_span_per_layer_compared(request, compare['attrib'], compare['attribValueSets'])
+    else:
+      return HttpResponseBadRequest(valid[1])
+  else:
+    result = _get_span_per_layer(request)
+
+  response = {'dataTables': [result.to_JSON()]}
+  return HttpResponse(json.dumps(response), content_type="application/json")
+
+def _get_span_per_layer(request):
+  """Private method to return the average span of control per layer as described in structure_span()"""
+
+  result = DataTable.with_title("Average span per layer")
+  result.add_column(int, "Layer", "layer")
+  result.add_column(float, "Span", "avg-span")
+
+  # Query the DB for the average span per layer for
+  # any position which has a span larger than 0.
+  span_per_layer = {
+      entry["solid_line_layer"]: entry["solid_line_direct_span__avg"]
+      for entry in Position.objects
+                           .auth_filtered(request,
+                                          active=True,
+                                          solid_line_direct_span__gt=0,
+                                          solid_line_layer__isnull=False)
+                           .values("solid_line_layer")
+                           .annotate(Avg("solid_line_direct_span"))
+                           .order_by('solid_line_layer')
+  }
+
+  # Maximum layer you would want to show is the max layer of the auth_filtered set
+  max_layer = _get_number_of_layers(request)
+  max_layer = max(max_layer["position"], max_layer["multi_position"])
+
+  # Create row for every layer
+  for layer in range(1, max_layer + 1):
+    result.add_row([
+        layer,
+        [span_per_layer.get(layer, 0.0), fo_format(span_per_layer.get(layer, 0.0))]
+    ])
+
+  return result
+
+def _get_span_per_layer_compared(request, attrib, attrib_value_sets):
+  """Private method to return the average span of control per layer
+  per attrib_value as described in structure_span().
+
+  Arguments:
+
+  * request -- The Django request object
+  * attrib -- Attribute to group the data on
+  * attrib_value_sets -- Attribute value sets to compare against each other
+  """
+
+  # Create the datatable and column for x-axis
+  result = DataTable.with_title("Average span per layer")
+  result.add_column(int, "Layer", "layer")
+
+  # Initialize variables
+  span_per_layer_per_value_set = {}
+  max_layer = 0
+
+  # Do calculations for each value set
+  for set in attrib_value_sets:
+    # Create column for value set
+    result.add_column(float, str(set["label"]), str(set["label"]))
+
+    # Create filter q object for value set
+    attrib_filter_q = QFactory(Position).get_q_node(attrib, set["values"])
+
+    # Get the span per layer filtered on the current set of values
+    span_per_layer = (Position.objects
+                              .auth_filtered(request,
+                                             attrib_filter_q,
+                                             active=True,
+                                             solid_line_direct_span__gt=0,
+                                             solid_line_layer__isnull=False)
+                              .values("solid_line_layer")
+                              .annotate(span=Avg("solid_line_direct_span"))
+                              .order_by("solid_line_layer"))
+
+    # Add the results to the dictionary, with layer and set as key and FTE as value
+    for entry in span_per_layer:
+      key = (entry["solid_line_layer"], str(set["label"]))
+      span_per_layer_per_value_set[key] = entry["span"]
+
+      # Update max_layer if occured layer is higer than previous result
+      if entry["solid_line_layer"] > max_layer:
+        max_layer = entry["solid_line_layer"]
+
+  # Create row for every layer until the last which still has employee's for one or more value sets
+  for layer in range(1, max_layer + 1):
+    row = [layer]
+
+    for set in attrib_value_sets:
+      key = (layer, str(set["label"]))
+      row.append([span_per_layer_per_value_set.get(key, 0.0), fo_format(span_per_layer_per_value_set.get(key, 0.0))])
+
+    result.add_row(row)
+
+  return result
+
+def structure_span_managers(request):
+  """Returns one datatable with the percentage of whom is manager per layer.
+
+  This view returns one datatable having rows for each layer (first column).
+  Layers up untill the last (filtered) layer are included in the result.
+
+  If the POST parameter compare is not given, there's only a second column with the percentage of
+  whom is manager in that layer.
+  If the POST parameter is given and valid, there's a column for each given attrib_value_set to compare.
+  In addition, only layers up untill the maximum layer of the compare filtered sets are included.
+
+  The compare functionality can be used by sending for example the following POST parameter:
+
+  {
+      'compare': {
+          'attrib': "location",
+          'attribValueSets': [
+              {label:'compare1', values: [1,3,5]},
+              {label:'compare2': values: [10]}
+          ]
+      }
+  }
+
+  Where attrib is a valid filterable column of a position, employee or person.
+  At least one valid value should be given. If not, the view just returns the result
+  as if compare would not be requested.
+
+  Arguments:
+
+  * request -- The Django request object.
+
+  POST Arguments:
+
+  * compare -- The compare object to base the comparison on
+  """
+  compare = request.attrs.get("compare")
+
+  if compare is not None:
+    valid = is_valid_compare_object(compare)
+    if valid[0]:
+      result = _get_percentage_managers_per_layer_compared(request, compare['attrib'], compare['attribValueSets'])
+    else:
+      return HttpResponseBadRequest(valid[1])
+  else:
+    result = _get_percentage_managers_per_layer(request)
+
+  response = {'dataTables' : [result.to_JSON()]}
+  return HttpResponse(json.dumps(response), content_type="application/json")
+
+
+def _get_percentage_managers_per_layer(request):
+  """Private method to return the percentage manager per layer as described in structure_span_managers()."""
+
+  result = DataTable.with_title("Percentage manager per layer")
+  result.add_column(int, "Layer", "layer")
+  result.add_column(float, "Managers", "percentage-manager")
+
+  count_per_layer = (Position.objects
+                             .auth_filtered(request,
+                                            solid_line_layer__isnull=False,
+                                            active=True)
+                             .values("solid_line_layer")
+                             .annotate(headcount_sum=Count("id"),
+                                       managers=Sum(
+                                           Case(
+                                             When(solid_line_direct_span__gte=1,then=Value(1)),
+                                             default=Value(0)
+                                           ),
+                                           output_field=IntegerField()
+                                       ))
+                             .order_by())
+
+  multipos_count_per_layer = (MultiPosition.objects
+                                           .auth_filtered(request, solid_line_layer__isnull=False)
+                                           .values("solid_line_layer")
+                                           .annotate(headcount_sum=Sum("headcount"))
+                                           .order_by())
+  max_layer = 0
+
+  # Create a dictionary with the layer as keys, and the headcount as values
+  # and a dictionary with the same key but #managers as values
+  positions_per_layer = {}
+  managers_per_layer = {}
+  for entry in count_per_layer:
+    layer = entry["solid_line_layer"]
+    positions_per_layer[layer] = entry["headcount_sum"]
+    # Since layer can have no managers, entry["managers"] might be None
+    managers_per_layer[layer] = (entry["managers"] or 0)
+
+    # If current layer is larger than max_layer, update max_layer
+    if layer > max_layer:
+      max_layer = layer
+
+  # Add multi_positions to headcount dictionary
+  for entry in multipos_count_per_layer:
+    layer = entry["solid_line_layer"]
+    positions_per_layer[layer] = positions_per_layer.get(layer, 0) + entry["headcount_sum"]
+
+    # If current layer is larger than max_layer, update max_layer
+    if layer > max_layer:
+      max_layer = layer
+
+  # Create row for every layer
+  for layer in range(1, max_layer + 1):
+    percentage = managers_per_layer.get(layer, 0) / positions_per_layer.get(layer, 1)
+    result.add_row([
+        layer,
+        [percentage * 100, fo_format_percentage(percentage)]
+    ])
+
+  return result
+
+def _get_percentage_managers_per_layer_compared(request, attrib, attrib_value_sets):
+  """Private method to return the percentage manager per layer
+  per attrib_value as described in structure_span_managers().
+
+  Arguments:
+
+  * request -- The Django request object
+  * attrib -- Attribute to group the data on
+  * attrib_value_sets -- Attribute value sets to compare against each other
+  """
+  result = DataTable.with_title("Percentage manager per layer")
+  result.add_column(int, "Layer", "layer")
+
+  # Initialize variables
+  managers_per_layer_per_value_set = {}
+  positions_per_layer_per_value_set = {}
+  max_layer = 0
+
+  # Do calculations for each value set
+  for set in attrib_value_sets:
+    # Create column for value set
+    result.add_column(float, str(set["label"]), str(set["label"]))
+
+    # Create filter q object for value set
+    attrib_filter_q = QFactory(Position).get_q_node(attrib, set["values"])
+
+    count_per_layer = (Position.objects
+                               .auth_filtered(request,
+                                              attrib_filter_q,
+                                              active=True,
+                                              solid_line_layer__isnull=False)
+                               .values("solid_line_layer")
+                               .annotate(headcount=Count("id"),
+                                         managers=Sum(
+                                             Case(
+                                               When(solid_line_direct_span__gte=1, then=Value(1)),
+                                               default=Value(0)
+                                             ),
+                                             output_field=IntegerField()
+                                         ))
+                               .order_by('solid_line_layer')
+                      )
+    for entry in count_per_layer:
+      key = (entry['solid_line_layer'], str(set["label"]))
+      positions_per_layer_per_value_set[key] = entry['headcount']
+      # Since layer can have no managers, entry["managers"] might be None
+      managers_per_layer_per_value_set[key] = (entry['managers'] or 0)
+
+      # Update max_layer if occured layer is higer than previous result
+      if entry["solid_line_layer"] > max_layer:
+        max_layer = entry["solid_line_layer"]
+
+    try:
+      mp_attrib_filter_q = QFactory(MultiPosition).get_q_node(attrib, set["values"])
+
+      multipos_count_per_layer = (MultiPosition.objects
+                                               .auth_filtered(request,
+                                                              mp_attrib_filter_q,
+                                                              solid_line_layer__isnull=False)
+                                               .values('solid_line_layer')
+                                               .annotate(headcount=Sum('headcount'))
+                                               .order_by('solid_line_layer')
+                                 )
+      for entry in multipos_count_per_layer:
+        key = (entry['solid_line_layer'], str(set["label"]))
+        positions_per_layer_per_value_set[key] = (positions_per_layer_per_value_set.get(key, 0)
+                                                  + entry["headcount"])
+        # Update max_layer if occured layer is higer than previous result
+        if entry["solid_line_layer"] > max_layer:
+          max_layer = entry["solid_line_layer"]
+
+    except InvalidAttributeError:
+      logger.info(MULTIPOS_EXCLUDED_BY_ATTRIBUTE)
+
+  # Create row for every layer until the last which still has employees for one or more value sets
+  for layer in range(1, max_layer + 1):
+    row = [layer]
+
+    for set in attrib_value_sets:
+      key = (layer, str(set["label"]))
+      percentage = (managers_per_layer_per_value_set.get(key, 0) / positions_per_layer_per_value_set.get(key, 1))
+      row.append([percentage * 100, fo_format_percentage(percentage)])
+
+    result.add_row(row)
+
+  return result
+
+
+def organisation_profile(request, job_id):
+  """Returns detailed position information from a position id
+
+  Arguments:
+
+  * request -- The Django request object.
+  * id -- The job id to retrieve the job information of
+
+  POST Arguments:
+
+  * isMultiPosition -- Boolean that indicates whether or not the job_id refers to a multiposition
+  """
+
+  is_multi_position = request.attrs.get("isMultiPosition")
+
+  result = DataTable.with_title("Organisation profile")
+
+  result.add_column(int, "Reporting Layer", "layer")
+  result.add_column(int, "Direct Span", "directSpan")
+  result.add_column(int, "Indirect Span", "indirectSpan")
+  result.add_column(list, "Direct Span", "directSpanList")
+  result.add_column(int, "Line Manager", "boss")
+
+  qf = QFactory(Position)
+  q_active = qf.get_q_node("active", True)
+
+  if is_multi_position:
+    try:
+      multi_position = MultiPosition.objects.authorized(request.user).values(
+          "id",
+          "solid_line",
+          "solid_line_layer"
+      ).get(id=job_id)
+      boss = _get_boss(multi_position, q_active, multi_position["solid_line_layer"], True)
+
+      layer = multi_position['solid_line_layer']
+
+      result.add_row([
+          [layer, (layer or "-")],
+          0,
+          0,
+          None,
+          boss
+      ])
+    except MultiPosition.DoesNotExist:
+      if MultiPosition.objects.filter(q_active, id=job_id).count() == 1:
+        return HttpResponseBadRequest("You do not have access to this multiposition information!")
+      else:
+        return HttpResponseBadRequest("There is no multiposition with this id!")
+  else:
+    try:
+      position = Position.objects.authorized(request.user, q_active).values(
+          "id",
+          "solid_line",
+          "solid_line_layer",
+          "solid_line_direct_span",
+          "solid_line_indirect_span",
+      ).get(job__id=job_id)
+
+      direct_span_list = _get_direct_span_list(position["id"], q_active)
+      boss = _get_boss(position, q_active, position["solid_line_layer"])
+
+      layer = position['solid_line_layer']
+
+      result.add_row([
+          [layer, (layer or "-")],
+          position["solid_line_direct_span"],
+          position["solid_line_indirect_span"],
+          direct_span_list,
+          boss
+      ], {
+          "isMultiPosition": False
+      })
+    except Position.DoesNotExist:
+      if Position.objects.filter(q_active, job__id=job_id).count() == 1:
+        return HttpResponseBadRequest("You do not have access to this position's information!")
+      else:
+        return HttpResponseBadRequest("There is no position with this id!")
+
+  response = {'dataTables' : [result.to_JSON()]}
+  return HttpResponse(json.dumps(response), content_type="application/json")
+
+def _get_direct_span_list(position_id, q_active):
+  """Private method to return the list of all sub positions of position_id.
+
+  This method returns a list, containing rows with position id's and names
+  representing all sub positions of the given position_id.
+
+  Arguments:
+
+  * position_id -- The position id to retrieve the direct span list of.
+  * q_active -- The Q Object which filters on active positions
+  """
+
+  result = []
+
+  direct_span = Position.objects.filter(q_active,
+                                        ~Q(id=position_id),
+                                        solid_line=position_id).values(
+      "id",
+      "job__employee__person__first_name",
+      "job__employee__person__last_name",
+      "solid_line_layer",
+      "job__id"
+  ).order_by("job__employee__person__first_name",
+             "job__employee__person__last_name")
+
+  for position in direct_span:
+    layer = position['solid_line_layer']
+
+    # A layer smaller than 1 means that the position does not belong to any layer
+    if layer is None:
+      layer = [None, "No layer"]
+
+    result.append({
+        "v": position["job__id"],
+        "f": position["job__employee__person__first_name"] + " " + position["job__employee__person__last_name"] if position["job__employee__person__last_name"] is not None else None,
+        "p": {
+            "isMultiPosition": False,
+            "layer": layer,
+        }
+    })
+
+  multipos_direct_span = MultiPosition.objects.filter(solid_line=position_id).values(
+      "id",
+      "title__title",
+      "solid_line_layer",
+  )
+
+  for multipos in multipos_direct_span:
+    layer = multipos['solid_line_layer']
+    result.append({
+        "v": multipos["id"],
+        "f": multipos["title__title"],
+        "p": {
+            "isMultiPosition": True,
+            "layer": layer,
+        }
+    })
+
+  return result
+
+def _get_boss(position, q_active, layer, is_multi_position=False):
+  """Private method to return the boss (id and name) of a certain position.
+
+  Arguments:
+
+  * position -- The position model to retrieve the boss of.
+  * q_active -- The Q Object which filters on active positions
+  """
+  # If it is a faulty layer or CEO, return None as boss
+  if layer is None or layer == 1:
+    return None
+
+  result = []
+
+  boss = Position.objects.filter(q_active).values(
+      "id",
+      "job__employee__person__first_name",
+      "job__employee__person__last_name",
+      "solid_line_layer",
+      "job__id"
+  ).get(id=position["solid_line"])
+
+  # If position's boss is the same position (usually the CEO)
+  if (not is_multi_position) and position["id"] == boss["id"]:
+    return None
+
+  layer = boss['solid_line_layer']
+
+  result = {
+      "v": boss["job__id"],
+      "f": boss["job__employee__person__first_name"] + " " + boss["job__employee__person__last_name"] if boss["job__employee__person__last_name"] is not None else None,
+      "p": {
+          "isMultiPosition": False,
+          "layer": layer,
+      }
+  }
+
+  return result

@@ -1,0 +1,34 @@
+
+def fo_format(num, amount_of_decimals=1, trailing_zeros=False):
+  ''' Formats the given number to the specified amount of decimals.
+  Also removes insignificant zeros at the end.
+
+  Arguments:
+  
+  * num -- The number (float or decimal) to format
+  * amount_of_decimals -- The optional amount of decimals to format to, default 1.
+  * [trailing_zeros] -- Set to True to add trailing zeroes (decimals), default False
+  '''
+  if num is None:
+    return None
+  
+  result = ("{:,." + str(amount_of_decimals) + "f}").format(num)
+  if not trailing_zeros:
+    # strip any trailing zeros after the decimal point
+    result.rstrip("0").rstrip(".")
+
+  return result
+
+def fo_format_percentage(num, amount_of_decimals=1):
+  ''' Formats the given number to the specified amount of decimals with a percentage sign.
+  Also removes insignificant zeros at the end.
+
+  Arguments:
+  
+  * num -- The number (float or decimal) to format
+  * amount_of_decimals -- The optional amount of decimals to format to, default 1.
+  '''
+  if num is None:
+    return None;
+  
+  return ("{:." + str(amount_of_decimals) + "f}").format(num * 100).rstrip("0").rstrip(".") + "%"

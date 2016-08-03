@@ -1,0 +1,3 @@
+DROP VIEW IF EXISTS view_shorttermbench;
+DROP VIEW IF EXISTS view_midtermbench;
+DROP VIEW IF EXISTS view_longtermbench;

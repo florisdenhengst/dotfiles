@@ -1,0 +1,4 @@
+for bracket in 1 2 3 4 5 10 15 20 25 30 35 40 45 50 65 70
+do
+  python plot_lof.py $bracket usg_scores_lof_big.csv usg_anomaly_classes.csv lofplots/
+done;

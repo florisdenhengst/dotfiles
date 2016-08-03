@@ -1,0 +1,30 @@
+(function(){
+
+menu-logout.directive('logout', function(){
+  tmplt = [' <div class="log-out">',
+'            <div class="row">  ',
+'              <div class="col-xs-3">  ',
+'                <img src=\'/static/kapstok/logos/profile.svg\'>',
+'              </div>',
+'              <div class="col-xs-8">',
+'                Welcome {{user}}',
+'                <a href="/logout.html">LOG OUT</a>',
+'              </div>',
+'            </div>',
+'            <div class="row">',
+'              <div class="col-xs-12">',
+'                <div class="app-toggle row" ng-click="toggleGlobalNav()">',
+'                  <div class="col-xs-3 col-xs-offset-4">APPS</div>',
+'                  <ng-include class="access-apps" ng-show="!globalNavIsVisible"',
+'                  src="\'/static/kapstok/logos/see apps.svg\'"></ng-include>',
+'                  <ng-include class="access-apps" ng-show="globalNavIsVisible"',
+'                  src="\'/static/kapstok/logos/hide apps.svg\'"></ng-include>',
+'                </div>',
+'              </div>',
+'            </div>',
+'          </div>'].join('\n')  
+
+  return {
+    template: tmplt,
+  };
+});

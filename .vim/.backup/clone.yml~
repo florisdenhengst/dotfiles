@@ -1,0 +1,184 @@
+---
+- hosts: "{{ host }}"
+  remote_user: fo_ansible
+  sudo: yes
+  vars:
+    inst: "{{ new_instance }}"
+    source: "{{ source_instance }}"
+    hostname: "{{ host }}.crunchrapps.com"
+    inst_dir_new: "/srv/{{ inst }}"
+    inst_dir_source: "/srv/{{ source }}"
+    repo_dir_new: "{{ inst_dir_new }}/web-framework"
+    repo_dir_source: "{{ inst_dir_source }}/web-framework"
+    #repo: git@bitbucket.org:foini/web-framework.git
+    manage_py_cmd: "cd {{ inst_dir_new }} && source bin/activate && python3 {{ repo_dir_new }}/manage.py"
+
+  tasks:
+
+  - file: path={{ inst_dir_new }}           state=directory owner=deploy group=deploy
+  - file: path={{ inst_dir_new }}/log       state=directory owner=deploy group=deploy
+  - file: path={{ inst_dir_new }}/run       state=directory owner=deploy group=deploy
+  - file: path={{ inst_dir_new }}/static    state=directory owner=deploy group=deploy
+
+  - name: Create virtual environment
+    shell: virtualenv {{ inst_dir_new }} -p /usr/bin/python3.4
+    sudo: yes
+    sudo_user: deploy
+
+  - name: Create SciPy symlink
+    file: src=/usr/lib/python3/dist-packages/scipy path={{ inst_dir_new }}/lib/python3.4/site-packages/scipy state=link
+    sudo: yes
+    sudo_user: deploy
+
+  - name: Create NumPy symlink
+    file: src=/usr/lib/python3/dist-packages/numpy path={{ inst_dir_new }}/lib/python3.4/site-packages/numpy state=link
+    sudo: yes
+    sudo_user: deploy
+
+  - name: Create psycopg2 symlink
+    file: src=/usr/lib/python3/dist-packages/psycopg2 path={{ inst_dir_new }}/lib/python3.4/site-packages/psycopg2 state=link
+    sudo: yes
+    sudo_user: deploy
+
+    # sitesettings.py will be updated later
+  - name: Copy web-framework directory
+    command: cp -r {{ repo_dir_source }} "{{ inst_dir_new }}/"
+    sudo: yes
+    sudo_user: deploy
+
+  - name: Installing python dependencies
+    pip: requirements={{ repo_dir_new }}/python_deps.txt
+         virtualenv={{ inst_dir_new }}
+    sudo: yes
+    sudo_user: deploy
+
+  - name: Check if there is already a database password
+    stat: path=/home/deploy/db_passwd
+    register: pw_file
+
+  - name: Generate a database password (if it doesn't exist yet)
+    shell: date +%s | sha256sum | base64 | head -c 32
+    register: db_pass
+    when: not pw_file.stat.exists
+
+  - name: Store password in /home/deploy/db_passwd
+    shell: echo "{{ db_pass.stdout }}" > /home/deploy/db_passwd
+    when: not pw_file.stat.exists
+
+  - name: Retrieve db password from file
+    shell: cat /home/deploy/db_passwd
+    register: db_pass
+
+  - name: Install postgresql deploy user
+    postgresql_user: name=deploy password={{ db_pass.stdout }} role_attr_flags=LOGIN state=present
+    sudo: yes
+    sudo_user: postgres
+
+  - name: Stop supervisorctl (for gunicorn)
+    supervisorctl: name={{ source }} state=stopped
+
+  - name: Clone database
+    command: psql -U postgres -c 'CREATE DATABASE {{ inst }} WITH TEMPLATE {{ source }} OWNER postgres;'
+    sudo_user: postgres
+    sudo: yes
+
+  - name: Reclaim dead tuples and update statistics in DB
+    shell: su - deploy -c "echo 'VACUUM ANALYZE;' | {{ manage_py_cmd }} dbshell"
+
+  - name: Restart supervisorctl (for gunicorn)
+    supervisorctl: name={{ source }} state=restarted
+
+  - name: Install bower
+    npm: name=bower global=yes
+
+  - name: Installing javascript dependencies
+    shell: npm install
+    args:
+      chdir: "{{ repo_dir_new }}"
+    sudo: yes
+    sudo_user: deploy
+
+  - name: Updating bower packages
+    shell: bower update
+    args:
+      chdir: "{{ repo_dir_new }}"
+    sudo: yes
+    sudo_user: deploy
+
+  - name: Generate django secret key
+    shell: head -c 30 /dev/urandom | xxd -ps
+    register: django_secret_key
+
+  - name: Building sitesettings
+    template: src=templates/sitesettings.j2
+              dest={{ repo_dir_new }}/sitesettings.py mode=0700
+    sudo: yes
+    sudo_user: deploy
+
+  - name: Installing Gunicorn startup script
+    template: src=templates/gunicorn_start.j2 dest={{ inst_dir_new }}/bin/gunicorn_start
+              owner=deploy group=deploy mode=750
+    sudo: yes
+    sudo_user: deploy
+
+  - shell: chmod -R o-rwx {{ inst_dir_new }}/*
+  - shell: chmod -R 777 {{ inst_dir_new }}/static/
+  - shell: chmod -R o+rX {{ inst_dir_new }}/run/
+  - shell: chown -R deploy:deploy {{ inst_dir_new }}/run/
+
+  - name: Setting up logrotate
+    template: src=templates/logrotate.j2 dest=/etc/logrotate.d/crunchr-instance_{{ inst }}.conf
+    sudo: yes
+
+  - name: Setting up supervisor config
+    template: src=templates/supervisor.j2 dest=/etc/supervisor/conf.d/{{ inst }}.conf
+    sudo: yes
+
+  - name: Load supervisor config
+    supervisorctl: name={{ inst }} state=present
+
+  - name: Are errors located in new static folder?
+    stat: path="{{ repo_dir_new }}/static/errors"
+    register: errorsdir_new
+
+  - name: Set errorsdir to new directory
+    set_fact:
+      errorsdir: "/static/errors"
+    when: errorsdir_new.stat.exists == True
+
+  - name: Set errorsdir to old directory
+    set_fact:
+      errorsdir: "/static/html/errors"
+    when: errorsdir_new.stat.exists == False
+
+  - name: Setting up nginx site
+    template: src=templates/nginx.j2 dest=/etc/nginx/sites-available/{{ inst }}
+    sudo: yes
+
+  - name: Does gulpfile exists
+    stat: path="{{ repo_dir_new }}/gulpfile.js"
+    register: gulpfile
+
+  - name: Compile translations (only when gulpfile exists)
+    shell: node_modules/.bin/gulp gettext-compile
+    args:
+      chdir: "{{ repo_dir_new }}"
+    sudo: yes
+    sudo_user: deploy
+    when: gulpfile.stat.exists == True
+
+  - name: Compile Preference C++ module
+    shell: make
+    args:
+      chdir: "{{ repo_dir_new }}/preference/cpp"
+    sudo: yes
+    sudo_user: deploy
+
+  # Unfortunately, the django_module results in an error when running
+  # collectstatic, due to some encoding related nonsense...
+  - name: Run collectstatic
+    shell: su - deploy -c "{{ manage_py_cmd }} collectstatic --noinput"
+
+    # Moved here from the end of the playbook
+  - name: Start supervisorctl
+    supervisorctl: name={{ inst }} state=started

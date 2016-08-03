@@ -1,0 +1,151 @@
+<?php
+class Client extends DataObject{
+  const JOIN_TO_USER = 'INNER JOIN `group` ON `client`.`group` = `group`.`id` ' . Group::JOIN_TO_USER;
+  protected static $TABLE = 'client';
+  public $last_active;
+  public $group;
+  public $label;
+
+  public function __construct(){
+    parent::__construct("");
+  }
+
+  public static function fromId($id){
+    $client = new Client();
+    $client->id = $id;
+    return $client;
+  }
+
+  public static function fromData($last_active, $group, $label){
+    $client = new Client();
+    $client->last_active = $last_active;
+    $client->group = $group;
+    $client->label = $label;
+    return $client;
+  }
+
+  /***
+   * Returns all public variables, but excludes the last_active var
+   */
+  public function getUpdateVars(){
+    if(isset($this->last_active)){
+      // we are setting a timestamp. Only return the timestamp
+      return array(
+        'last_active' => $this->_getPublicVars()['last_active']
+      );
+    }
+    $result = $this->_getPublicVars();
+    unset($result['last_active']);
+    return $result;
+  }
+
+  /***
+   * Creates a Client.
+   */
+  public function create($dbh, $columns= "", $values = ""){
+    // all column names in DB
+    $columns = "`last_active`, `group`, `label`";
+    // column matching variable names in TimeSlot object 
+    $values = ":last_active, :group, :label";
+    return parent::create($dbh, $columns, $values);
+  }
+
+  /***
+   * Update an existing Client.
+   */
+  public function update($dbh, $columns="", $values="", $operator=""){
+    if($columns == ""){
+      $columns = array("group", "label");
+    }
+    $values = $columns;
+    return parent::update($dbh, $columns, $values);
+  }
+
+  /***
+   * Returns authorized instances with label instead of ID's.
+   */
+  public static function get_all_auth_assoc($dbh, $user){
+    $preparation = sprintf(
+      'SELECT `%s`.*, 
+        `%s`.`id` AS `group_id`,
+        `%s`.`label` AS `group_label`,
+        DATE_FORMAT(`%s`.`last_active`, "%%d-%%m %%H:%%i") AS last_active 
+      FROM `%s` 
+      %s
+      WHERE `user`.`id` = :user_id',
+      static::$TABLE,
+      Group::$TABLE,
+      Group::$TABLE,
+      static::$TABLE,
+      static::$TABLE,
+      static::JOIN_TO_USER);
+    $statement = $dbh->prepare($preparation);
+    //run query
+    $statement->execute(array('user_id' => $user['id']));
+    $statement->setFetchMode(PDO::FETCH_ASSOC);
+    //ask for assoc. array
+    $result = array();
+    while($row = $statement->fetch()){
+      array_push($result, $row);
+    }
+    return $result;
+  }
+  /***
+   * Returns instances with label instead of ID's.
+   */
+  public static function get_all_assoc($dbh){
+    $qry = sprintf(
+      'SELECT `%s`.*, 
+        `%s`.`id` AS `group_id`,
+        `%s`.`label` AS `group_label`,
+        DATE_FORMAT(`%s`.`last_active`, "%%d-%%m %%H:%%i") AS last_active 
+      FROM `%s` 
+      INNER JOIN `%s` ON `%s`.`%s` = `%s`.`id`',
+      static::$TABLE,
+      Group::$TABLE,
+      Group::$TABLE,
+      static::$TABLE,
+      static::$TABLE,
+      Group::$TABLE, static::$TABLE, Group::$TABLE, GROUP::$TABLE);
+    $statement = $dbh->query($qry);
+    $statement->setFetchMode(PDO::FETCH_ASSOC);
+    $result = array();
+    while($row = $statement->fetch()){
+      array_push($result, $row);
+    }
+    return $result;
+  }
+
+  /***
+   * Returns the current client with some info (its url etc.) if it exists
+   * for the current TimeSlot
+   */
+  public static function get_full_assoc($dbh, $id){
+    $qry = sprintf(
+      'SELECT `client`.*,
+        `presentation`.`url`
+      FROM `client`
+        INNER JOIN `group` ON `client`.`group` = `group`.`id`
+        INNER JOIN `presentation` ON `presentation`.`group` = `group`.`id`
+        INNER JOIN `timeslot` ON `presentation`.`timeslot` = `timeslot`.`id`
+      WHERE
+        `timeslot`.`start_time` <= NOW() AND
+        `timeslot`.`end_time`   >= NOW() AND
+        `client`.`id` = :id');
+    $statement = $dbh->prepare($qry);
+    $statement->execute(array('id' => $id));
+    $statement->setFetchMode(PDO::FETCH_ASSOC);
+    return $statement->fetch();
+  }
+
+  /***
+   * Stamps a Client with the current time stamp
+   */
+  public function stamp($dbh){
+    $this->last_active = date(TimeSlot::DB_DATE_FORMAT);
+    $columns = array('last_active');
+    return $this->update($dbh, $columns);
+  }
+}
+
+?>

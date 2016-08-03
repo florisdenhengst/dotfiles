@@ -1,0 +1,15 @@
+{extends "base.html"}
+
+{block "title"}
+  Edit {$user.username}
+{/block}
+
+{block "content"}
+  <form>
+    <div class="row">
+      <div class="col-xs-1 form-label">
+
+      </div>
+    </div>
+  </form>
+{/block}

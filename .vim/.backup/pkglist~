@@ -1,0 +1,4 @@
+apache
+php>=5.6
+php-apache
+mysql-workbench

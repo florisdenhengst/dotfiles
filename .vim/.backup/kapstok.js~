@@ -1,0 +1,509 @@
++(function() {
+
+/**
+ * The Kapstok module glues all pages together
+ */
+
+var kapstok = angular.module('kapstok', [
+  'ngAnimate',
+  'ngSanitize',
+  'ui.router',
+  'ui.bootstrap',
+  'fo.filter',
+  'fo.learn',
+  'fo.message',
+  'layercheck',
+  'workforce',
+  'preference',
+  'organisation',
+  'succession',
+  'talent',
+]);
+
+kapstok.config(function(
+    $stateProvider,
+    $urlRouterProvider,
+    $locationProvider,
+    $httpProvider,
+    $anchorScrollProvider) {
+
+  // Make sure that AngularJS knows how Django provides the CSRF token
+  $httpProvider.defaults.xsrfHeaderName = "X-CSRFToken";
+  $httpProvider.defaults.xsrfCookieName = "csrftoken";
+  $httpProvider.interceptors.push(function($q, $rootScope) {
+    return {
+        responseError: function(rejection) {
+          if(rejection.status == 403 && rejection.statusText == "Not Logged In") {
+            $rootScope.auth.loginState = false;
+            $rootScope.auth.userName = null;
+            $rootScope.auth.firstName = null;
+            $rootScope.auth.lastName = null;
+            $rootScope.auth.apps = [];
+            $rootScope.auth.statusMessage = "Please log in.";
+            $rootScope.auth.redirectIfNotLoggedIn();
+          }
+          return $q.reject(rejection);
+        }
+    }
+  });
+  
+  // Enable html5 mode and disable auto scrolling
+  $locationProvider.html5Mode(true);
+  $anchorScrollProvider.disableAutoScrolling();
+  
+  // Error handling
+  $urlRouterProvider.otherwise(function ($injector, $location) {
+    $injector.invoke(['$state', function ($state) { $state.go('error'); }]);
+    return true;
+  });
+        
+  /**
+   * Use this template when you want to have an empty state that groups multiple substates.
+   */
+  
+  var DeferTemplate = '<div ui-view></div>';
+  
+  $stateProvider
+  
+    // Home page
+  
+    .state('home', {
+      url: '/',
+      templateUrl: '/static/kapstok/html/home.html',
+      controller: 'HomeController',
+      sidebarsInvisible: true,
+    })
+    
+    // Login page
+    
+    .state('auth', {
+      url: '/app/auth',
+      templateUrl: '/static/kapstok/html/auth/login.html',
+      controller: 'AuthController',
+      sidebarsInvisible: true,
+    })
+    
+    .state('auth.logout', {
+      url: '/logout',
+      controller: function($scope) {
+        $scope.attemptLogout();
+      }
+    })
+    
+    // Workforce
+    
+    .state('workforce', {
+      url: '/app/workforce',
+      templateUrl: '/static/workforce/html/index.html',
+      controller: 'WorkforceController',
+      sidebarsInvisible: true,
+    })
+    .state('workforce.overview', {
+      url: '/overview',
+      templateUrl: '/static/workforce/html/overview.html',
+    })
+    .state('workforce.scenarios', {
+      template: DeferTemplate
+    })
+    .state('workforce.scenarios.create', {
+      url: '/scenarios/create',
+      params: {
+        scenario: {},
+        action: ''
+      },
+      templateUrl: '/static/workforce/html/scenarios/create.html'
+    })
+    .state('workforce.scenarios.saved', {
+      url: '/scenarios/saved',
+      templateUrl: '/static/workforce/html/scenarios/saved.html',
+      params: {
+        scenario: {},
+        action: ''
+      },
+    })
+  
+    // Organisation
+    
+    .state('organisation', {
+      url: '/app/organisation',
+      templateUrl: '/static/organisation/html/index.html',
+      controller: 'OrganisationController',
+      sidebarsInvisible: true,
+    })
+    .state('organisation.summary', {
+      url: '/summary',
+      templateUrl: '/static/organisation/html/summary.html'
+    })
+    .state('organisation.headcount', {
+      template: DeferTemplate,
+      controller: 'OrganisationHeadcountController'
+    })
+    .state('organisation.headcount.overview', {
+      url: '/headcount',
+      templateUrl: '/static/organisation/html/headcount/overview.html'
+    })
+    .state('organisation.headcount.location', {
+      url: '/headcount/location',
+      templateUrl: '/static/organisation/html/headcount/location.html'
+    })
+    .state('organisation.headcount.functional', {
+      url: '/headcount/functional',
+      templateUrl: '/static/organisation/html/headcount/functional.html'
+    })
+    .state('organisation.headcount.business', {
+      url: '/headcount/business',
+      templateUrl: '/static/organisation/html/headcount/business.html'
+    })
+    .state('organisation.structure', {
+      template: DeferTemplate
+    })
+    .state('organisation.structure.overview', {
+      url: '/structure',
+      templateUrl: '/static/organisation/html/structure/overview/overview.html',
+      controller: 'OrganisationOverviewController'   
+    })
+    .state('organisation.structure.overview.layer', {
+      url: '/overview/layer/{level:int}',
+      templateUrl: '/static/organisation/html/structure/overview/layer.html',
+      controller: 'OrganisationOverviewLayerController'
+    })
+    .state('organisation.structure.overview.layer.profile', {
+      url: '/{position:int}'
+    })
+    .state('organisation.structure.layers', {
+      url: '/structure/layers',
+      templateUrl: '/static/organisation/html/structure/layers.html',
+      controller: 'OrganisationLayersController'
+    })
+    .state('organisation.structure.layers.profile', {
+      url: '/{position:int}#max-reporting-path'
+    })    
+    .state('organisation.structure.layers.profile2', {  // Hack
+      url: '/{position:int}'
+    })
+    .state('organisation.structure.span', {
+      url: '/structure/span',
+      templateUrl: '/static/organisation/html/structure/span.html',
+      controller: 'OrganisationSpanController'
+    })
+    .state('organisation.structure.health', {
+      url: '/structure/health',
+      templateUrl: '/static/organisation/html/structure/health.html'
+    })
+    .state('organisation.powerreport', {
+      url: '/powerreport',
+      templateUrl: '/static/organisation/html/powerreport.html'
+    })
+    
+    // Preference
+    
+    .state('preference', {
+      url: '/app/preference',
+      templateUrl: '/static/preference/html/index.html',
+      controller: 'PreferenceController',
+      sidebarsInvisible: true,
+    })
+    .state('preference.survey', {
+      url: '/survey',
+      templateUrl: '/static/preference/html/survey.html',
+      controller: 'SurveyController'
+    })
+    .state('preference.participation', {
+      url: '/participation',
+      template: DeferTemplate,
+    })
+    .state('preference.participation.statistics', {
+      url: '/statistics',
+      templateUrl: '/static/preference/html/participation/statistics.html',
+      controller: 'StatisticsController'
+    })
+    .state('preference.participation.history', {
+      url: '/history',
+      templateUrl: '/static/preference/html/participation/history.html',
+      controller: 'HistoryController'
+    })
+    
+    // Succession
+    
+    .state('succession', {
+      url: '/app/succession',
+      templateUrl: '/static/succession/html/index.html',
+      controller: 'SuccessionController',
+      sidebarsInvisible: true,
+    })
+    .state('succession.overview', {
+      template: DeferTemplate
+    })
+    .state('succession.overview.summary', {
+      url: '/overview',
+      templateUrl: '/static/succession/html/overview/summary.html',
+    })
+    .state('succession.overview.network', {
+      url: '/overview/network',
+      templateUrl: '/static/succession/html/overview/network.html',
+    })
+    .state('succession.risk', {
+      template: DeferTemplate
+    })
+    .state('succession.risk.positions', {
+      url: '/risk',
+      templateUrl: '/static/succession/html/risk/positions.html',
+    })
+    .state('succession.risk.individuals', {
+      url: '/risk/individuals',
+      templateUrl: '/static/succession/html/risk/individuals.html',
+    })
+    .state('succession.quality', {
+      template: DeferTemplate
+    })
+    .state('succession.quality.flow', {
+      url: '/quality',
+      templateUrl: '/static/succession/html/quality/flow.html',
+    })
+    .state('succession.quality.leadership', {
+      url: '/quality/leadership',
+      templateUrl: '/static/succession/html/quality/leadership.html',
+    })
+    .state('succession.powerreport', {
+      url: '/powerreport',
+      templateUrl: '/static/succession/html/powerreport.html',
+    })
+    
+    // Talent
+    
+    .state('talent', {
+      url: '/app/talent',
+      templateUrl: '/static/talent/html/index.html',
+      controller: 'TalentController',
+      sidebarsInvisible: true,
+    })
+    .state('talent.summary', {
+      url: '/summary',
+      templateUrl: '/static/talent/html/summary.html',
+    })
+    .state('talent.distribution', {
+      template: DeferTemplate
+    })
+    .state('talent.distribution.location', {
+      url: '/distribution',
+      templateUrl: '/static/talent/html/distribution/location.html',
+    })
+    .state('talent.distribution.location.list', {
+      url: '/location/:id',
+      templateUrl: '/static/talent/html/distribution/talents-in-location.html'
+    })
+    .state('talent.distribution.functional', {
+      url: '/distribution/functional',
+      templateUrl: '/static/talent/html/distribution/functional.html'
+    })
+    .state('talent.distribution.functional.list', {
+      url: '/:id',
+      templateUrl: '/static/talent/html/distribution/talents-in-functional.html'
+    })
+    .state('talent.distribution.business', {
+      url: '/distribution/business',
+      templateUrl: '/static/talent/html/distribution/business.html'
+    })
+    .state('talent.distribution.business.list', {
+      url: '/:id',
+      templateUrl: '/static/talent/html/distribution/talents-in-business.html'
+    })
+    .state('talent.exploration', {
+      template: DeferTemplate
+    })
+    .state('talent.exploration.risk', {
+      url: '/exploration',
+      templateUrl: '/static/talent/html/exploration/risk.html'
+    })
+    .state('talent.exploration.search', {
+      url: '/exploration/search',
+      templateUrl: '/static/talent/html/exploration/search.html'
+    })
+    .state('talent.powerreport', {
+      url: '/powerreport',
+      templateUrl: '/static/talent/html/powerreport.html'
+    })
+    .state('talent.profile', {
+      url: '/profile/:id',
+      templateUrl: '/static/talent/html/profile.html',
+      controller: 'TalentProfileController'
+    })
+    
+    // Layercheck
+    
+    .state('layercheck', {
+      url: '/app/layercheck',
+      templateUrl: '/layercheck/',
+      controller: 'LayercheckController',
+      sidebarsInvisible: true,
+    })
+    
+    // Error page
+    
+    .state('error', {
+      templateUrl: '/static/kapstok/html/errors/error404.html',
+      sidebarsInvisible: true,
+    })
+    .state('error402', {
+      templateUrl: '/static/kapstok/html/errors/error402.html',
+      sidebarsInvisible: true,
+    })
+});
+
+kapstok.run(function(
+    $rootScope,
+    $animate,
+    $location,
+    $stateParams,
+    $log,
+    $state,
+    $window,
+    $anchorScroll,
+    $http,
+    FilterData,
+    LearnService,
+    appAccessFactory
+) {
+  Date.prototype.addDays = function(days){
+    var dat = new Date(this.valueOf());
+    dat.setDate(dat.getDate() + days);
+    return dat;
+  }
+
+  window.findWithAttr = function(array, attr, value){
+    for(var i = 0;i< array.length; i++){
+      if(array[i][attr] === value){
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  window.getCookie = function(name) {
+      var cookieValue = null;
+      if (document.cookie && document.cookie != '') {
+          var cookies = document.cookie.split(';');
+          for (var i = 0; i < cookies.length; i++) {
+              var cookie = jQuery.trim(cookies[i]);
+              // Does this cookie string begin with the name we want?
+              if (cookie.substring(0, name.length + 1) == (name + '=')) {
+                  cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                  break;
+              }
+          }
+      }
+      return cookieValue;
+  }
+
+  window.parseDecimal = function(string){
+    return parseInt(string, 10);
+  }
+  
+  /**
+   * IE9 doesn't fire an event after every frame
+   */
+   
+  if(!window.requestAnimationFrame) {
+    window.requestAnimationFrame = function(callback) {
+      setTimeout(callback, 1000/30);
+    }
+  }
+  
+  /**
+   * Resize sidebars every frame
+   */
+  
+  function resize(filterBar, element) {
+    if(filterBar.length && element.length) {
+      var currentOffset = element.offset().top;
+      var nextOffset = filterBar.offset().top + filterBar.height();
+      var currentHeight = element.height();
+      var nextHeight = $window.innerHeight - nextOffset + $window.scrollY;
+      
+      if(element.is(':visible') && (currentOffset != nextOffset || currentHeight != nextHeight)) {
+        element.offset({ top: nextOffset });
+        element.height(nextHeight);
+      }
+    }
+  }
+  
+  function onAnimationFrame() {
+    if(!$rootScope.userScroll && $location.hash().length > 0)
+      $anchorScroll();
+    
+    var filterBar = $('.app-filter');
+    var filter = $('#filter');
+    var learn = $('#learn');
+    
+    resize(filterBar, $('#filter'));
+    resize(filterBar, $('#learn'));
+    window.requestAnimationFrame(onAnimationFrame);
+  }
+
+  // Change location
+  $rootScope.go = function(url) { location.href = url };
+
+  $rootScope.accessible_apps = [];
+  
+  // Set accessible apps 
+  appAccessFactory.success(function(data){
+    $rootScope.accessible_apps = (data || []);
+  });
+
+  $rootScope.isAccessible = function(app){
+    return $rootScope.accessible_apps.indexOf(app) >= 0;
+  };
+
+  $rootScope.requestDemo = function(app){
+    console.log(app)
+    $http.get('/api/request_demo/' + app);
+  }
+
+  // Global navigation toggle
+  $rootScope.globalNavIsVisible = false;
+  $rootScope.toggleGlobalNav = function() {
+    $rootScope.globalNavIsVisible = !$rootScope.globalNavIsVisible;
+  }
+  
+  // Learn toggle
+  $rootScope.learn = LearnService;
+
+  
+  // makes stateParams available to templates
+  $rootScope.getStateParam = function(param) {
+    return $stateParams[param];
+  }
+  
+  $rootScope.filter = FilterData;
+  $rootScope.userScroll = false;
+  $rootScope.userScrollCounter = 0;
+  
+  $rootScope.getAppClass = function() {
+    return $state.current.name.split(".")[0];
+  }
+  
+  onAnimationFrame();
+  
+  // Enable user scroll when a scroll event is fired
+  angular.element($window).bind("scroll", function() {
+    if($location.hash().length > 0) {
+      // Ignore once, because anchor generates one scroll event
+      if($rootScope.userScrollCounter > 1)
+        $rootScope.userScroll = true;
+      else
+        $rootScope.userScrollCounter++;
+    } else {
+      $rootScope.userScroll = true;  
+    }
+  });
+  
+  // Disable user scroll when the URL is changed
+  $rootScope.$watch(function() {
+    return $location.path();
+  }, function() {
+      $rootScope.userScroll = false;
+      $rootScope.userScrollCounter = 0;
+  });
+});
+
+})();

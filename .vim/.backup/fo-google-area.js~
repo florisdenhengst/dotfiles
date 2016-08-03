@@ -1,0 +1,166 @@
+/**
+ * Wrap everything inside a self-executing function to prevent creating globals
+ */
+
+(function() {
+
+/**
+ * Load the kapstok module, to add our directives
+ */
+
+var kapstok = angular.module('kapstok');
+
+/**
+ * Google Area directive using Google Chart
+ *
+ * You can use it like this: <fo-google-area data="myData" />. The chart will automatically determine the number of
+ * data series and their ranges, and it will automatically update when the data changes. The data bound should be an
+ * DataTable. Example:
+ * <pre>
+ * $scope.myData = {
+ *   title: "Graph Title",
+ *   cols: [
+ *       {"label": "FTE",
+ *        "type": "number",
+ *      "id": "fte",
+ *     "show": true
+ *     }
+ *   ],
+ *   rows: [
+ *       {"c": [
+ *           {"v": 1, "f": "100%"}
+ *       ]
+     },
+ *   ]
+ * };
+ * </pre>
+ */
+kapstok.directive('foGoogleArea', ['HttpPostService', function(HttpPostService) {
+  function areaChart(div, xTitle, yTitle) {
+    var defaultOptions = {
+      width: 654,
+      height: 333,  
+      animation: {
+          duration: 1000,
+          easing: 'out',
+      },
+      backgroundColor: {
+        fill: '14212C'
+      },
+      legend: {
+        position: 'none',
+        textStyle: {
+          color: 'white'
+        }
+      },
+      pointSize: 6,
+      tooltip: {isHtml: true},
+      vAxis: {
+        'title': yTitle,
+        'titleTextStyle': {
+          'color': 'white'
+        },
+        textStyle: {
+          'color': 'white'
+        },
+        gridlines: {
+          'color': '#2d3d50'
+        },
+        baselineColor: 'white',
+        format: "#'%'"
+      },
+      hAxis: {
+        title: xTitle,
+        titleTextStyle: {
+          'color': 'white'
+        },
+        textStyle: {
+          'color': 'white'
+        },
+        gridlines: {
+          'color': '14212C'
+        },
+        baselineColor: 'white',
+      }
+    };
+    
+    var chart;
+    
+    google.load('visualization', '1', {
+        packages: ['corechart'], 
+        callback: function() { chart = new google.visualization.AreaChart(div); },
+    });
+
+    this.update = function(data) {
+      if( data == null) return;
+      
+      google.load('visualization', '1', {
+          packages:['corechart'], 
+          callback: draw
+      });
+          
+      function draw() {
+        var chartData = new google.visualization.DataTable(data)
+       
+        var options = {
+          //title: data.title
+        }
+        
+        defaultOptions.hAxis.gridlines.count = chartData.getNumberOfRows();
+        
+        if(data.cols.length > 2) {
+          defaultOptions.legend.position = 'right';
+          defaultOptions.isStacked = data.isStacked;
+          
+          if(data.cols.length == 3) {
+            defaultOptions.colors = ['90c142', '61d9fd'];
+          } else if (data.cols.length == 4) {
+            defaultOptions.colors = ['43670b', '90c142', 'd2f39c'];
+          } else {
+            defaultOptions.colors = ['2b4307', '43670b', '90c142', 'd2f39c'];
+          }
+        } else {
+          defaultOptions.legend.position = 'none';
+          defaultOptions.colors = ['90c142'];
+        }
+            
+        chart.draw(chartData, $.extend(options, defaultOptions));
+      } 
+    }
+  }
+
+  return {
+    restrict: 'E',
+    scope: {
+      data: '=?',
+      postParms: '=?'
+    },
+    controller: function($scope, $attrs) {
+      if($attrs.url) {
+
+        function getData() {
+          HttpPostService($attrs.url, $scope.postParms).success(function(data) {
+            $scope.data = data.dataTables[0];
+          });
+        }
+
+        getData();
+        
+        $scope.$on('filterChanged', function() {
+          getData();
+        });
+        
+      }
+    },
+    link: function(scope, element, attrs) {
+      var chart = new areaChart(element[0], attrs.xtitle, attrs.ytitle);
+      scope.$watch('data', chart.update, true);  
+    } 
+  };  
+}]);
+
+/**
+ * Close and execute the wrapper function
+ */
+
+})();

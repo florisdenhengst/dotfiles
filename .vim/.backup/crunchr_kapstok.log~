@@ -1,0 +1,769 @@
+2015-02-25 11:00:00,310	ERROR	=== Exception caught for request /api/request_demo/succession/ from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/views.py", line 401, in request_demo
+    settings.DEMO_MAIL_SENDER,
+  File "/usr/lib/python3.3/site-packages/django/conf/__init__.py", line 47, in __getattr__
+    return getattr(self._wrapped, name)
+AttributeError: 'Settings' object has no attribute 'DEMO_MAIL_SENDER'
+2015-02-25 11:00:03,587	ERROR	=== Exception caught for request /api/request_demo/succession/ from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/views.py", line 401, in request_demo
+    settings.DEMO_MAIL_SENDER,
+  File "/usr/lib/python3.3/site-packages/django/conf/__init__.py", line 47, in __getattr__
+    return getattr(self._wrapped, name)
+AttributeError: 'Settings' object has no attribute 'DEMO_MAIL_SENDER'
+2015-02-25 13:17:39,368	INFO	=== Logging out user fofloris from IP 127.0.0.1
+2015-02-25 13:18:12,454	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-25 13:18:13,619	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-25 14:08:19,865	ERROR	=== Exception caught for request /talent/distribution/location/ from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/talent/views.py", line 181, in distribution
+    in Employee.objects.authorized(request.user).exclude(talent_status=0).values(related_field).annotate(Count("id")).order_by()
+  File "/usr/lib/python3.3/site-packages/django/db/models/query.py", line 626, in values
+    return self._clone(klass=ValuesQuerySet, setup=True, _fields=fields)
+  File "/usr/lib/python3.3/site-packages/django/db/models/query.py", line 961, in _clone
+    c._setup_query()
+  File "/usr/lib/python3.3/site-packages/django/db/models/query.py", line 1129, in _setup_query
+    self.query.add_fields(self.field_names, True)
+  File "/usr/lib/python3.3/site-packages/django/db/models/sql/query.py", line 1655, in add_fields
+    allow_many=allow_m2m)
+  File "/usr/lib/python3.3/site-packages/django/db/models/sql/query.py", line 1463, in setup_joins
+    names, opts, allow_many, fail_on_missing=True)
+  File "/usr/lib/python3.3/site-packages/django/db/models/sql/query.py", line 1427, in names_to_path
+    self.raise_field_error(opts, name)
+  File "/usr/lib/python3.3/site-packages/django/db/models/sql/query.py", line 1433, in raise_field_error
+    "Choices are: %s" % (name, ", ".join(available)))
+django.core.exceptions.FieldError: Cannot resolve keyword 'position' into field. Choices are: contract_type, contract_type_id, employee_id, grade, grade_id, id, job, longtermbench, midtermbench, mobility, mobility_id, person, person_id, potential, potential_id, retention_risk, retention_risk_id, retention_risk_reason, retention_risk_reason_id, shorttermbench, succession, talent_status, talent_status_id, totalbench
+2015-02-25 14:16:20,763	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-25 14:16:21,943	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-25 14:32:17,068	INFO	=== Authenticating user admin from IP 127.0.0.1
+2015-02-25 14:32:18,172	INFO	=== Authentication failed. User admin from IP 127.0.0.1 provided incorrect credentials
+2015-02-25 14:34:42,121	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-25 14:34:43,261	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-25 14:35:13,794	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-25 14:35:16,092	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-25 14:47:24,307	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-25 14:47:25,429	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-25 14:49:27,843	INFO	=== Authenticating user derpie from IP 127.0.0.1
+2015-02-25 14:49:28,966	INFO	=== Authentication succesful for user derpie from IP 127.0.0.1
+2015-02-25 15:02:39,979	INFO	=== Logging out user derpie from IP 127.0.0.1
+2015-02-25 15:02:43,209	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-25 15:02:44,865	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-25 15:05:32,043	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-25 15:05:33,185	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-25 15:06:28,517	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-25 15:06:29,650	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-25 15:09:17,852	INFO	=== Logging out user fofloris from IP 127.0.0.1
+2015-02-25 15:09:37,520	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-25 15:09:38,652	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-25 15:10:37,490	ERROR	=== Exception caught for request /api/organisation/structure/layers/path/ from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 631, in structure_layers_path
+    max_path = __build_path(path_origin)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 686, in __build_path
+    ).get(id=position["solid_line"])
+  File "/usr/lib/python3.3/site-packages/django/db/models/query.py", line 357, in get
+    self.model._meta.object_name)
+database.models.DoesNotExist: Position matching query does not exist.
+2015-02-25 15:33:06,998	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-25 15:33:09,859	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-25 15:34:24,357	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-25 15:34:25,616	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-25 15:58:10,413	INFO	=== Logging out user fofloris from IP 127.0.0.1
+2015-02-25 15:58:14,227	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-25 15:58:15,862	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-25 16:10:59,900	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-25 16:11:01,289	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-25 16:14:56,138	ERROR	=== Exception caught for request /app/organisation/structure/overview/layer/3 from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/utils/decorators.py", line 105, in _wrapped_view
+    response = view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/views.py", line 26, in index
+    return render_to_response('kapstok/index.html', {'debug': settings.DEBUG})
+  File "/usr/lib/python3.3/site-packages/django/shortcuts.py", line 25, in render_to_response
+    return HttpResponse(loader.render_to_string(*args, **kwargs), **httpresponse_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/template/loader.py", line 172, in render_to_string
+    return t.render(Context(dictionary))
+  File "/usr/lib/python3.3/site-packages/django/template/base.py", line 148, in render
+    return self._render(context)
+  File "/usr/lib/python3.3/site-packages/django/template/base.py", line 142, in _render
+    return self.nodelist.render(context)
+  File "/usr/lib/python3.3/site-packages/django/template/base.py", line 844, in render
+    bit = self.render_node(node, context)
+  File "/usr/lib/python3.3/site-packages/django/template/base.py", line 858, in render_node
+    return node.render(context)
+  File "/usr/lib/python3.3/site-packages/pipeline/templatetags/pipeline.py", line 59, in render
+    return self.render_compressed(package, 'css')
+  File "/usr/lib/python3.3/site-packages/pipeline/templatetags/pipeline.py", line 44, in render_compressed
+    paths = packager.compile(package.paths)
+  File "/usr/lib/python3.3/site-packages/pipeline/packager.py", line 99, in compile
+    return self.compiler.compile(paths, force=force)
+  File "/usr/lib/python3.3/site-packages/pipeline/compilers/__init__.py", line 56, in compile
+    return list(executor.map(_compile, paths))
+  File "/usr/lib64/python3.3/concurrent/futures/_base.py", line 546, in result_iterator
+    yield future.result()
+  File "/usr/lib64/python3.3/concurrent/futures/_base.py", line 399, in result
+    return self.__get_result()
+  File "/usr/lib64/python3.3/concurrent/futures/_base.py", line 351, in __get_result
+    raise self._exception
+  File "/usr/lib64/python3.3/concurrent/futures/thread.py", line 54, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/usr/lib/python3.3/site-packages/pipeline/compilers/__init__.py", line 41, in _compile
+    outdated=outdated, force=force)
+  File "/usr/lib/python3.3/site-packages/pipeline/compilers/less.py", line 23, in compile_file
+    return self.execute_command(command, cwd=dirname(infile))
+  File "/usr/lib/python3.3/site-packages/pipeline/compilers/__init__.py", line 100, in execute_command
+    raise CompilerError(stderr)
+pipeline.exceptions.CompilerError: b'\x1b[31mParseError: missing closing `}`\x1b[39m\x1b[31m in \x1b[39m/home/fofloris/Documents/fo/web-framework/compressed/kapstok/less/kapstok.less\x1b[90m on line 3170, column 22:\x1b[39m\n\x1b[90m3169 }\x1b[39m\n3170 .pvtCheckContainer p \x1b[7m\x1b[31m\x1b[1m{\x1b[22m\x1b[39m\x1b[27m\n\x1b[90m3171   margin: 5px;\x1b[39m\x1b[0m\x1b[0m\n\n'
+2015-02-25 16:25:01,747	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-25 16:25:02,992	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-25 18:58:22,003	ERROR	=== Exception caught for request /api/organisation/headcount/business/ from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 337, in headcount
+    [float(headcount), fo_format(headcount, trailing_zeroes=True)],
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/formatters.py", line 17, in fo_format
+    if not trailing_zeros:
+NameError: global name 'trailing_zeros' is not defined
+2015-02-25 18:58:26,363	ERROR	=== Exception caught for request /api/organisation/headcount/location/ from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 337, in headcount
+    [float(headcount), fo_format(headcount, trailing_zeroes=True)],
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/formatters.py", line 17, in fo_format
+    if not trailing_zeros:
+NameError: global name 'trailing_zeros' is not defined
+2015-02-25 18:58:40,141	ERROR	=== Exception caught for request /api/organisation/headcount/location/ from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 337, in headcount
+    [float(headcount), fo_format(headcount, trailing_zeroes=True)],
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/formatters.py", line 17, in fo_format
+    if not trailing_zeros:
+NameError: global name 'trailing_zeros' is not defined
+2015-02-25 18:58:58,380	ERROR	=== Exception caught for request /api/organisation/headcount/location/ from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 337, in headcount
+    [float(headcount), fo_format(headcount, trailing_zeroes=True)],
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/formatters.py", line 17, in fo_format
+    if not trailing_zeros:
+NameError: global name 'trailing_zeros' is not defined
+2015-02-25 18:58:59,587	ERROR	=== Exception caught for request /api/organisation/headcount/location/ from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 337, in headcount
+    [float(headcount), fo_format(headcount, trailing_zeroes=True)],
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/formatters.py", line 17, in fo_format
+    if not trailing_zeros:
+NameError: global name 'trailing_zeros' is not defined
+2015-02-25 19:00:45,309	ERROR	=== Exception caught for request /api/organisation/headcount/location/ from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 339, in headcount
+    (element.parent_id or element.id)
+TypeError: 'list' object is not callable
+2015-02-25 19:00:51,369	ERROR	=== Exception caught for request /api/organisation/headcount/location/ from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 339, in headcount
+    (element.parent_id or element.id)
+TypeError: 'list' object is not callable
+2015-02-25 19:01:52,066	ERROR	=== Exception caught for request /api/organisation/headcount/location/ from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 337, in headcount
+    [float(headcount), fo_format(headcount,amount_of_decimals=2)],#trailing_zeroes=True)],
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/formatters.py", line 17, in fo_format
+    if not trailing_zeros:
+NameError: global name 'trailing_zeros' is not defined
+2015-02-25 19:01:52,155	ERROR	=== Exception caught for request /api/organisation/headcount/location/ from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 337, in headcount
+    [float(headcount), fo_format(headcount,amount_of_decimals=2)],#trailing_zeroes=True)],
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/formatters.py", line 17, in fo_format
+    if not trailing_zeros:
+NameError: global name 'trailing_zeros' is not defined
+2015-02-25 19:01:57,201	ERROR	=== Exception caught for request /api/organisation/headcount/location/ from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 337, in headcount
+    [float(headcount), fo_format(headcount,amount_of_decimals=2)],#trailing_zeroes=True)],
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/formatters.py", line 17, in fo_format
+    if not trailing_zeros:
+NameError: global name 'trailing_zeros' is not defined
+2015-02-25 19:01:59,617	ERROR	=== Exception caught for request /api/organisation/headcount/location/ from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 337, in headcount
+    [float(headcount), fo_format(headcount,amount_of_decimals=2)],#trailing_zeroes=True)],
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/formatters.py", line 17, in fo_format
+    if not trailing_zeros:
+NameError: global name 'trailing_zeros' is not defined
+2015-02-26 10:05:49,302	ERROR	=== Exception caught for request /api/organisation/structure/overview/layer/4/ from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 516, in structure_overview_layer
+    dt.add_properties({"length": total_count, "last_page": int(total_count / page_size)})
+UnboundLocalError: local variable 'page_size' referenced before assignment
+2015-02-26 10:05:50,189	ERROR	=== Exception caught for request /api/organisation/structure/overview/layer/4/ from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 516, in structure_overview_layer
+    dt.add_properties({"length": total_count, "last_page": int(total_count / page_size)})
+UnboundLocalError: local variable 'page_size' referenced before assignment
+2015-02-26 10:05:50,203	ERROR	=== Exception caught for request /api/organisation/structure/overview/layer/4/ from user fofloris at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 516, in structure_overview_layer
+    dt.add_properties({"length": total_count, "last_page": int(total_count / page_size)})
+UnboundLocalError: local variable 'page_size' referenced before assignment
+2015-02-26 11:17:23,906	INFO	=== Logging out user fofloris from IP 127.0.0.1
+2015-02-26 11:22:00,139	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-26 11:22:01,343	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-26 12:57:54,830	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-26 12:57:56,103	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-26 14:27:06,596	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-26 14:27:07,821	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-26 14:27:45,763	INFO	=== Authenticating user derpie from IP 127.0.0.1
+2015-02-26 14:27:46,879	INFO	=== Authentication succesful for user derpie from IP 127.0.0.1
+2015-02-26 14:27:50,293	ERROR	=== Exception caught for request /api/global_filter from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/views.py", line 142, in global_filter
+    pos = Position.objects.authorized(request.user)
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 51, in authorized
+    q_node = qf.auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:27:53,873	ERROR	=== Exception caught for request /api/filter_scope/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/views.py", line 229, in filter_scope
+    n_employees = Employee.active.auth_filtered(request).count()
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 101, in auth_filtered
+    auth_filter_q = qf.auth_filtered(request.user, request.global_filter, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 644, in auth_filtered
+    return self.auth(user) & self.filtered(global_filter, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:27:58,078	ERROR	=== Exception caught for request /api/organisation/summary/statistics/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 71, in summary_statistics
+    q_job = (QFactory(Job).auth_filtered(request.user, request.global_filter)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 644, in auth_filtered
+    return self.auth(user) & self.filtered(global_filter, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:04,554	ERROR	=== Exception caught for request /api/global_filter from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/views.py", line 142, in global_filter
+    pos = Position.objects.authorized(request.user)
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 51, in authorized
+    q_node = qf.auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:13,166	ERROR	=== Exception caught for request /api/organisation/headcount/overview/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 203, in headcount_overview
+    employee_count = Employee.active.auth_filtered(request).count()
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 101, in auth_filtered
+    auth_filter_q = qf.auth_filtered(request.user, request.global_filter, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 644, in auth_filtered
+    return self.auth(user) & self.filtered(global_filter, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:18,648	ERROR	=== Exception caught for request /api/organisation/headcount/business/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 284, in headcount
+    .auth_filtered(request)
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 101, in auth_filtered
+    auth_filter_q = qf.auth_filtered(request.user, request.global_filter, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 644, in auth_filtered
+    return self.auth(user) & self.filtered(global_filter, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:19,297	ERROR	=== Exception caught for request /api/organisation/headcount/function/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 284, in headcount
+    .auth_filtered(request)
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 101, in auth_filtered
+    auth_filter_q = qf.auth_filtered(request.user, request.global_filter, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 644, in auth_filtered
+    return self.auth(user) & self.filtered(global_filter, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:19,874	ERROR	=== Exception caught for request /api/organisation/headcount/business/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 284, in headcount
+    .auth_filtered(request)
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 101, in auth_filtered
+    auth_filter_q = qf.auth_filtered(request.user, request.global_filter, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 644, in auth_filtered
+    return self.auth(user) & self.filtered(global_filter, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:20,392	ERROR	=== Exception caught for request /api/organisation/structure/overview/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 370, in structure_overview
+    pos = PositionHierarchy.active.auth_filtered(request, layer__gt=0)
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 101, in auth_filtered
+    auth_filter_q = qf.auth_filtered(request.user, request.global_filter, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 644, in auth_filtered
+    return self.auth(user) & self.filtered(global_filter, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:20,481	ERROR	=== Exception caught for request /api/search_position_data/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/views.py", line 338, in search_position_data
+    positions = Position.active.authorized(request.user).values(
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 51, in authorized
+    q_node = qf.auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:21,670	ERROR	=== Exception caught for request /api/organisation/structure/layers/path/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 580, in structure_layers_path
+    max_layers = _get_number_of_layers(request)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 424, in _get_number_of_layers
+    pos_auth_q = pos_q.auth(request.user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:21,682	ERROR	=== Exception caught for request /api/organisation/structure/layers/fte/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 744, in structure_layers_fte
+    fte = __get_fte_per_layer(request)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 762, in __get_fte_per_layer
+    .auth_filtered(request, layer__gt=0)
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 101, in auth_filtered
+    auth_filter_q = qf.auth_filtered(request.user, request.global_filter, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 644, in auth_filtered
+    return self.auth(user) & self.filtered(global_filter, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:21,717	ERROR	=== Exception caught for request /api/search_position_data/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/views.py", line 338, in search_position_data
+    positions = Position.active.authorized(request.user).values(
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 51, in authorized
+    q_node = qf.auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:24,857	ERROR	=== Exception caught for request /api/organisation/structure/span/avg/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 941, in structure_span_avg
+    .auth_filtered(request, ~Q(direct_span=0))
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 101, in auth_filtered
+    auth_filter_q = qf.auth_filtered(request.user, request.global_filter, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 644, in auth_filtered
+    return self.auth(user) & self.filtered(global_filter, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:24,858	ERROR	=== Exception caught for request /api/organisation/structure/span/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 1007, in structure_span
+    result = __get_span_per_layer(request)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 1027, in __get_span_per_layer
+    layer__gt=0)
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 101, in auth_filtered
+    auth_filter_q = qf.auth_filtered(request.user, request.global_filter, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 644, in auth_filtered
+    return self.auth(user) & self.filtered(global_filter, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:24,867	ERROR	=== Exception caught for request /api/organisation/structure/span/managers/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 1136, in structure_span_managers
+    result = __get_percentage_managers_per_layer(request)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 1152, in __get_percentage_managers_per_layer
+    layer__gt=0)
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 101, in auth_filtered
+    auth_filter_q = qf.auth_filtered(request.user, request.global_filter, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 644, in auth_filtered
+    return self.auth(user) & self.filtered(global_filter, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:27,834	ERROR	=== Exception caught for request /api/organisation/structure/layers/path/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 580, in structure_layers_path
+    max_layers = _get_number_of_layers(request)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 424, in _get_number_of_layers
+    pos_auth_q = pos_q.auth(request.user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:27,845	ERROR	=== Exception caught for request /api/organisation/structure/layers/fte/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 744, in structure_layers_fte
+    fte = __get_fte_per_layer(request)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 762, in __get_fte_per_layer
+    .auth_filtered(request, layer__gt=0)
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 101, in auth_filtered
+    auth_filter_q = qf.auth_filtered(request.user, request.global_filter, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 644, in auth_filtered
+    return self.auth(user) & self.filtered(global_filter, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:27,902	ERROR	=== Exception caught for request /api/search_position_data/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/views.py", line 338, in search_position_data
+    positions = Position.active.authorized(request.user).values(
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 51, in authorized
+    q_node = qf.auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:31,942	ERROR	=== Exception caught for request /api/organisation/structure/span/avg/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 941, in structure_span_avg
+    .auth_filtered(request, ~Q(direct_span=0))
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 101, in auth_filtered
+    auth_filter_q = qf.auth_filtered(request.user, request.global_filter, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 644, in auth_filtered
+    return self.auth(user) & self.filtered(global_filter, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:31,946	ERROR	=== Exception caught for request /api/organisation/structure/span/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 1007, in structure_span
+    result = __get_span_per_layer(request)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 1027, in __get_span_per_layer
+    layer__gt=0)
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 101, in auth_filtered
+    auth_filter_q = qf.auth_filtered(request.user, request.global_filter, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 644, in auth_filtered
+    return self.auth(user) & self.filtered(global_filter, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:31,952	ERROR	=== Exception caught for request /api/organisation/structure/span/managers/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 1136, in structure_span_managers
+    result = __get_percentage_managers_per_layer(request)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 1152, in __get_percentage_managers_per_layer
+    layer__gt=0)
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 101, in auth_filtered
+    auth_filter_q = qf.auth_filtered(request.user, request.global_filter, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 644, in auth_filtered
+    return self.auth(user) & self.filtered(global_filter, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:34,327	ERROR	=== Exception caught for request /api/organisation/structure/layers/path/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 580, in structure_layers_path
+    max_layers = _get_number_of_layers(request)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 424, in _get_number_of_layers
+    pos_auth_q = pos_q.auth(request.user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:34,340	ERROR	=== Exception caught for request /api/organisation/structure/layers/fte/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/django/contrib/auth/decorators.py", line 21, in _wrapped_view
+    return view_func(request, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 744, in structure_layers_fte
+    fte = __get_fte_per_layer(request)
+  File "/home/fofloris/Documents/fo/web-framework/organisation/views.py", line 762, in __get_fte_per_layer
+    .auth_filtered(request, layer__gt=0)
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 101, in auth_filtered
+    auth_filter_q = qf.auth_filtered(request.user, request.global_filter, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 644, in auth_filtered
+    return self.auth(user) & self.filtered(global_filter, *args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:28:34,370	ERROR	=== Exception caught for request /api/search_position_data/ from user derpie at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/views.py", line 338, in search_position_data
+    positions = Position.active.authorized(request.user).values(
+  File "/usr/lib/python3.3/site-packages/django/db/models/manager.py", line 92, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/home/fofloris/Documents/fo/web-framework/database/models.py", line 51, in authorized
+    q_node = qf.auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 660, in auth
+    return self._chunks_auth(user)
+  File "/home/fofloris/Documents/fo/web-framework/database/q_factory.py", line 575, in _chunks_auth
+    raise NoChunksSetException(user)
+database.q_factory.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:44:50,686	INFO	=== Authenticating user derpie from IP 127.0.0.1
+2015-02-26 14:44:51,791	ERROR	=== Exception caught for request /api/login from user AnonymousUser at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/ratelimit/decorators.py", line 30, in _wrapped
+    return fn(*args, **kw)
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/views.py", line 100, in user_login
+    raise NoChunksSetException(user)
+kapstok.views.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 14:45:10,868	INFO	=== Authenticating user derpie from IP 127.0.0.1
+2015-02-26 14:45:11,952	ERROR	=== Exception caught for request /api/login from user AnonymousUser at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/ratelimit/decorators.py", line 30, in _wrapped
+    return fn(*args, **kw)
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/views.py", line 100, in user_login
+    raise NoChunksSetException(user)
+kapstok.views.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 15:03:16,586	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-26 15:03:17,721	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-26 15:03:46,158	INFO	=== Authenticating user derpie from IP 127.0.0.1
+2015-02-26 15:03:47,238	ERROR	=== Exception caught for request /api/login from user AnonymousUser at IP 127.0.0.1
+Traceback (most recent call last):
+  File "/usr/lib/python3.3/site-packages/django/core/handlers/base.py", line 111, in get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/lib/python3.3/site-packages/ratelimit/decorators.py", line 30, in _wrapped
+    return fn(*args, **kw)
+  File "/home/fofloris/Documents/fo/web-framework/kapstok/views.py", line 100, in user_login
+    raise NoChunksSetException(user)
+kapstok.views.NoChunksSetException: Could not find any chunks for user 'derpie'.
+2015-02-26 15:07:34,066	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-26 15:07:35,210	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1
+2015-02-27 08:27:32,298	INFO	=== Authenticating user fofloris from IP 127.0.0.1
+2015-02-27 08:27:34,345	INFO	=== Authentication succesful for user fofloris from IP 127.0.0.1

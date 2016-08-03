@@ -1,0 +1,120 @@
+<?php
+class User extends DataObject{
+  protected static $TABLE = 'user';
+  public $username;
+  public $password;
+  public $active;
+  public $is_superuser;
+  public $salt;
+
+
+  public function __construct(){
+    parent::__construct("");
+  }
+
+  public static function fromId($id){
+    $user = new User();
+    $user->id = $id;
+    return $user;
+  }
+
+  public static function fromData($uname, $pwd, $active, $is_su){
+    $user = new User();
+    $user->username = $uname;
+    $user->password = $pwd;
+    $user->active = $active;
+    $user->is_superuser = $is_su;
+    return $user;
+  }
+
+  /***
+   * Creates a User.
+   */
+  public function create($dbh, $columns= "", $values = ""){
+    // create new salt on every update
+    $this->_createNewSalt();
+    // hash the password with the new salt
+    $this->_hashPassword();
+    // all column names in DB
+    $columns = "username, password, active, is_superuser, salt";
+    // column matching variable names in User object 
+    $values = ":username, :password, :active, :is_superuser, :salt";
+    return parent::create($dbh, $columns, $values);
+  }
+
+  /***
+   * Update an existing user.
+   */
+  public function update($dbh, $columns="", $values="", $operator=""){
+    // create new salt on every update
+    $this->_createNewSalt();
+    // hash the password with the new salt
+    $this->_hashPassword();
+    $columns = array("username", "password", "active", "is_superuser", "salt");
+    $values = $columns;
+    return parent::update($dbh, $columns, $values);
+  }
+
+  /***
+   * Creates new salt for instance.
+   */
+  private function _createNewSalt(){
+    $saltSize = mcrypt_get_iv_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_ECB);
+    $salt = mcrypt_create_iv($saltSize, MCRYPT_RAND);
+    $this->salt = $this->safe_b64encode($salt);
+  }
+
+  /***
+   * Hashes password for instance.
+   */
+  private function _hashPassword(){
+    if(!$this->password){
+      throw new Exception("Uses should have non-empty passwords!");
+    }
+    $this->password = $this->safe_b64encode(
+      $this->hash($this->password, $this->salt)
+    );
+  }
+
+ /***
+   * Hashes $input using $salt
+   */
+  public static function hash($input, $salt){
+    return mcrypt_encrypt(MCRYPT_RIJNDAEL_256, SECRET_KEY, $input,
+      MCRYPT_MODE_ECB, $salt);
+  }
+
+  /***
+   * Safely decrypts 
+   */
+  public static function safe_b64encode($string){
+    $data = str_replace(array('-','_'),array('+','/'),$string);
+    $mod4 = strlen($data) % 4;
+    if ($mod4) {
+        $data .= substr('====', $mod4);
+    }
+    return base64_encode($data);
+  }
+
+  public static function get_all_auth_assoc($dbh, $is_superuser){
+    if(!$is_superuser){
+      return FALSE;
+    } else {
+      return static::get_all_assoc($dbh);
+    }
+  }
+
+  public static function get_all_auth_label_assoc($dbh, $user){
+    $qry = sprintf('SELECT id AS value, username as label FROM `%s`', static::$TABLE);
+    $statement = $dbh->query($qry);
+    $statement->setFetchMode(PDO::FETCH_ASSOC);
+    $result = array();
+    while($row = $statement->fetch()){
+      array_push($result, $row);
+    }
+    return $result;
+  }
+
+}
+
+?>

@@ -1,0 +1,84 @@
+(function(){
+/**
+ * Load the fo.menu-logout module, to add our directives
+ */
+
+var kapstok = angular.module('kapstok');
+
+/**
+ * The UserInfo factory constructs the global state for the currently logged in
+ * user
+ */ 
+kapstok.service('userInfo', function($http) {
+  /**
+   * Fetches data about the currently logged in user
+   */
+  
+  var self = this;
+  
+  var url = "/user.json";
+  var options = { responseType: 'json' };
+
+  var obj = {
+    firstName: null,
+    lastName: null,
+    username: null
+  };
+
+  var userInfo = $http.get(url, options).success(function(data){
+    obj.firstName = data.firstName;
+    obj.lastName = data.lastName;
+    obj.username = data.username;
+  });
+
+  return obj;  
+});
+
+/**
+ * Implements the <logout> element, used for global nav and logging out.
+ * It retrieves its own user login data and can be used like this:
+ *
+ * <logout></logout> 
+ *
+ */
+
+kapstok.directive('userInfo', function(userInfo){
+  console.log(userInfo);
+  console.log(userInfo.username);
+  tmplt = [' <div class="log-out">',
+'            <div class="row">  ',
+'              <div class="col-xs-3">  ',
+'                <img src=\'/static/kapstok/logos/profile.svg\'>',
+'              </div>',
+'              <div class="col-xs-8">',
+'                Welcome {{userInfo.username}}', 
+'                <a href="/logout.html">LOG OUT</a>',
+'              </div>',
+'            </div>',
+'            <div class="row">',
+'              <div class="col-xs-12">',
+'                <div class="app-toggle row" ng-click="toggleGlobalNav()">',
+'                  <div class="col-xs-3 col-xs-offset-4">APPS</div>',
+'                  <ng-include class="access-apps" ng-show="!globalNavIsVisible"',
+'                  src="\'/static/kapstok/logos/see apps.svg\'"></ng-include>',
+'                  <ng-include class="access-apps" ng-show="globalNavIsVisible"',
+'                  src="\'/static/kapstok/logos/hide apps.svg\'"></ng-include>',
+'                </div>',
+'              </div>',
+'            </div>',
+'          </div>'].join('\n')  
+
+  return {
+    restrict: 'E',
+    scope: {},
+    replace: true,
+    template: tmplt,
+  };
+});
+
+
+/**
+ * Close and execute the wrapper function
+ */
+
+})();

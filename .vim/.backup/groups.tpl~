@@ -1,0 +1,50 @@
+{extends "menu-page.tpl"}
+
+{block "title"}
+Client Groups
+<a class="btn btn-primary"
+  href="/management/groups/new">
+  <span class='glyphicon glyphicon-plus'></span>
+</a>
+{/block}
+
+{block "content"}
+  <div class="row header">
+    <div class="col-xs-2">
+      &nbsp;
+    </div>
+    <div class="col-xs-1">
+      ID
+    </div>
+    <div class="col-xs-8">
+      Label 
+    </div>
+    <div class="col-xs-1">
+      &nbsp;
+    </div>
+  </div>
+  {foreach $groups, index, group}
+  <div class="row 
+              {if $index mod 2 == 1}odd{else}even{/if}
+              {if $group.id == $highlight_id} bg-success my-fade-out{/if}">
+    <div class="col-xs-2">
+      <a class="btn btn-primary"
+        href="/management/groups/{$group.id}">
+        <span class='glyphicon glyphicon-edit'></span>
+      </a>
+    </div>
+    <div class="col-xs-1">
+      {$group.id}
+    </div>
+    <div class="col-xs-8">
+      {$group.label}
+    </div>
+    <div class="col-xs-1">
+      <a class="btn btn-danger"
+        href="/management/groups/delete/{$group.id}">
+        <span class='glyphicon glyphicon-remove'></span>
+      </a>
+    </div>
+  </div>
+  {/foreach}
+{/block}

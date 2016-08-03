@@ -1,0 +1,241 @@
+from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.models import User
+from django.contrib.admin.widgets import *
+from database.models import *
+from database.q_factory import *
+from django.forms import *
+from django.forms.models import BaseInlineFormSet
+
+class RequiredInlineFormSet(BaseInlineFormSet):
+  """InlineFormSet that is required."""
+
+  def _construct_form(self, i, **kwargs):
+    """Overrides parent method to change the form attribute empty_permitted, which specifies
+    whether the formset may be empty."""
+    form = super(RequiredInlineFormSet, self)._construct_form(i, **kwargs)
+    form.empty_permitted = False
+    return form
+
+class UserSettingsInline(admin.StackedInline):
+  """Inline that allows the administrator to add/remove/edit user settings of a user"""
+  model = UserSettings
+  formset = RequiredInlineFormSet
+  can_delete = False
+
+class UserAdmin(UserAdmin):
+  """Extended UserAdmin that adds an inline to allow user settings to be added/removed/edited"""
+  inlines = (UserSettingsInline, )
+
+admin.site.unregister(User)
+admin.site.register(User, UserAdmin)
+
+class RoleAdminForm(ModelForm):
+  """
+  Defines what a form for editing Roles in the Admin site looks like.
+  """
+  location_field = ModelMultipleChoiceField(
+      queryset = Location.objects.all(),
+      widget = FilteredSelectMultiple('Location options', is_stacked = False),
+      required = False,
+  )
+
+  business_unit_field = ModelMultipleChoiceField(
+      queryset = BusinessUnit.objects.all(),
+      widget = FilteredSelectMultiple('Business Unit options', is_stacked = False),
+      required = False,
+  )
+
+  functional_area_field = ModelMultipleChoiceField(
+      queryset = FunctionalArea.objects.all(),
+      widget = FilteredSelectMultiple('Functional Area options', is_stacked = False),
+      required = False,
+  )
+
+
+  class Meta:
+    model = Role
+    exclude = ('chunks',)
+
+
+class RuleSetAdmin():
+  """
+  Helper class for saving a set of rules in the Role Admin page.
+  """
+
+  def save_rule(prototype, form, model_field, form_field):
+    """
+    Saves Rule given a `prototype` rule to copy from,
+    a `form` containing submitted values and Strings
+    `model_field` and `form_field` denoting which values
+    to save where.
+    """
+    # clone the Rule
+    rule_copy = Rule(
+        field = Rule.get_field_enum_id(model_field),
+        role  = prototype.role
+        )
+    ids = []
+
+    # put all relevant IDs in a list
+    for rule_field in form.cleaned_data[form_field]:
+      ids.append(rule_field.id)
+
+    # add to the copied rule
+    rule_copy.set_value_set(ids)
+    # save the rule
+    rule_copy.save()
+    return rule_copy
+
+  def save_rules(request, obj, form, change):
+    """
+    Saves set of rules for a form in the Role Admin page.
+    """
+    obj_copy = obj
+    value_set = []
+
+    # For every Rule type, put the data in a separate rule and save
+    if 'business_unit_field' in form.cleaned_data:
+      obj = RuleAdmin.save_rule(obj_copy, form, 'businessunit', 'business_unit_field')
+    if 'locations_field' in form.cleaned_data:
+      obj = RuleAdmin.save_rule(obj_copy, form, 'location', 'locations_field')
+    if 'functional_area_field' in form.cleaned_data:
+      obj = RuleAdmin.save_rule(obj_copy, form, 'functionalarea', 'functional_area_field')
+    else:
+      return obj
+
+    obj.save()
+    return obj
+
+@admin.register(Role)
+class RoleAdmin(admin.ModelAdmin):
+  """
+  Handles layout and behavior of the Admin page for Roles, including setting
+  Rules for a Role.
+  Shows form containing `name`, `description`, `group` fields and adds
+  fields for every rule type possible.
+  Note: all Rules for a Role are removed on update, then built up from the
+  submitted values.
+  """
+  form = RoleAdminForm
+  list_display = ('name', 'description', 'get_access',
+                  'get_users', 'group', )
+  list_filter = ('name', 'group', 'description', 'rules', )
+
+  def get_access_employees(self, obj):
+    qf = QFactory(Employee)
+    warning = ''
+    q_auth = qf.auth(obj)
+    n_employees = Employee.objects.filter(q_auth).count()
+    if n_employees == 0 or n_employees is None:
+      n_employees = 0
+      warning = ' (No Chunks Set?)'
+    return '{:d} employees{}'.format(n_employees, warning)
+
+  def get_access_positions(self, obj):
+    qf = QFactory(Position)
+    warning = ''
+    q_auth = qf.auth(obj)
+    n_positions = Position.objects.filter(q_auth).count()
+    if n_positions == 0 or n_positions is None:
+      n_positions = 0
+      warning = ' (No Chunks Set?)'
+    return '{:d} positions{}'.format(n_positions, warning)
+
+  def get_access(self, obj):
+    class MockUser(object):
+      # Qfactory's ``auth()`` expects an iterable.
+      roles = [obj]
+    mock_user = MockUser()
+    return ', '.join([self.get_access_employees(mock_user),
+                      self.get_access_positions(mock_user)])
+
+
+  # alter the column name
+  get_access.short_description = 'Access to'
+
+  def get_users(self, obj):
+    return ', '.join([user.username for user in obj.group.user_set.all()])
+
+  # alter the column name
+  get_users.short_description = 'usernames in group'
+
+  def set_initial_locations(self, form, rule):
+    """
+    Sets the initial locations in the form.
+    """
+    ids = rule.get_value_set()
+    query_set = Location.objects.filter(pk__in=ids)
+
+    form.base_fields['location_field'].initial = query_set
+    return form
+
+  def set_initial_business_units(self, form, rule):
+    """
+    Sets the initial business units in the form.
+    """
+    ids = rule.get_value_set()
+    query_set = BusinessUnit.objects.filter(pk__in=ids)
+    form.base_fields['business_unit_field'].initial = query_set
+    return form
+
+  def set_initial_functional_areas(self, form, rule):
+    """
+    Sets the initial functional areas for in the form.
+    """
+    ids = rule.get_value_set()
+    query_set = FunctionalArea.objects.filter(pk__in=ids)
+    form.base_fields['functional_area_field'].initial = query_set
+    return form
+
+  def set_initial_values_custom_fields(self, form, obj):
+    """
+    Sets the default values for custom fields in the form used.
+    """
+    # if we are creating a new Role, set all initial values to None.
+    if obj is None:
+      form.base_fields['location_field'].initial = None
+      form.base_fields['business_unit_field'].initial = None
+      form.base_fields['functional_area_field'].initial = None
+      return form
+
+    # we are editing an existing Role, we should set its values as initials.
+    rules = Rule.objects.filter(role=obj).all()
+    # loop over all Rules that are related to this Role
+    for rule in rules:
+      # set the appropiate value for every rule type
+      rule_type = rule.format_field()
+      if(rule_type == 'location'):
+        self.set_initial_locations(form, rule)
+      if(rule_type == 'businessunit'):
+        self.set_initial_business_units(form, rule)
+      if(rule_type == 'functionalarea'):
+        self.set_initial_functional_areas(form, rule)
+    return form
+
+  def get_form(self, request, obj=None, **kwargs):
+    """
+    Returns the form for this Admin page and sets the right initial values for
+    its custom Fields.
+    """
+    form = super(RoleAdmin, self).get_form(request, obj, **kwargs)
+    return self.set_initial_values_custom_fields(form, obj)
+
+  def save_model(self, request, obj, form, change):
+    """
+    Saves this Role and its Rules.
+    First removes all Rules associated with this Role and creates new
+    Rules for the submitted values.
+    Calculates all chunks for this Role.
+    """
+    super(RoleAdmin, self).save_model(request, obj, form, change)
+    Rule.objects.filter(role=obj).all().delete()
+    rule = Rule(role = obj)
+    for field in form.cleaned_data:
+      if field == 'business_unit_field':
+        RuleSetAdmin.save_rule(rule, form, 'businessunit', 'business_unit_field')
+      if field == 'location_field':
+        RuleSetAdmin.save_rule(rule, form, 'location', 'location_field')
+      if field == 'functional_area_field':
+        RuleSetAdmin.save_rule(rule, form, 'functionalarea', 'functional_area_field')
+    obj.update()

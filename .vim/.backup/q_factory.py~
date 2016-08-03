@@ -1,0 +1,717 @@
+from database.models import *
+from layercheck.models import *
+
+class ModelRoutingError(Exception):
+  """Indicates that no routes are found between two models.
+  This can have two causes:
+      - the model on which is being filtered is not filterable
+      - the attribute on which is being filtered is not supported
+  """
+  def __init__(self, msg):
+    self.msg = msg
+
+  def __str__(self):
+    return self.msg
+
+class ModelNotFilterableException(Exception):
+  """Indicates that a model is not filtered, i.e. that calling::
+    
+    .filtered(global_filter)
+
+  on a QFactory made for this model cannot return sensible results.
+  """
+
+class InvalidAttributeError(Exception):
+  """Indicates that an invalid attribute is present in the selections
+  passed to the global filter, i.e. that the attribute on which is being
+  filtered is not supported."""
+  def __init__(self, msg):
+    self.msg = msg
+
+  def __str__(self):
+    return self.msg
+
+
+class QFactory():
+  """Builds Q objects for global filtering and authorisation for a specific Model.
+  First instantiate a QFactory for the model you are going to filter on::
+
+    qf = QFactory(MyModel)
+
+  Now you can ask qf for two filters::
+
+    q_obj_for_auth = qf.auth(request.user)
+    q_obj_for_global_filtering = qf.filtered(request.global_filter)
+
+  These can then be combined as follows::
+    
+    MyModel.objects.filter(q_obj_for_auth, q_obj_for_global_filtering,
+    possible__other=filters)
+
+  Note that this might lead to duplicate results, as can be expected by the JOINS
+  that these functions make under the hood. To get your unique results back::
+
+    MyModel.objects.filter( .... ).distinct()
+
+  We assume that both the user and global_filter objects have been pre-processed
+  by middleware to contain the following:
+
+  * user.roles should contain a QuerySet describing all roles for the user.
+  * global_filter should be a dictionary containing at least a 'selections' key,
+    which again is a dictionary. This 'selections' dictionary should contain
+    attribute-names as keys and a selection as value. For example::
+
+      global_filter = {
+        'some_var'        : True,
+        'some_other_var'  : False,
+        'selections'      :
+            {
+              'age'             : (0, 30),
+              'grades'          : [1, 2, 3,],
+              '....'            : [],
+            }
+
+  Arguments:
+
+  * model -- A model for which to construct Q objects.
+  """
+  # NOTE: these consts can be removed when we have switched to Django 1.8
+  #       as the get_field method then also returns indirect fields.
+  _IS_DIRECT_FIELD_INDEX = 2
+  _FIELD_REFERENCE_INDEX = 0
+  _EMPTY_SELECTIONS = [(), [], {}, None, '']
+  # These selections are interpreted as being 'empty'
+  _ROLE_BASED_AUTH_MODELS = [Location, FunctionalArea, BusinessUnit,]
+
+  # Dictionary containing all filter attributes and their corresponding
+  # Django model Fields and filter lookups.
+  _filter_attributes = {
+    "location":              
+                              {
+                                'field':     Position._meta.get_field('location'),
+                                'lookup': '_id__in',
+                              },
+    "function":         
+                              {
+                                'field':     Position._meta.get_field('functional_area'),
+                                'lookup': '_id__in',
+                              },
+    "business":              
+                              {
+                                'field':     Position._meta.get_field('business_unit'),
+                                'lookup': '_id__in',
+                              },
+    "jobTitle":              
+                              {
+                                'field':     Position._meta.get_field('title'),
+                                'lookup': '__in',
+                              },
+    "gender":                
+                              {
+                                'field':     Person._meta.get_field('gender'),
+                                'lookup': '__in',
+                              },
+    "age":                   
+                              {
+                                'field':     ConvertedDatesPerson._meta.get_field('age'),
+                                'lookup': '__range',
+                              },
+    "talentStatus":     
+                              {
+                                'field':     Employee._meta.get_field('talent_status'),
+                                'lookup': '_id__in',
+                              },
+    "performanceStatus":     
+                              {
+                                'field':     Job._meta.get_field('performance_status'),
+                                'lookup': '_id__in',
+                              },
+    "employeeGrade":         
+                              {
+                                'field':     Employee._meta.get_field('grade'),
+                                'lookup': '_id__in',
+                              },
+    "positionGrade":         
+                              {
+                                'field':     Position._meta.get_field('grade'),
+                                'lookup': '_id__in',
+                              },
+    "managers":      
+                              {
+                                'field':     PositionHierarchy._meta.get_field('direct_span'),
+                                'lookup': '',
+                              },
+    "contractType":
+                              {
+                                'field':    Employee._meta.get_field('contract_type'),
+                                'lookup':   '_id__in',
+                              },
+    "fte":                    {
+                               'field':     Job._meta.get_field('fte'),
+                               'lookup':    '',
+                              }
+  }
+
+  _auth_attributes = {
+    "chunk":              {
+                            'field':    Job._meta.get_field('chunk'),
+                            'lookup': '_id__in',
+                          },
+  }
+
+  _misc_attributes = {
+    "active":             {
+                            'field':    JobStatus._meta.get_field('active'),
+                            'lookup':   '',
+                          },
+  }
+  
+  # MultiPositions shoullist(d be fil/ered in a different way, this dictionary
+  # describes on which attributes MultiPositions can be filtered and which
+  # lookup to apply.
+  _multiposition_filter_attributes = {
+    "jobTitle":           {
+                            'field':     MultiPosition._meta.get_field('title'),
+                            'lookup': '__in',
+                          },
+    "function":           {
+                            'field':     MultiPosition._meta.get_field('functional_area'),
+                            'lookup': '_id__in',
+                          },
+    "business":       {
+                            'field':     MultiPosition._meta.get_field('business_unit'),
+                            'lookup': '_id__in',
+                          },
+    "location":           {
+                            'field':     MultiPosition._meta.get_field('location'),
+                            'lookup': '_id__in',
+                          },
+    "employeeGrade":      {
+                            'field':     MultiPosition._meta.get_field('grade'),
+                            'lookup': '_id__in',
+                          },
+    "positionGrade":      {
+                            'field':     MultiPosition._meta.get_field('grade'),
+                            'lookup': '_id__in',
+                          },
+  }
+  _multiposition_auth_attributes = {
+    "chunk":              {
+                            'field':    MultiPosition._meta.get_field('chunk'),
+                            'lookup': '_id__in',
+                          }
+
+  }
+
+  #: Dictionary containing all routes from Django models to other Django models
+  #: that are necessary for filtering.
+  routes = {
+      Person:
+        { 
+          Employee:             "employee__",
+          Job:                  "employee__job__",
+          JobStatus:            "employee__job__status__",
+          Position:             "employee__job__position__",
+          PositionHierarchy:    "employee__job__position__positionhierarchy__",
+          ConvertedDatesPerson: "converteddatesperson__",
+          Person:               "",
+        },
+      Employee: 
+        { 
+          Person:               "person__",
+          Job:                  "job__",
+          JobStatus:            "job__status__",
+          Position:             "job__position__",
+          PositionHierarchy:    "job__position__positionhierarchy__",
+          ConvertedDatesPerson: "person__converteddatesperson__",
+          Employee:             "",
+        },
+
+      Position: 
+        { 
+          Job:                  "job__",
+          JobStatus:            "job__status__",
+          Employee:             "job__employee__",
+          Person:               "job__employee__person__",
+          ConvertedDatesPerson: "job__employee__person__converteddatesperson__",
+          Position:             "",
+          PositionHierarchy:    "positionhierarchy__",
+        },
+      Job: 
+        { 
+          Person:               "employee__person__",
+          Employee:             "employee__",
+          Position:             "position__",
+          PositionHierarchy:    "position__positionhierarchy__",
+          ConvertedDatesPerson: "employee__person__converteddatesperson__",
+          Job:                  "",
+          JobStatus:            "status__",
+        },
+      ConvertedDatesPerson:
+        { 
+          Person:               "person__",
+          Employee:             "person__employee__",
+          Position:             "person__employee__job__position__",
+          PositionHierarchy:    "person__employee__job__position__positionhierarchy__",
+          Job:                  "person__employee__job__",
+          JobStatus:            "person__employee__job__status__",
+          ConvertedDatesPerson: ""
+        },
+      ConvertedDatesJob:
+        {
+          Person:               "job__employee__person__",
+          Employee:             "job__employee__",
+          Position:             "job__position__",
+          PositionHierarchy:    "job__position__positionhierarchy__",
+          Job:                  "job__",
+          JobStatus:            "job__status__",
+          ConvertedDatesPerson: "job__employee__person__converteddatesperson__",
+        },
+      Succession:
+        { 
+          Person:               "position__job__employee__person__",
+          Employee:             "position__job__employee__",
+          Position:             "position__",
+          PositionHierarchy:    "position__positionhierarchy__",
+          Job:                  "position__job__",
+          JobStatus:            "position__job__status__",
+          ConvertedDatesPerson: "position__job__employee__person__converteddatesperson__",
+        },
+      PositionTitle:
+        { 
+          Job:                  "position__job__",
+          JobStatus:            "position__job__status__",
+          Employee:             "position__job__employee__",
+          Person:               "position__job__employee__person__",
+          ConvertedDatesPerson: "position__job__employee__person__converteddatesperson__",
+          Position:             "position__",
+          PositionHierarchy:    "position__positionhierarchy__",
+          MultiPosition:        "multiposition__",
+        },
+      MultiPosition:
+        { 
+          MultiPosition:        "",
+        },
+      MultiPositionHierarchy:
+        {
+          MultiPosition:        "multi_position__",
+        },
+      ShortTermSuccessors:
+        {
+          Person:               "position__job__employee__person__",
+          Employee:             "position__job__employee__",
+          Position:             "position__",
+          PositionHierarchy:    "position__positionhierarchy__",
+          Job:                  "position__job__",
+          JobStatus:            "position__job__status__",
+          ConvertedDatesPerson: "position__job__employee__person__converteddatesperson__",
+        },
+      MidTermSuccessors:
+        {
+          Person:               "position__job__employee__person__",
+          Employee:             "position__job__employee__",
+          Position:             "position__",
+          PositionHierarchy:    "position__positionhierarchy__",
+          Job:                  "position__job__",
+          JobStatus:            "position__job__status__",
+          ConvertedDatesPerson: "position__job__employee__person__converteddatesperson__",
+        },
+      LongTermSuccessors:
+        {
+          Person:               "position__job__employee__person__",
+          Employee:             "position__job__employee__",
+          Position:             "position__",
+          PositionHierarchy:    "position__positionhierarchy__",
+          Job:                  "position__job__",
+          JobStatus:            "position__job__status__",
+          ConvertedDatesPerson: "position__job__employee__person__converteddatesperson__",
+        },
+      ShortTermAvailableSuccessors:
+        {
+          Person:               "position__job__employee__person__",
+          Employee:             "position__job__employee__",
+          Position:             "position__",
+          PositionHierarchy:    "position__positionhierarchy__",
+          Job:                  "position__job__",
+          JobStatus:            "position__job__status__",
+          ConvertedDatesPerson: "position__job__employee__person__converteddatesperson__",
+        },
+      MidTermAvailableSuccessors:
+        {
+          Person:               "position__job__employee__person__",
+          Employee:             "position__job__employee__",
+          Position:             "position__",
+          PositionHierarchy:    "position__positionhierarchy__",
+          Job:                  "position__job__",
+          JobStatus:            "position__job__status__",
+          ConvertedDatesPerson: "position__job__employee__person__converteddatesperson__",
+        },
+      LongTermAvailableSuccessors:
+        {
+          Person:               "position__job__employee__person__",
+          Employee:             "position__job__employee__",
+          Position:             "position__",
+          PositionHierarchy:    "position__positionhierarchy__",
+          Job:                  "position__job__",
+          JobStatus:            "position__job__status__",
+          ConvertedDatesPerson: "position__job__employee__person__converteddatesperson__",
+        },
+      ShortTermBench:
+        {
+          Person:               "employee__person__",
+          Employee:             "employee__",
+          Position:             "employee__job__position__",
+          PositionHierarchy:    "employee__job__position__positionhierarchy__",
+          Job:                  "employee__job__",
+          JobStatus:            "employee__job__status__",
+          ConvertedDatesPerson: "employee__person__converteddatesperson__",
+        },
+      MidTermBench:
+        {
+          Person:               "employee__person__",
+          Employee:             "employee__",
+          Position:             "employee__job__position__",
+          PositionHierarchy:    "employee__job__position__positionhierarchy__",
+          Job:                  "employee__job__",
+          JobStatus:            "employee__job__status__",
+          ConvertedDatesPerson: "employee__person__converteddatesperson__",
+        },
+      LongTermBench:
+        {
+          Person:               "employee__person__",
+          Employee:             "employee__",
+          Position:             "employee__job__position__",
+          PositionHierarchy:    "employee__job__position__positionhierarchy__",
+          Job:                  "employee__job__",
+          JobStatus:            "employee__job__status__",
+          ConvertedDatesPerson: "employee__person__converteddatesperson__",
+        },
+      TotalBench:
+        {
+          Person:               "employee__person__",
+          Employee:             "employee__",
+          Position:             "employee__job__position__",
+          PositionHierarchy:    "employee__job__position__positionhierarchy__",
+          Job:                  "employee__job__",
+          JobStatus:            "employee__job__status__",
+          ConvertedDatesPerson: "employee__person__converteddatesperson__",
+        },
+      PositionHierarchy:
+        { 
+          Person:               "position__job__employee__person__",
+          Employee:             "position__job__employee__",
+          Position:             "position__",
+          PositionHierarchy:    "position__positionhierarchy__",
+          Job:                  "position__job__",
+          JobStatus:            "position__job__status__",
+          ConvertedDatesPerson: "position__job__employee__person__converteddatesperson__",
+        },
+    }
+
+  #: A dictionary consisting of filter options in the following format::
+  #: 
+  #:   attributes = {
+  #:       'attribute1': {
+  #:          'field'  : django.db.models.fields.Field
+  #:          'lookup' : '_id__in' / '__in' / '__range' / ...,
+  #:          ...
+  #:        },
+  #:        ....
+  #:    }
+  #: 
+  #: This dictionary is build on construction of a QFactory instance
+  #: and depends on the Model the QFactory created for.
+  attributes = {}
+
+  def __init__(self, model):
+    """Constructor that sets up the QFactory.
+    supply a model in order to ensure that you get the right Q objects::
+
+      qf = QFactory(MyModel)
+      q_auth = qf.auth(user)
+    
+    The constructor makes sure the attributes to filter on are set up correctly.
+
+    Arguments:
+
+    * model -- A model for which to construct Q objects.
+    """
+    self.model = model
+    if(model is MultiPosition 
+        or model is MultiPositionHierarchy):
+      self.attributes = dict(list(self._multiposition_filter_attributes.items()) +
+                             list(self._multiposition_auth_attributes.items()) + 
+                             list(self._multiposition_misc_attributes.items())
+                             )
+    else:
+      self.attributes = dict( list(self._filter_attributes.items()) + 
+                              list(self._auth_attributes.items()) +
+                              list(self._misc_attributes.items())
+                        )
+
+
+  def get_path_to_field(self, to_field):
+    """Function that returns the field from a Django Model to a Django Field
+    in a string format.
+    
+    Arguments:
+      
+    * to_field -- an instance of django.db.fields.Field to route to."""
+    try:
+      model_to_model_route = self.routes[self.model][to_field.model]
+    except KeyError:
+      raise ModelRoutingError("No route found from {} to {}".format( 
+          str(self.model), str(to_field.model))
+      )
+    return model_to_model_route + to_field.name
+
+
+  def get_q_node(self, to_attribute, selection, *args, **kwargs):
+    """Returns an elementary Q object describing the filter that should be applied to a model
+    in order to filter it on the attribute using the selection. The Q object can
+    than be used to compose a single filter, or be directly inserted in a
+    filter() call.
+    
+    Arguments:
+      
+    * to_attribute -- An attribute to filter on. 
+      This attribute should be present in QFactory(MyModel).attributes.
+    * selection -- A selection to filter attribute on. This selection should match the 
+      lookup in QFactory(MyModel).attributes[current_attribute]['lookup'], that is:
+      * For ranges, it should be a tuple '(lower_bound, upper_bound)'.
+      * For lists of IDs, it should be a list: '[1, 2, 3,]'.
+      * For lists of values, it should be a list: '[1, 2, 3,]'.
+    * [**kwargs]
+      * prefix -- An optional parameter to denote a prefix that is to be prefixed to the lookup."""
+    if(selection in self._EMPTY_SELECTIONS):
+      # Return an empty Q() object. Note that an empty Q() object results in no filtering.
+      return Q()
+    
+    prefix = kwargs.get('prefix', '')
+    
+    # Find the Field in which attribute can be found.
+    try:
+      to_field = self.attributes[to_attribute]['field']
+    except KeyError:
+      raise InvalidAttributeError("'{}' is not a valid filter attribute for model '{}'".format( 
+          str(to_attribute), str(self.model))
+      )
+    # find the route from the model we want to filter to the Field
+    lookup = prefix + self.get_path_to_field(to_field)
+    # apply the correct filter lookup
+    lookup += self.attributes[to_attribute]['lookup']
+
+
+    if to_attribute == 'managers':
+      __selection = '0'
+    else:
+      __selection = selection
+    
+    filter_part = {lookup: __selection}
+    result = Q(**filter_part)
+
+    if to_attribute == 'managers' and selection:
+      result = ~result
+
+    return result 
+
+  def get_q_tree(self, selections, *args, **kwargs):
+    """Returns a composed Q object describing the filter that should be aplied to a model
+    in order to filter it on selections. Provide the key-word argument 'through'
+    containing a field of model in a string in order to define the field through
+    which should be filtered.
+
+    Arguments:
+
+    * selections -- A dictionary of attributes to filter on. The keys of this dictionary
+      should be the present in QFactory(MyModel).attributes, and the values should be valid 
+      for the lookups that correspond to these attributes.
+      Example::
+
+        selections = {
+          'age': (0,30),
+          'location': [1,2,3,4,],
+          'chunk': [1,2,3,4,],
+          'gender': ['M', 'O',],
+        }
+    * [through] -- An optional parameter that defines the first step to take for finding
+      the path to each field for each lookup. The value of this string should be the name
+      of a field in MyModel. For example::
+      
+        QFactory(Succession).get_q_tree(some_selections, through='position')
+
+      results in lookups that look like::
+
+        Succession.objects.filter(position__some__lookup__here,
+                                  position__other__lookup__here,
+                                  )
+
+      Note that each lookup is prefixed by 'position__'. After this prefix, the path of
+      the lookup is made as though we have called::
+
+        QFactory(Position).get_q_tree(some_selections)
+
+      resulting in a lookup from Succession in which the first step is predefined.
+    * [prefix] -- An optional parameter which is used in supporting the 'through' parameter.
+      You should never have to use it.
+    """
+    through = kwargs.get('through', None)
+    prefix = kwargs.get('prefix', '')
+    if(through is not None):
+      # The first step to take in routing is defined by a (possibly reverse)
+      # related field. We find a reference to this (possibly reverse) related field.
+      # We can't use model._meta.get_field(through), as it does not fetch
+      # reverse related fields.
+      through_field = self.model._meta.get_field_by_name(through)
+      # Find the model to which the first step is made.
+      # NOTE: this if/else block can be removed when we have switched to Django 1.8
+      #       as the get_field method then also returns indirect fields.
+      if(through_field[self._IS_DIRECT_FIELD_INDEX]):
+        # If through_field lives in model, we reference the model it points to.
+        through_model = through_field[self._FIELD_REFERENCE_INDEX].rel.to
+      else:
+        # If through_field does not exist in model, but is a reverse related
+        # field, we reference the model it lives in.
+        through_model = through_field[self._FIELD_REFERENCE_INDEX].model
+      # Continue routing from this model as regular, but do append a prefix to ensure the
+      # first step is included in every lookup.
+      qf = QFactory(through_model)
+      return qf.get_q_tree(selections, prefix = through + '__')
+    else:  # No first step is defined. We can use the default route.
+      # Instantiate an empty Q object (note than empty Q object
+      # will result in no filtering.
+      result = Q()
+      for k in selections:
+        # Fech Q objects for all attributes and chain them using 'AND'.
+        result = result & self.get_q_node(k, selections[k], prefix=prefix)
+      return result
+
+  def _chunks_auth(self, user):
+    """Returns a Q object describing the filter that should be applied to a model
+    in order to authorize it, for all models that should be authorized using chunks.
+    """
+    chunks = Role.chunks.through.objects.filter(role__in=user.roles).values('chunk_id')
+    return self.get_q_node('chunk', chunks)
+
+  def _role_auth(self, user):
+    """Returns a Q object describing the filter that should be applied to a model
+    in order to authorize it, for all models that should be authorized by inspecting
+    the Roles for this user.
+    """
+    id_set = set()
+    bu_super_user = False
+    fa_super_user = False
+    loc_super_user = False
+    for role in user.roles.all():
+      if self.model is BusinessUnit:
+        rule = role.rules.filter(field=Rule.BUSINESS_UNIT_FIELD)
+        rule_count = rule.count()
+        if rule_count == 0:
+          return Q() 
+        else:
+          rule = rule.get()
+      elif self.model is FunctionalArea:
+        rule = role.rules.filter(field=Rule.FUNCTIONAL_AREA_FIELD)
+        rule_count = rule.count()
+        if rule_count == 0:
+          return Q() 
+        else:
+          rule = rule.get()
+      else: # field is Location
+        rule = role.rules.filter(field=Rule.LOCATION_FIELD)
+        rule_count = rule.count()
+        if rule_count == 0:
+          return Q() 
+        else:
+          rule = rule.get()
+      rule_ids = rule.get_value_set()
+      id_set = id_set | set(rule_ids)
+    return Q(id__in=id_set)
+
+
+  def _no_results_q_object(self):
+    """Returns a Q object that is guaranteed to lead to no results by creating
+    a lookup with pk = -1 AND pk = -2."""
+    return Q(Q(pk=-1) & Q(pk=-2))
+
+  
+  def auth_filtered(self, user, global_filter, *args, **kwargs):
+    """Wrapper function for QFactory.auth() and QFactory.filtered.
+
+    Arguments:
+
+    * user -- A properly preprocessed request.user object, that is:
+      A user object that has a roles attribute that describes this users
+      roles in a QuerySet.
+    * global_filter -- should be a dictionary containing at least a 'selections' key,
+    which again is a dictionary. This 'selections' dictionary should contain
+    attribute-names as keys and a selection as value. For example::
+
+      global_filter = {
+        'some_var'        : True,
+        'some_other_var'  : False,
+        'selections'      :
+            {
+              'age'             : (0, 30),
+              'grades'          : [1, 2, 3,],
+              '....'            : [],
+            }
+    * [*args] -- all optional parameters for QFactory.get_q_tree
+    * [**kwargs] -- all optional key word arguments for QFactory.get_q_tree
+      """
+    return self.auth(user) & self.filtered(global_filter, *args, **kwargs)
+  
+
+  def auth(self, user):
+    """Returns a Q object describing the filter that should be applied to a model
+    in order to authorise it.
+    
+    Arguments:
+
+    * user -- A properly preprocessed request.user object, that is:
+      A user object that has a roles attribute that describes this users
+      roles in a QuerySet."""
+    if issubclass(self.model, AuthorizableModel):
+      if self.model in self._ROLE_BASED_AUTH_MODELS:
+        return self._role_auth(user)
+      else:
+        return self._chunks_auth(user)
+    else:
+      return Q()
+
+
+  def filtered(self, global_filter, *args, **kwargs):
+    """Returns a Q object describing the filter that should be applied to a model
+    in order to apply the global filter to it.
+
+    Arguments:
+
+    * global_filter -- should be a dictionary containing at least a 'selections' key,
+    which again is a dictionary. This 'selections' dictionary should contain
+    attribute-names as keys and a selection as value. For example::
+
+      global_filter = {
+        'some_var'        : True,
+        'some_other_var'  : False,
+        'selections'      :
+            {
+              'age'             : (0, 30),
+              'grades'          : [1, 2, 3,],
+              '....'            : [],
+            }
+    * [*args] -- all optional parameters for QFactory.get_q_tree
+    * [**kwargs] -- all optional key word arguments for QFactory.get_q_tree
+    """
+    if((self.model is MultiPosition or self.model is MultiPositionHierarchy) and
+        not global_filter['multipositions']):
+      # No multipositions are desired, return a Q object that is guaranteed
+      # to lead to an empty QuerySet.
+      return self._no_results_q_object()
+
+    if(issubclass(self.model, FilterableModel)):
+      result = self.get_q_tree(global_filter['selections'], *args, **kwargs)
+      return result
+#      return self.get_q_tree(global_filter['selections'], *args, **kwargs)
+    else:
+      raise ModelNotFilterableException(self.model)
+

@@ -1,0 +1,65 @@
+---
+- hosts: "{{ host }}"
+  remote_user: fo_ansible
+  sudo: yes
+  vars:
+    # Instance is called after the version by default
+    inst: "{{ instance }}"
+    instance_dir: /srv/{{ inst }}
+    repo_dir: "{{ instance_dir }}/web-framework"
+    dataset: "{{ dataset }}"
+    manage_py_cmd:  "cd {{ instance_dir }} && source bin/activate && python3 {{ repo_dir }}/manage.py"
+
+  tasks:
+  - name: Clear all targeted tables 
+    shell: su - deploy -c "{{ manage_py_cmd }} csvtool clear --no-input"
+    when: clear_workforce == "false" 
+
+  - name: Load the currency fixture
+    django_manage: command=loaddata fixtures=currency 
+      app_path={{ repo_dir }} virtualenv={{ instance_dir }}
+
+  - name: Load default user data
+    django_manage: command=loaddata fixtures=fo_admin_user
+          app_path={{ repo_dir }} 
+            virtualenv={{ instance_dir }}
+
+  - name: Clear all targeted tables (including workforce)
+    shell: su - deploy -c "{{ manage_py_cmd }} csvtool clear --no-input --clear-workforce"
+    when: clear_workforce == "true" 
+
+  - name: Copy the dataset from the host to the guest
+    copy: src={{ dataset }} dest=/tmp/data
+
+  - name: Create a directory to contain the decrypted file
+    file: path=/tmp/datadir state=directory
+    when: trupax_password is defined
+
+
+  - name: Decrypt dataset if necessary
+    command: trupax --extract --password='{{ trupax_password }}' /tmp/data /tmp/datadir
+    when: trupax_password is defined
+
+  # Unfortunately, the django_module cannot execute an 
+  # custom command with arguments.
+  # This step is only executed when the supplied dataset
+  # is not encrypted.
+  - name: Import the new dataset
+    shell: su - deploy -c "{{ manage_py_cmd }} csvtool importzip --ignore-floating-trees /tmp/data"
+    when: trupax_password is not defined
+
+  # This step is only exectuted if the supplied dataset
+  # is encrypted, and a password is supplied.
+  - name: Import the new decrypted dataset
+    shell: su - deploy -c "{{ manage_py_cmd }} csvtool importzip --ignore-floating-trees /tmp/datadir/*.zip"
+    when: trupax_password is defined
+
+  - name: Delete the data file
+    file: path=/tmp/data state=absent
+
+  - name: Delete the data directory
+    file: path=/tmp/datadir state=absent
+    when: trupax_password is defined 
+
+  - name: Reclaim dead tuples and update statistics in DB
+    shell: su - deploy -c "echo 'VACUUM ANALYZE;' | {{ manage_py_cmd }} dbshell"

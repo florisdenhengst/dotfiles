@@ -1,0 +1,71 @@
+<?php
+class users extends controller{
+  function __construct(){
+    parent::__construct();
+    $this->_list_tpl = TEMPLATE_ROOT . 'management/users.tpl';
+    $this->_edit_tpl = TEMPLATE_ROOT . 'management/edit-user.tpl';
+    $this->_create_tpl = TEMPLATE_ROOT . 'management/create-user.tpl';
+  }
+
+  function POST($id){
+    $this->_matches = $id;
+
+    if(count($id) > 2){
+      $newUser = $id[2] == 'new';
+
+      $active = (isset($_POST['active'])) ? $_POST['active'] == 'on' : FALSE;
+      $is_superuser = (isset($_POST['is_superuser'])) ? $_POST['is_superuser'] == 'on' : FALSE;
+      $usr = User::fromData($_POST['username'], $_POST['password'], $active, $is_superuser);
+
+      if(!$newUser){
+        // an id was provided. We're updating the given id.
+        $usr->id = $id[2];
+        $id = $usr->update($this->_db);
+      } else {
+        $id = $usr->create($this->_db);
+      }
+      $this->all($id);
+    } else {
+      // no id was provided. Which user are we trying to update??
+      // TODO: this might have to result in creating a new user
+      throw new Exception('Tried to alter user without providing ID');
+    }
+  }
+
+  function edit($id){
+    if(!$this->_user['is_superuser']){
+      $this->_response_not_authorized(
+        $summary= "You are not authorised to go here",
+        $body = 'Viewing and editing users requires superuser credentials.'
+      );
+    } else {
+      $user = User::get_auth_assoc($this->_db, $id);
+      $data = array('user' => $user);
+      parent::output($this->_edit_tpl, $data);
+    }
+  }
+
+  function delete($id){
+    $result = User::delete($this->_db, $id);
+    $this->all($this->_db);
+  }
+
+  function all($highlighId=FALSE){
+    $users = User::get_all_auth_assoc($this->_db,
+      $this->_user['is_superuser']);
+    if($users === FALSE){
+      // No authorisation -- show message instead
+      $this->_response_not_authorized(
+        $summary= "You are not authorised to go here",
+        $body = 'Viewing and editing users requires superuser credentials.'
+      );
+    }
+    $data = array(
+      'users' => $users,
+      'highlight_id' => $highlighId
+    );
+    parent::output($this->_list_tpl, $data);
+  }
+
+}
+?>

@@ -1,0 +1,905 @@
+from database.datatable import DataTable
+from django.test import SimpleTestCase as TestCase
+from datetime import date, time, datetime
+
+class ConstructDataTableTestCase(TestCase):
+  """Tests all constructors of DataTable"""
+  
+  def setUp(self):
+    pass
+  
+  def test_default_constructor(self):
+    dt = DataTable()
+    self.assertEqual(dt.cols, [])
+    self.assertEqual(dt.rows, [])
+    self.assertEqual(dt.title, "")
+    self.assertEqual(dt.p, {})
+  
+  def test_with_title(self):
+    dt = DataTable.with_title("The title!")
+    self.assertEqual(dt.cols, [])
+    self.assertEqual(dt.rows, [])
+    self.assertEqual(dt.title, "The title!")
+    self.assertEqual(dt.p, {})
+  
+  def test_from_data(self):
+    dt = DataTable.from_data({
+        'cols': [{
+            'type': type(0),
+            'label': "The Number",
+            'id': "the-number",
+            'show': False,
+        },{
+            'type': type(""),
+            'label': "That String",
+            'id': "that-string",
+            'show': True,
+        },],
+        'rows': [
+            { 'c': [ { 'v': 1 }, { 'v': "blah" } ] },
+            { 'c': [ { 'v': 2 }, { 'v': "blop" } ] },
+        ],
+        'title': "That title!",
+        'p': {
+          'a': 1,
+          'b': True,
+        }
+    })
+    
+    self.assertEqual(dt.cols[0]['type'], type(0))
+    self.assertEqual(dt.cols[0]['label'], "The Number")
+    self.assertEqual(dt.cols[0]['id'], "the-number")
+    self.assertEqual(dt.cols[0]['show'], False)
+    self.assertEqual(dt.cols[1]['type'], type(""))
+    self.assertEqual(dt.cols[1]['label'], "That String")
+    self.assertEqual(dt.cols[1]['id'], "that-string")
+    self.assertEqual(dt.cols[1]['show'], True)
+    self.assertEqual(dt.rows[0]['c'][0]['v'], 1)
+    self.assertEqual(dt.rows[0]['c'][1]['v'], "blah")
+    self.assertEqual(dt.rows[1]['c'][0]['v'], 2)
+    self.assertEqual(dt.rows[1]['c'][1]['v'], "blop")
+    self.assertEqual(dt.title, "That title!")
+    self.assertEqual(dt.p['a'], 1)
+    self.assertEqual(dt.p['b'], True)
+  
+  def test_with_columns(self):
+    dt_tmp = DataTable.from_data({
+        'cols': [{
+            'type': type(0),
+            'label': "The Number",
+            'id': "the-number",
+            'show': False,
+        },{
+            'type': type(""),
+            'label': "That String",
+            'id': "that-string",
+            'show': True,
+        },],
+        'rows': [
+            { 'c': [ { 'v': 1 }, { 'v': "blah" } ] },
+            { 'c': [ { 'v': 2 }, { 'v': "blop" } ] },
+        ],
+        'title': "That title!",
+        'p': {
+          'a': 1,
+          'b': True,
+        }
+    })
+    dt = DataTable.with_columns(dt_tmp)
+    
+    self.assertEqual(dt.cols[0]['type'], type(0))
+    self.assertEqual(dt.cols[0]['label'], "The Number")
+    self.assertEqual(dt.cols[0]['id'], "the-number")
+    self.assertEqual(dt.cols[0]['show'], False)
+    self.assertEqual(dt.cols[1]['type'], type(""))
+    self.assertEqual(dt.cols[1]['label'], "That String")
+    self.assertEqual(dt.cols[1]['id'], "that-string")
+    self.assertEqual(dt.cols[1]['show'], True)
+    self.assertEqual(dt.rows, [])
+    self.assertEqual(dt.title, "")
+    self.assertEqual(dt.p, {})
+
+class PropertiesTestCase(TestCase):
+  def test_add_properties_empty(self):
+    dt = DataTable()
+    dt.add_properties({})
+    
+    self.assertEqual(dt.p, {})
+  
+  def test_add_properties_two(self):
+    dt = DataTable()
+    dt.add_properties({
+        'myKey': 'The Value!',
+        'anotherKey': 42
+    })
+    
+    self.assertEqual(len(dt.p), 2)
+    self.assertEqual(dt.p['myKey'], "The Value!")
+    self.assertEqual(dt.p['anotherKey'], 42)
+  
+  def test_add_properties_no_dict(self):
+    dt = DataTable()
+    
+    self.assertRaises(TypeError, dt.add_properties, "This should throw!")
+    self.assertEqual(dt.p, {})
+
+class AddColumnTestCase(TestCase):
+  def test_add_column_correct(self):
+    dt = DataTable()
+    num_cols = dt.add_column(type(0))
+    
+    self.assertEqual(len(dt.cols), 1)
+    self.assertEqual(num_cols, 1)
+    self.assertEqual(dt.cols[0]['type'], type(0))
+    self.assertEqual(dt.cols[0]['label'], "")
+    self.assertEqual(dt.cols[0]['id'], "")
+    self.assertEqual(dt.cols[0]['show'], True)
+  
+  def test_add_column_wrong_type(self):
+    dt = DataTable()
+    
+    self.assertRaises(TypeError, dt.add_column, "***")
+    self.assertEqual(len(dt.cols), 0)
+  
+  def test_add_column_all_params(self):
+    dt = DataTable()
+    num_cols = dt.add_column(type(0), "Numbers", "the-id", False)
+    
+    self.assertEqual(len(dt.cols), 1)
+    self.assertEqual(num_cols, 1)
+    self.assertEqual(dt.cols[0]['type'], type(0))
+    self.assertEqual(dt.cols[0]['label'], "Numbers")
+    self.assertEqual(dt.cols[0]['id'], "the-id")
+    self.assertEqual(dt.cols[0]['show'], False)
+  
+  def test_add_column_list(self):
+    dt = DataTable()
+    num_cols = dt.add_column(type([]))
+    
+    self.assertEqual(len(dt.cols), 1)
+    self.assertEqual(num_cols, 1)
+    self.assertEqual(dt.cols[0]['type'], type([]))
+  
+  def test_add_column_dict(self):
+    dt = DataTable()
+    
+    self.assertRaises(TypeError, dt.add_column, type({}))
+  
+  def test_add_column_after_rows(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    dt.add_row([42])
+    dt.add_column(type(0))
+    self.assertEqual(dt.rows[0]['c'][1]['v'], None)
+
+class AddRowTestCase(TestCase):
+  def test_add_row_correct_simple(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    dt.add_row([42])
+    
+    self.assertEqual(dt.rows[0]['c'][0]['v'], 42)
+    self.assertEqual('f' in dt.rows[0]['c'][0], False)
+  
+  def test_add_row_correct_dict(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    dt.add_row([{ 'v': 42, 'f': "forty-two" }])
+    
+    self.assertEqual(dt.rows[0]['c'][0]['v'], 42)
+    self.assertEqual(dt.rows[0]['c'][0]['f'], "forty-two")
+  
+  def test_add_row_correct_list(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    dt.add_row([[42, "forty-two"]])
+    
+    self.assertEqual(dt.rows[0]['c'][0]['v'], 42)
+    self.assertEqual(dt.rows[0]['c'][0]['f'], "forty-two")
+  
+  def test_add_row_wrong_num_cols(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    
+    self.assertRaises(ValueError, dt.add_row, [1, 2])
+  
+  def test_add_row_dict_wrong_type(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    
+    self.assertRaises(TypeError, dt.add_row, [{ 'v': "42" }])
+  
+  def test_add_row_list_wrong_type(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    
+    self.assertRaises(TypeError, dt.add_row, [["42"]])
+  
+  def test_add_row_empty_list(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    
+    self.assertRaises(TypeError, dt.add_row, [[]])
+  
+  def test_add_row_simple_wrong_type(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    
+    self.assertRaises(TypeError, dt.add_row, ["42"])
+  
+  def test_add_row_list_cell_value(self):
+    dt = DataTable()
+    dt.add_column(type([]))
+    dt.add_row([[]])
+    
+    self.assertEqual(len(dt.cols), 1)
+    self.assertEqual(len(dt.rows), 1)
+    self.assertEqual(dt.rows[0]['c'][0]['v'], [])
+  
+  def test_add_row_invalid_dict(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    
+    self.assertRaises(TypeError, dt.add_row, [{ 'foo': "bar" }])
+  
+  def test_add_row_simple_none(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    dt.add_row([None])
+    self.assertEqual(dt.rows[0]['c'][0]['v'], None)
+    self.assertEqual(dt.rows[0]['c'][0]['f'], None)
+
+class SetCellTestCase(TestCase):
+  def setUp(self):
+    self.dt = DataTable()
+    self.dt.add_column(type(0))
+    self.dt.add_row([42])
+  
+  def test_set_cell_negative_row(self):
+    self.assertRaises(IndexError, self.dt.set_cell, -1, 0, 23)
+  
+  def test_set_cell_overflow_row(self):
+    self.assertRaises(IndexError, self.dt.set_cell, 1, 0, 23)
+  
+  def test_set_cell_negative_col(self):
+    self.assertRaises(IndexError, self.dt.set_cell, 0, -1, 23)
+  
+  def test_set_cell_overflow_col(self):
+    self.assertRaises(IndexError, self.dt.set_cell, 0, 1, 23)
+  
+  def test_set_cell_wrong_type(self):
+    self.assertRaises(TypeError, self.dt.set_cell, 0, 0, "twenty-three")
+  
+  def test_set_cell_none(self):
+    self.dt.set_cell(0, 0, None)
+    self.assertEqual(self.dt.rows[0]['c'][0]['v'], None)
+  
+  def test_set_cell_some(self):
+    self.dt.set_cell(0, 0, 23)
+    self.assertEqual(self.dt.rows[0]['c'][0]['v'], 23)
+
+class GetValueTestCase(TestCase):
+  def setUp(self):
+    self.dt = DataTable()
+    self.dt.add_column(type(0))
+    self.dt.add_row([42])
+  
+  def test_get_value_negative_row(self):
+    self.assertRaises(IndexError, self.dt.get_value, -1, 0)
+  
+  def test_get_value_overflow_row(self):
+    self.assertRaises(IndexError, self.dt.get_value, 1, 0)
+  
+  def test_get_value_negative_column(self):
+    self.assertRaises(IndexError, self.dt.get_value, 0, -1)
+  
+  def test_get_value_overflow_column(self):
+    self.assertRaises(IndexError, self.dt.get_value, 0, 1)
+  
+  def test_get_value_correct(self):
+    val = self.dt.get_value(0, 0)
+    self.assertEqual(type(val), type(0))
+    self.assertEqual(val, 42)
+
+class GetNumberOfRowsTestCase(TestCase):
+  def test_get_number_of_rows(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    self.assertEqual(dt.get_number_of_rows(), 0)
+    dt.add_row([4])
+    self.assertEqual(dt.get_number_of_rows(), 1)
+    dt.add_row([8])
+    self.assertEqual(dt.get_number_of_rows(), 2)
+    dt.add_row([15])
+    self.assertEqual(dt.get_number_of_rows(), 3)
+    dt.add_row([16])
+    self.assertEqual(dt.get_number_of_rows(), 4)
+    dt.add_row([23])
+    self.assertEqual(dt.get_number_of_rows(), 5)
+    dt.add_row([42])
+    self.assertEqual(dt.get_number_of_rows(), 6)
+
+class GetNumberOfColumnsTestCase(TestCase):
+  def test_get_number_of_columns(self):
+    dt = DataTable()
+    self.assertEqual(dt.get_number_of_columns(), 0)
+    dt.add_column(type(0))
+    self.assertEqual(dt.get_number_of_columns(), 1)
+    dt.add_column(type(0))
+    self.assertEqual(dt.get_number_of_columns(), 2)
+    dt.add_column(type(0))
+    self.assertEqual(dt.get_number_of_columns(), 3)
+    dt.add_column(type(0))
+    self.assertEqual(dt.get_number_of_columns(), 4)
+    dt.add_column(type(0))
+    self.assertEqual(dt.get_number_of_columns(), 5)
+    dt.add_column(type(0))
+    self.assertEqual(dt.get_number_of_columns(), 6)
+
+class GetNumberOfVisibleColumnsTestCase(TestCase):
+  def test_get_number_of_visible_columns(self):
+    dt = DataTable()
+    self.assertEqual(dt.get_number_of_visible_columns(), 0)
+    dt.add_column(type(0))
+    self.assertEqual(dt.get_number_of_visible_columns(), 1)
+    dt.add_column(type(0), show=False)
+    self.assertEqual(dt.get_number_of_visible_columns(), 1)
+
+class ShowColumnTestCase(TestCase):
+  def test_show_column_correct(self):
+    dt = DataTable()
+    dt.add_column(type(0), show=False)
+    self.assertEqual(dt.cols[0]['show'], False)
+    dt.show_column(0)
+    self.assertEqual(dt.cols[0]['show'], True)
+  
+  def test_show_column_already_visible(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    self.assertEqual(dt.cols[0]['show'], True)
+    dt.show_column(0)
+    self.assertEqual(dt.cols[0]['show'], True)
+  
+  def test_show_column_negative(self):
+    dt = DataTable()
+    dt.add_column(type(0), show=False)
+    self.assertRaises(IndexError, dt.show_column, -1)
+  
+  def test_show_column_overflow(self):
+    dt = DataTable()
+    dt.add_column(type(0), show=False)
+    self.assertRaises(IndexError, dt.show_column, 1)
+
+class HideColumnTestCase(TestCase):
+  def test_hide_column_correct(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    self.assertEqual(dt.cols[0]['show'], True)
+    dt.hide_column(0)
+    self.assertEqual(dt.cols[0]['show'], False)
+  
+  def test_hide_column_already_hidden(self):
+    dt = DataTable()
+    dt.add_column(type(0), show=False)
+    self.assertEqual(dt.cols[0]['show'], False)
+    dt.hide_column(0)
+    self.assertEqual(dt.cols[0]['show'], False)
+  
+  def test_hide_column_negative(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    self.assertRaises(IndexError, dt.hide_column, -1)
+  
+  def test_hide_column_overflow(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    self.assertRaises(IndexError, dt.hide_column, 1)
+
+class IsColumnVisibleTestCase(TestCase):
+  def test_is_column_visible_false(self):
+    dt = DataTable()
+    dt.add_column(type(0), show=False)
+    self.assertEqual(dt.is_column_visible(0), False)
+  
+  def test_is_column_visible_true(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    self.assertEqual(dt.is_column_visible(0), True)
+  
+  def test_is_column_visible_negative(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    self.assertRaises(IndexError, dt.is_column_visible, -1)
+  
+  def test_is_column_visible_overflow(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    self.assertRaises(IndexError, dt.is_column_visible, 1)
+
+class GetColumnLabelTestCase(TestCase):
+  def setUp(self):
+    self.dt = DataTable()
+    self.dt.add_column(type(0), label="The Label")
+    
+  def test_get_column_label_negative(self):
+    self.assertRaises(IndexError, self.dt.get_column_label, -1)
+  
+  def test_get_column_label_overflow(self):
+    self.assertRaises(IndexError, self.dt.get_column_label, 1)
+  
+  def test_get_column_label_correct(self):
+    self.assertEqual(self.dt.get_column_label(0), "The Label")
+
+class GetColumnTypeTestCase(TestCase):
+  def setUp(self):
+    self.dt = DataTable()
+    self.dt.add_column(type(0))
+  
+  def test_get_column_type_negative(self):
+    self.assertRaises(IndexError, self.dt.get_column_type, -1)
+  
+  def test_get_column_type_overflow(self):
+    self.assertRaises(IndexError, self.dt.get_column_type, 1)
+  
+  def test_get_column_type_correct(self):
+    self.assertEqual(self.dt.get_column_type(0), type(0))
+
+class RemoveRowTestCase(TestCase):
+  def setUp(self):
+    self.dt = DataTable()
+    self.dt.add_column(type(0))
+    self.dt.add_row([42])
+  
+  def test_remove_row_negative(self):
+    self.assertRaises(IndexError, self.dt.remove_row, -1)
+  
+  def test_remove_row_overflow(self):
+    self.assertRaises(IndexError, self.dt.remove_row, 1)
+  
+  def test_remove_row_correct(self):
+    self.assertEqual(len(self.dt.rows), 1)
+    self.dt.remove_row(0)
+    self.assertEqual(len(self.dt.rows), 0)
+
+class RemoveColumnTestCase(TestCase):
+  def setUp(self):
+    self.dt = DataTable()
+    self.dt.add_column(type(0))
+  
+  def test_remove_column_negative(self):
+    self.assertRaises(IndexError, self.dt.remove_column, -1)
+  
+  def test_remove_column_overflow(self):
+    self.assertRaises(IndexError, self.dt.remove_column, 1)
+  
+  def test_remove_column_correct(self):
+    self.assertEqual(len(self.dt.cols), 1)
+    self.dt.remove_column(0)
+    self.assertEqual(len(self.dt.cols), 0)
+
+class GetColumnRangeTestCase(TestCase):
+  def test_get_column_range_negative(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    self.assertRaises(IndexError, dt.get_column_range, -1)
+  
+  def test_get_column_range_overflow(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    self.assertRaises(IndexError, dt.get_column_range, 1)
+  
+  def test_get_column_range_string_type(self):
+    dt = DataTable()
+    dt.add_column(type(""))
+    dt.add_row(["a"])
+    dt.add_row(["b"])
+    dt.add_row(["c"])
+    self.assertEqual(dt.get_column_range(0)['min'], "a")
+    self.assertEqual(dt.get_column_range(0)['max'], "c")
+  
+  def test_get_column_range_float_type(self):
+    dt = DataTable()
+    dt.add_column(type(0.0))
+    dt.add_row([0.0])
+    dt.add_row([0.3])
+    dt.add_row([-1.0])
+    self.assertEqual(dt.get_column_range(0)['min'], -1.0)
+    self.assertEqual(dt.get_column_range(0)['max'], 0.3)
+  
+  def test_get_column_range_no_rows(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    self.assertEqual(dt.get_column_range(0)['min'], None)
+    self.assertEqual(dt.get_column_range(0)['max'], None)
+  
+  def test_get_column_range_only_positives(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    dt.add_row([1])
+    dt.add_row([2])
+    self.assertEqual(dt.get_column_range(0)['min'], 1)
+    self.assertEqual(dt.get_column_range(0)['max'], 2)
+
+class GetDistinctValuesTestCase(TestCase):
+  def test_get_distinct_values_negative(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    self.assertRaises(IndexError, dt.get_distinct_values, -1)
+  
+  def test_get_distinct_values_overflow(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    self.assertRaises(IndexError, dt.get_distinct_values, 1)
+  
+  def test_get_distinct_values_none(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    self.assertEqual(dt.get_distinct_values(0), [])
+  
+  def test_get_distinct_values_no_duplicates(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    dt.add_row([4])
+    dt.add_row([8])
+    dt.add_row([15])
+    dt.add_row([16])
+    dt.add_row([23])
+    dt.add_row([42])
+    self.assertEqual(dt.get_distinct_values(0), [4, 8, 15, 16, 23, 42])
+  
+  def test_get_distinct_values_duplicates(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    dt.add_row([42])
+    dt.add_row([8])
+    dt.add_row([15])
+    dt.add_row([16])
+    dt.add_row([23])
+    dt.add_row([42])
+    self.assertEqual(dt.get_distinct_values(0), [42, 8, 15, 16, 23])
+
+class GetColumnValuesTestCase(TestCase):
+  def test_get_column_values_negative(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    self.assertRaises(IndexError, dt.get_column_values, -1)
+  
+  def test_get_column_values_overflow(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    self.assertRaises(IndexError, dt.get_column_values, 1)
+  
+  def test_get_column_values_none(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    self.assertEqual(dt.get_column_values(0), [])
+  
+  def test_get_column_values_no_duplicates(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    dt.add_row([4])
+    dt.add_row([8])
+    dt.add_row([15])
+    dt.add_row([16])
+    dt.add_row([23])
+    dt.add_row([42])
+    self.assertEqual(dt.get_column_values(0), [4, 8, 15, 16, 23, 42])
+  
+  def test_get_column_values_duplicates(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    dt.add_row([42])
+    dt.add_row([8])
+    dt.add_row([15])
+    dt.add_row([16])
+    dt.add_row([23])
+    dt.add_row([42])
+    self.assertEqual(dt.get_column_values(0), [42, 8, 15, 16, 23, 42])
+
+class SetTitleTestCase(TestCase):
+  def test_set_title(self):
+    dt = DataTable()
+    self.assertEqual(dt.title, "")
+    dt.set_title("Dat Title")
+    self.assertEqual(dt.title, "Dat Title")
+
+class GetTitleTestCase(TestCase):
+  def test_get_title(self):
+    dt = DataTable()
+    self.assertEqual(dt.get_title(), "")
+    dt.set_title("Dat Title")
+    self.assertEqual(dt.get_title(), "Dat Title")
+
+class GetRowValuesTestCase(TestCase):
+  def test_get_row_values_negative(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    dt.add_row([42])
+    self.assertRaises(IndexError, dt.get_row_values, -1)
+  
+  def test_get_row_values_overflow(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    dt.add_row([42])
+    self.assertRaises(IndexError, dt.get_row_values, 1)
+  
+  def test_get_row_values_none(self):
+    dt = DataTable()
+    dt.add_row([])
+    self.assertEqual(dt.get_row_values(0), [])
+  
+  def test_get_row_values_some(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    dt.add_column(type(""))
+    dt.add_column(type(False))
+    dt.add_row([-1, "The String", True])
+    self.assertEqual(dt.get_row_values(0), [-1, "The String", True])
+
+class GetValueByLabelTestCase(TestCase):
+  def setUp(self):
+    self.dt = DataTable()
+    self.dt.add_column(type(0), label="the label")
+    self.dt.add_row([42])
+    
+  def test_get_value_by_column_id_negative(self):
+    self.assertRaises(IndexError, self.dt.get_value_by_column_id, "the label", -1)
+  
+  def test_get_value_by_column_id_overflow(self):
+    self.assertRaises(IndexError, self.dt.get_value_by_column_id, "the label", 1)
+  
+  def test_get_value_by_column_id_wrong_label(self):
+    self.assertRaises(KeyError, self.dt.get_value_by_column_id, "other label", 0)
+  
+  def test_get_value_by_column_id_correct(self):
+    self.assertEqual(self.dt.get_value_by_column_id("the label", 0), 42)
+
+class GetRowIndexTestCase(TestCase):
+  def setUp(self):
+    self.dt = DataTable()
+    self.dt.add_column(type(0))
+    self.dt.add_row([42])
+  
+  def test_get_row_index_negative(self):
+    self.assertRaises(IndexError, self.dt.get_row_index, -1, 42)
+  
+  def test_get_row_index_overflow(self):
+    self.assertRaises(IndexError, self.dt.get_row_index, 1, 42)
+  
+  def test_get_row_index_no_value(self):
+    self.assertEqual(self.dt.get_row_index(0, 43), -1)
+  
+  def test_get_row_index_some_value(self):
+    self.assertEqual(self.dt.get_row_index(0, 42), 0)
+
+class GetColumnIndexTestCase(TestCase):
+  def setUp(self):
+    self.dt = DataTable()
+    self.dt.add_column(type(0), label="The Label")
+  
+  def test_get_column_index_no_label(self):
+    self.assertEqual(self.dt.get_column_index("Other Label"), -1)
+  
+  def test_get_column_index_some_label(self):
+    self.assertEqual(self.dt.get_column_index("The Label"), 0)
+
+class IncrementCellTestCase(TestCase):
+  def setUp(self):
+    self.dt = DataTable()
+    self.dt.add_column(type(0))
+    self.dt.add_column(type(""))
+    self.dt.add_row([42, "foo"])
+  
+  def test_increment_cell_negative_row(self):
+    self.assertRaises(IndexError, self.dt.increment_cell, -1, 0)
+  
+  def test_increment_cell_overflow_row(self):
+    self.assertRaises(IndexError, self.dt.increment_cell, 1, 0)
+    
+  def test_increment_cell_negative_column(self):
+    self.assertRaises(IndexError, self.dt.increment_cell, 0, -1)
+  
+  def test_increment_cell_overflow_column(self):
+    self.assertRaises(IndexError, self.dt.increment_cell, 0, 2)
+  
+  def test_increment_cell_wrong_type(self):
+    self.assertRaises(TypeError, self.dt.increment_cell, 0, 1)
+  
+  def test_increment_cell_auto(self):
+    self.assertEqual(self.dt.increment_cell(0, 0), 1)
+    self.assertEqual(self.dt.get_value(0, 0), 43)
+  
+  def test_increment_cell_custom(self):
+    self.assertEqual(self.dt.increment_cell(0, 0, 3), 3)
+    self.assertEqual(self.dt.get_value(0, 0), 45)
+
+class ScaleColumnsTestCase(TestCase):
+  def test_scale_columns(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    dt.add_column(type(0))
+    dt.add_column(type(0))
+    dt.add_row([1, 2, 3])
+    dt.add_row([4, 5, 6])
+    dt.add_row([7, 8, 9])
+    dt.scale_columns([0, 2], 2.5)
+    self.assertEqual(dt.get_column_values(0), [2.5, 10, 17.5])
+    self.assertEqual(dt.get_column_values(1), [2, 5, 8])
+    self.assertEqual(dt.get_column_values(2), [7.5, 15, 22.5])
+
+class ReverseTestCase(TestCase):
+  def test_reverse_empty(self):
+    dt = DataTable()
+    dt.reverse()
+    self.assertEqual(len(dt.rows), 0)
+  
+  def test_reverse_one(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    dt.add_row([0])
+    dt.reverse()
+    self.assertEqual(dt.get_column_values(0), [0])
+  
+  def test_reverse_more(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    dt.add_row([0])
+    dt.add_row([1])
+    dt.add_row([2])
+    dt.reverse()
+    self.assertEqual(dt.get_column_values(0), [2, 1, 0])
+
+class ToJsonTestCase(TestCase):
+  def test_to_json_empty(self):
+    dt = DataTable()
+    result = dt.to_JSON()
+    self.assertEqual(result, {
+        'cols': [],
+        'rows': [],
+        'title': "",
+        'p': {}
+    })
+  
+  def test_to_json_strings(self):
+    dt = DataTable()
+    dt.add_column(type(""))
+    result = dt.to_JSON()
+    self.assertEqual(result, {
+        'cols': [ {
+          'type': "string",
+          'label': "",
+          'id': "",
+          'show': True
+        } ],
+        'rows': [],
+        'title': "",
+        'p': {}
+    })
+  
+  def test_to_json_booleans(self):
+    dt = DataTable()
+    dt.add_column(type(False))
+    result = dt.to_JSON()
+    self.assertEqual(result, {
+        'cols': [ {
+          'type': "boolean",
+          'label': "",
+          'id': "",
+          'show': True
+        } ],
+        'rows': [],
+        'title': "",
+        'p': {}
+    })
+  
+  def test_to_json_integers(self):
+    dt = DataTable()
+    dt.add_column(type(0))
+    result = dt.to_JSON()
+    self.assertEqual(result, {
+        'cols': [ {
+          'type': "number",
+          'label': "",
+          'id': "",
+          'show': True
+        } ],
+        'rows': [],
+        'title': "",
+        'p': {}
+    })
+  
+  def test_to_json_floats(self):
+    dt = DataTable()
+    dt.add_column(type(0.0))
+    result = dt.to_JSON()
+    self.assertEqual(result, {
+        'cols': [ {
+          'type': "number",
+          'label': "",
+          'id': "",
+          'show': True
+        } ],
+        'rows': [],
+        'title': "",
+        'p': {}
+    })
+  
+  def test_to_json_dates(self):
+    dt = DataTable()
+    dt.add_column(type(date(1900, 1, 1)))
+    result = dt.to_JSON()
+    self.assertEqual(result, {
+        'cols': [ {
+          'type': "date",
+          'label': "",
+          'id': "",
+          'show': True
+        } ],
+        'rows': [],
+        'title': "",
+        'p': {}
+    })
+  
+  def test_to_json_datetimes(self):
+    dt = DataTable()
+    dt.add_column(type(datetime(1900, 1, 1, 1)))
+    result = dt.to_JSON()
+    self.assertEqual(result, {
+        'cols': [ {
+          'type': "datetime",
+          'label': "",
+          'id': "",
+          'show': True
+        } ],
+        'rows': [],
+        'title': "",
+        'p': {}
+    })
+  
+  def test_to_json_times(self):
+    dt = DataTable()
+    dt.add_column(type(time(1)))
+    result = dt.to_JSON()
+    self.assertEqual(result, {
+        'cols': [ {
+          'type': "timeofday",
+          'label': "",
+          'id': "",
+          'show': True
+        } ],
+        'rows': [],
+        'title': "",
+        'p': {}
+    })
+  
+  def test_to_json_lists(self):
+    dt = DataTable()
+    dt.add_column(type([]))
+    result = dt.to_JSON()
+    self.assertEqual(result, {
+        'cols': [ {
+          'type': "array",
+          'label': "",
+          'id': "",
+          'show': True
+        } ],
+        'rows': [],
+        'title': "",
+        'p': {}
+    })
+  
+  def test_to_json_tuples(self):
+    dt = DataTable()
+    dt.add_column(type(()))
+    result = dt.to_JSON()
+    self.assertEqual(result, {
+        'cols': [ {
+          'type': "array",
+          'label': "",
+          'id': "",
+          'show': True
+        } ],
+        'rows': [],
+        'title': "",
+        'p': {}
+    })

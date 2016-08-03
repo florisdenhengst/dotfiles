@@ -1,0 +1,20 @@
+from database.models import *
+
+class AttributeRouter(object):
+  """
+  Helper class for routing between fields in our models, as used by the global
+  filter.
+  """
+
+  # Object that stores information on filter attributes (i.e. elements of the global
+  # filter)     
+  FILTER_ATTRIBUTES =  {
+     'locations'     : {
+         'django_model' : Position,
+         'django_field' : Position._meta.get_field('location'),
+         'db_table'     : Position._meta.db_table,
+         'db_field'     : Position._meta.get_field('location').db_column
+         'orm_filter'   : lambda values : {'__in' : values} # values should be an array of location IDs
+         'raw_filter'   : lambda values : '"' + Position._meta\
+                                          .get_field('location')\
+                                          .db_column + '" IN (' +  + ')'

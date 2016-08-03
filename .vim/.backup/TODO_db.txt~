@@ -1,0 +1,78 @@
+DATABASE ACCESS:
+- Create custom Django lookup (https://docs.djangoproject.com/en/1.7/ref/models/lookups/)
+  for filtering & auth?
+- Disable save() and other operations that alter the DB or check for auth
+  first or just do nothing?
+- NOTE: we want to provide some different filtering functionalities. For
+  instance, we would want to enable 
+  - strict filtered joining (also filter the original row if the joined row should 
+    be filtered)
+  - lenient filtered joining (OUTER JOIN the new table: dont display the
+    joined tables rows but dont filter the original either)
+- QuerySet methods for which we should provide some alternatives:
+  Symbol meanings:
+  V <- done
+  / <- halfway done, only strict filtering implemented
+  - <- not done yet (unclear what to do)
+
+
+    V filter()      <-  Do not alter
+    V exclude()     <-  Do not alter
+    / order_by()    <-  Might have to be altered, as the order_by might be put
+                        on a column that has been excluded
+                        16 occurences
+    V reverse()     <-  Do not alter
+    V distinct()    <-  Do not alter
+    / values()      <-  Might have to be altered, as the values listed might be
+                        columns that are excluded. See values_list() as well
+                        ~11 occurences
+    / values_list() <-  Similar to values()
+                        0 occurences
+    / dates()       <-  Probably not, but might have to be altered to remove
+                        date columns that are not allowed and remove rows that
+                        are not allowed. See datetimes() as well
+    / datetimes()   <-  Similar to dates()
+    V none()        <-  Do not alter
+    / all()         <-  Add two filtering alternatives: one that really filters
+                        rows & columns and one that hides fields. This last
+                        might be necessary if a salary should be hidden, but
+                        name is visible for example. See select_related and
+                        prefetch_related as well.
+                        48 occurences
+    / select_related()  Add two filtering alternatives, similar to all().
+                        10 occurences
+    - prefetch_related()  Similar to select_related()
+                        8 occurences
+    V extra()       <-  Should be used with caution, as it might override our generic
+                        filtering
+                        0 occurences
+    / defer()       <-  This may not remove columns we are using to filter
+                        0 occurences
+    / only()        <-  Columns that have to be filtered should not be removed
+                        0 occurences
+    V using()       <-  Do not alter
+    V select_for_update() Do not alter
+    V raw()         <-  Do not alter
+    / get()         <-  Add two filtering alternatives.
+                        ~ > 80 occurences
+    V create()      <-  Do not alter
+    V get_or_create()   Do not alter
+    V update_or_create()  Do not alter
+    V latest()      |
+    V earliest()    |
+    V first()       |
+    V last()        <-  We can simply use Person.objects.filtered.first() /
+                        .last()/ .earliest()  
+                        0 occurences of any of these
+    / annotate()    <-  Maybe add a annotate_filtered.
+                        Don't see much use cases yet, as most of the times there
+                        will be a sensible setting of rights. Low prio
+                        6 occurences
+    V All aggregate functions:
+                        Aggregate functions work on querysets, so we can apply
+                        them on filtered querysets. They give the correct
+                        result.
+    V exists()      <-  Similar to first(), last() etc. 
+                        0 occurences
+    V update()      <-  Do not alter
+    V delete()      <-  Do not alter

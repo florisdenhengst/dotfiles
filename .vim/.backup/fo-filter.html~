@@ -1,0 +1,261 @@
+<div id="filter-body" class="unselectable">
+
+  <div ng-if="filter.contents.timeslice.length > 1 &&
+      navigation.getCurrentApp() !== 'succession'">
+     <h3 id="filter-time-slice">DATE</h3>
+     <fo-multi-select
+         name="timeslice"
+         value="filter.contents.timeslice"
+         ng-model="filter.selections.timeslice"
+         single-mode="true"
+         input-data-ready="filter._contentLoaded"
+         selectionEmptyIfAllSelected="true">
+     </fo-multi-select>
+  </div>
+  <div ng-if="filter.contents.timesliceSuccession.length > 1 &&
+      navigation.getCurrentApp() === 'succession'">
+     <h3 id="filter-time-slice">DATE</h3>
+     <fo-multi-select
+         name="timesliceSuccession"
+         value="filter.contents.timesliceSuccession"
+         ng-model="filter.selections.timeslice"
+         single-mode="true"
+         input-data-ready="filter._contentLoaded"
+         selectionEmptyIfAllSelected="true">
+     </fo-multi-select>
+   </div>
+
+  <div ng-if="filter.contents.multiPositions">
+    <h3 id="filter-multipositions">MULTIPOSITIONS</h3>
+    <fo-switch class="multiposition-switch"
+        is-disabled="!filter.multiPositionsEnabled"
+        states="[[true, 'Include'], [false, 'Exclude']]"
+        active-state="filter.showMultiPositions">
+    </fo-switch>
+  </div>
+
+  <div ng-if="filter.contents.location.length > 0">
+    <h3 id="filter-location">LOCATION</h3>
+    <fo-multi-select
+        name="location"
+        value="filter.contents.location"
+        ng-model="filter.selections.location"
+        input-data-ready="filter._contentLoaded"
+        selectionEmptyIfAllSelected="true">
+    </fo-multi-select>
+  </div>
+
+  <div ng-if="filter.contents.function.length > 0">
+    <h3 id="filter-function">FUNCTIONAL AREA</h3>
+    <fo-multi-select
+        name="function"
+        value="filter.contents.function"
+        ng-model="filter.selections.function"
+        input-data-ready="filter._contentLoaded"
+        selectionEmptyIfAllSelected="true">
+    </fo-multi-select>
+  </div>
+
+  <div ng-if="filter.contents.business.length > 0">
+    <h3 id="filter-business">BUSINESS UNIT</h3>
+    <fo-multi-select
+        name="business"
+        value="filter.contents.business"
+        ng-model="filter.selections.business"
+        input-data-ready="filter._contentLoaded"
+        selectionEmptyIfAllSelected="true">
+    </fo-multi-select>
+  </div>
+
+  <div ng-if="filter.contents.jobTitle.length > 0">
+    <h3 id="filter-job-title">JOB TITLE</h3>
+    <fo-multi-select
+        name="jobTitle"
+        value="filter.contents.jobTitle"
+        ng-model="filter.selections.jobTitle"
+        input-data-ready="filter._contentLoaded"
+        selectionEmptyIfAllSelected="true">
+    </fo-multi-select>
+  </div>
+
+  <hr>
+
+  <div ng-if="filter.contents.gender.length > 0">
+    <h3 id="filter-gender">GENDER</h3>
+    <fo-switch
+        states="[['F', '/static/kapstok/img/filter female.svg'], ['M', '/static/kapstok/img/filter male.svg']]"
+        active-states="filter.selections.gender"
+        load-image="true"
+        image-height="30px">
+    </fo-switch>
+  </div>
+
+  <div class="range-slider-container">
+    <h3 id="filter-age">AGE</h3>
+    <div class="box-container"
+         ng-show="filter.contents.age.min == filter.contents.age.max">
+      Filter requires <span class="highlight">date of birth</span> data
+    </div>
+    <fo-range-slider
+        ng-hide="filter.contents.age.min == filter.contents.age.max"
+        ng-model="filter.selections.age"
+        domain="filter.contents.age"
+        input-data-ready="filter._contentLoaded"
+        class="ui-slider">
+      <div class="ui-slider-handle"></div>
+      <div class="ui-slider-handle"></div>
+    </fo-range-slider>
+  </div>
+
+  <hr>
+
+  <div ng-if="filter.contents.managers.length > 0">
+    <h3 id="filter-managers">PEOPLE MANAGER</h3>
+    <div class="box-container" ng-hide="organisationAccess">
+      Filter requires <span class="organisation">Organisation</span> app
+    </div>
+    <fo-switch
+        ng-show="organisationAccess"
+        states="[[null, 'All'], [true, 'Yes'], [false, 'No']]"
+        active-state="filter.selections.managers">
+    </fo-switch>
+  </div>
+
+  <div class="range-slider-container">
+    <h3 id="filter-span">SPAN OF CONTROL</h3>
+    <div class="box-container" ng-hide="organisationAccess">
+      Filter requires <span class="organisation">Organisation</span> app
+    </div>
+    <div class="box-container"
+         ng-show="filter.contents.span.min !== filter.contents.span.max &&
+                  filter.selections.managers===false">
+      No managers selected
+    </div>
+    <div class="box-container"
+         ng-show="organisationAccess && 
+         filter.contents.span.min == filter.contents.span.max">
+      Filter requires <span class="highlight">solid line</span> data
+    </div>
+    <fo-range-slider
+        ng-if="organisationAccess"
+        ng-hide="filter.selections.managers===false ||
+                 filter.contents.span.min == filter.contents.span.max"
+        ng-model="filter.selections.span"
+        domain="filter.contents.span"
+        input-data-ready="filter._contentLoaded"
+        class="ui-slider">
+      <div class="ui-slider-handle"></div>
+      <div class="ui-slider-handle"></div>
+    </fo-range-slider>
+  </div>
+
+  <div class="range-slider-container">
+    <h3 id="filter-layer">LAYER</h3>
+    <div class="box-container" ng-hide="organisationAccess">
+      Filter requires <span class="organisation">Organisation</span> app
+    </div>
+    <div class="box-container"
+         ng-show="organisationAccess && 
+         filter.contents.layer.min == filter.contents.layer.max">
+      Filter requires <span class="highlight">solid line</span> data
+    </div>
+    <fo-range-slider
+        ng-if="organisationAccess"
+        ng-model="filter.selections.layer"
+        ng-hide="filter.contents.layer.min == filter.contents.layer.max"
+        domain="filter.contents.layer"
+        input-data-ready="filter._contentLoaded"
+        class="ui-slider">
+      <div class="ui-slider-handle"></div>
+      <div class="ui-slider-handle"></div>
+    </fo-range-slider>
+  </div>
+
+  <hr>
+
+  <div ng-if="filter.contents.talentStatus.length > 0">
+    <h3 id="filter-talent-status">TALENT STATUS</h3>
+    <div class="box-container" ng-hide="talentAccess">
+      Filter requires <span class="talent">Talent</span> app
+    </div>
+    <fo-multi-select
+        ng-if="talentAccess"
+        name="talentStatus"
+        value="filter.contents.talentStatus"
+        ng-model="filter.selections.talentStatus"
+        input-data-ready="filter._contentLoaded"
+        show-search-box="false"
+        selectionEmptyIfAllSelected="true">
+    </fo-multi-select>
+  </div>
+
+  <div ng-if="filter.contents.performanceStatus.length > 0">
+    <h3 id="filter-performance-status">PERFORMANCE STATUS</h3>
+    <div class="box-container" ng-hide="talentAccess">
+      Filter requires <span class="talent">Talent</span> app
+    </div>
+    <fo-multi-select
+        ng-if="talentAccess"
+        name="performanceStatus"
+        value="filter.contents.performanceStatus"
+        ng-model="filter.selections.performanceStatus"
+        input-data-ready="filter._contentLoaded"
+        show-search-box="false"
+        selectionEmptyIfAllSelected="true">
+    </fo-multi-select>
+  </div>
+
+  <div ng-if="filter.contents.potential.length > 0">
+    <h3 id="filter-potential">POTENTIAL</h3>
+    <div class="box-container" ng-hide="talentAccess">
+      Filter requires <span class="talent">Talent</span> app
+    </div>
+    <fo-multi-select
+        ng-if="talentAccess"
+        name="potential"
+        value="filter.contents.potential"
+        ng-model="filter.selections.potential"
+        input-data-ready="filter._contentLoaded"
+        show-search-box="false"
+        selectionEmptyIfAllSelected="true">
+    </fo-multi-select>
+  </div>
+
+  <div ng-if="filter.contents.contractType.length > 0">
+    <h3 id="filter-contract-type">CONTRACT TYPE</h3>
+    <fo-multi-select
+        name="contractType"
+        value="filter.contents.contractType"
+        ng-model="filter.selections.contractType"
+        input-data-ready="filter._contentLoaded"
+        show-search-box="false"
+        expandable="false"
+        selectionEmptyIfAllSelected="true">
+    </fo-multi-select>
+  </div>
+
+  <hr>
+
+  <div ng-if="filter.contents.employeeGrade.length > 0">
+    <h3 id="filter-employee-grade">GRADE EMPLOYEE</h3>
+    <fo-multi-select
+        name="employeeGrade"
+        value="filter.contents.employeeGrade"
+        ng-model="filter.selections.employeeGrade"
+        input-data-ready="filter._contentLoaded"
+        selectionEmptyIfAllSelected="true">
+    </fo-multi-select>
+  </div>
+
+  <div ng-if="filter.contents.positionGrade.length > 0">
+    <h3 id="filter-position-grade">GRADE POSITION</h3>
+    <fo-multi-select
+        name="positionGrade"
+        value="filter.contents.positionGrade"
+        ng-model="filter.selections.positionGrade"
+        input-data-ready="filter._contentLoaded"
+        selectionEmptyIfAllSelected="true">
+    </fo-multi-select>
+  </div>
+
+</div>

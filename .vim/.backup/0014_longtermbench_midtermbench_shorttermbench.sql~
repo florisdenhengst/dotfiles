@@ -1,0 +1,68 @@
+CREATE OR REPLACE VIEW view_shorttermbench AS
+SELECT id,
+COALESCE(successors.count, 0) AS sucs
+FROM employee
+LEFT OUTER JOIN(
+  SELECT COUNT(*), employee_id 
+  FROM succession
+  INNER JOIN successionterm
+  ON succession.term_id = successionterm.id
+  WHERE successionterm.description = 'ShortTerm'
+  GROUP BY employee_id
+  ORDER BY employee_id) successors
+ON employee.id = successors.employee_id;
+
+CREATE OR REPLACE VIEW view_midtermbench AS
+SELECT id,
+COALESCE(successors.count, 0) AS sucs
+FROM employee
+LEFT OUTER JOIN(
+  SELECT COUNT(*), employee_id 
+  FROM succession
+  INNER JOIN successionterm
+  ON succession.term_id = successionterm.id
+  WHERE successionterm.description = 'MidTerm'
+  GROUP BY employee_id
+  ORDER BY employee_id) successors
+ON employee.id = successors.employee_id;
+
+CREATE OR REPLACE VIEW view_longtermbench AS
+SELECT id,
+COALESCE(successors.count, 0) AS sucs
+FROM employee
+LEFT OUTER JOIN(
+  SELECT COUNT(*), employee_id 
+  FROM succession
+  INNER JOIN successionterm
+  ON succession.term_id = successionterm.id
+  WHERE successionterm.description = 'LongTerm'
+  GROUP BY employee_id
+  ORDER BY employee_id) successors
+ON employee.id = successors.employee_id;
+
+CREATE OR REPLACE VIEW view_totalbench AS
+SELECT id,
+COALESCE(successors.count, 0) AS sucs
+FROM employee
+LEFT OUTER JOIN(
+  SELECT COUNT(*), employee_id 
+  FROM succession
+  GROUP BY employee_id
+  ORDER BY employee_id) successors
+ON employee.id = successors.employee_id;
+
+CREATE OR REPLACE RULE stbdelete AS
+ON DELETE TO shorttermbench
+DO INSTEAD NOTHING;
+
+CREATE OR REPLACE RULE mtbdelete AS
+ON DELETE TO midtermbench
+DO INSTEAD NOTHING;
+
+CREATE OR REPLACE RULE ltbdelete AS
+ON DELETE TO longtermbench
+DO INSTEAD NOTHING;
+  
+CREATE OR REPLACE RULE tbdelete AS
+ON DELETE TO totalbench
+DO INSTEAD NOTHING;

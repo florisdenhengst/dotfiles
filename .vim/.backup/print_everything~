@@ -1,0 +1,86 @@
+#!/usr/bin/env ruby
+require_relative "config"
+require 'tmpdir'
+
+def main
+  puts "Are you sure (yes, any other => abort)"
+  exit if gets.chomp != "yes"
+  all_teams.each do |team|
+    puts(format(team))
+    full_path = team
+    code2ps(team)
+    report2double(team)
+#    print_report(team)
+#    print_code(team)
+    puts()
+  end
+end
+
+def format(team)
+  teamname = team.dup
+  teamname.slice! "Bachelor/"
+  teamname.slice! "Master/"
+  teamname
+end
+
+
+def print(file)
+  puts "Printing #{file}"
+#  system("lp -o sides=two-sided-short-edge #{file}")
+end
+
+def report2double(team)
+  report_path = "#{Dir.pwd}/#{team}/#{REPORT_FILENAME}.pdf"
+  if File.exists?(report_path)
+    output_path = "#{Dir.pwd}/#{team}/#{REPORT_FILENAME}-double.pdf"
+
+    system("pdfjam --landscape --nup 2x1 #{report_path} --outfile #{output_path} -q")
+  else
+    puts("Couldn't find report, skipping..")
+  end
+end
+
+def print_report(team)
+  teamname = format(team)
+  path = "#{Dir.pwd}/#{team}/#{teamname}-double.pdf"
+  if File.exist?(path)
+    print(path)
+  else
+    puts "No report for team #{teamname}."
+  end
+end
+
+def print_code(team)
+  teamname = format(team)
+  path = "#{Dir.pwd}/#{team}/code.ps"
+  print(path)
+end
+
+# Find all code that is changed, compared to the assignment code, and print it to a .ps file
+def code2ps(team)
+  teamdir = "#{Dir.pwd}/#{team}"
+  teamname = format(team)
+  targz = "#{teamdir}/#{TARNAME}.tar.gz"
+  to_print = []
+  puts(targz)
+  if File.exists?(targz)
+    Dir.mktmpdir do |tmp|
+      Dir.chdir(tmp) do
+        system("tar -xzf #{targz}")
+
+        Dir["**/*.java"].sort.each do |file|
+          to_print.push(file)
+        end
+
+        # create postscript
+        system("a2ps --header='#{DEADLINE} - #{TARNAME} - \"#{teamname}\"' --line-numbers=1 -q -o #{File.join(teamdir, "code.ps")} #{to_print.join(" ")}")
+        # create pdf
+        system("ps2pdf #{File.join(teamdir, "code.ps")} #{File.join(teamdir, "code.pdf")")
+      end
+    end
+  else
+    puts("Couldn't find code-tar, skipping..")
+  end
+end
+
+main

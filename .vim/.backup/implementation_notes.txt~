@@ -1,0 +1,22 @@
+- Can 'Colors' objects be shared amongst workers safely?
+  - Should these be made thread-safe?
+  - 'Colors' objects alter the color of states. When states are shared amongst
+    threads, the color() and hasColor() methods are 'critical'.
+
+- Graph generation - how can this be parallelized
+  - Lock on Graph object
+  - Create a Graph object per thread!
+
+- How is the 'red' variable implemented? It should be shared across all
+  workers. Is it declared volatile?
+
+- How is the 'count' variable implemented? It should be shared across all
+  workers. Using an AtomicInteger is a good idea (using getAndDecrement and
+  getAndIncrement). Is it declared volatile?
+
+- How is the 'await' (Alg.1 - ln 22) implemented? Busy wait? Are we sure that
+  this section is synchronized correctly? Are awaits wrapped by a spin lock to
+  guard against spurious wakeups?
+
+- Is it ensured that all threads have returned a NoCycleFoundException before
+  terminating?

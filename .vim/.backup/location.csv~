@@ -1,0 +1,132 @@
+id;name;parent
+1;Global;0
+2;Africa;1
+3;Asia;1
+4;Europe;1
+5;Middle East;1
+6;North America;1
+7;South America;1
+8;Angola;2
+9;Democratic Republic of the Congo;2
+10;Egypt;2
+11;Ethiopia;2
+12;Ivory Coast;2
+13;Kenya;2
+14;Nigeria;2
+15;South Africa;2
+16;Tanzania;2
+17;Afghanistan;3
+18;Australia;3
+19;Bangladesh;3
+20;China;3
+21;India;3
+22;Indonesia;3
+23;Japan;3
+24;North Korea;3
+25;Pakistan;3
+26;Republic of China (Taiwan);3
+27;Russia;3
+28;Singapore;3
+29;South Korea;3
+30;Thailand;3
+31;Vietnam;3
+32;Germany;4
+33;Spain;4
+34;The Netherlands;4
+35;Turkey;4
+36;United Kingdom;4
+37;Iran;5
+38;Iraq;5
+39;Saudi Arabia;5
+40;Mexico;6
+41;United States;6
+42;Brazil;7
+43;Chile;7
+44;Colombia;7
+45;Peru;7
+46;Luanda;8
+47;Kinshasa;9
+48;Alexandria;10
+49;Cairo;10
+50;Giza;10
+51;Addis Ababa;11
+52;Abidjan;12
+53;Nairobi;13
+54;Lagos;14
+55;Cape Town;15
+56;Durban;15
+57;Ekurhuleni;15
+58;Johannesburg;15
+59;Dar es Salaam;16
+60;Kabul;17
+61;Melbourne;18
+62;Sydney;18
+63;Dhaka;19
+64;Beijing;20
+65;Changsha;20
+66;Chengdu;20
+67;Chongqing;20
+68;Dongguan;20
+69;Foshan;20
+70;Guangzhou;20
+71;Hangzhou;20
+72;Harbin;20
+73;Hefei;20
+74;Hong Kong;20
+75;Nanjing;20
+76;Quanzhou;20
+77;Shanghai;20
+78;Shantou;20
+79;Shenyang;20
+80;Shenzhen;20
+81;Suzhou;20
+82;Tianjin;20
+83;Wenzhou;20
+84;Wuhan;20
+85;Xiamen;20
+86;Xi'an;20
+87;Zhengzhou;20
+88;Ahmedabad;21
+89;Bangalore;21
+90;Chennai;21
+91;Delhi;21
+92;Hyderabad;21
+93;Jaipur;21
+94;Kolkata;21
+95;Mumbai;21
+96;Pune;21
+97;Surat;21
+98;Jakarta;22
+99;Tokyo;23
+100;Yokohama;23
+101;Pyongyang;24
+102;Karachi;25
+103;Lahore;25
+104;New Taipei City;26
+105;Moscow;27
+106;Saint Petersburg;27
+107;Singapore;28
+108;Busan;29
+109;Seoul;29
+110;Bangkok;30
+111;Hanoi;31
+112;Ho Chi Minh City;31
+113;Berlin;32
+114;Madrid;33
+115;Amsterdam;34
+116;Rotterdam;34
+117;Ankara;35
+118;Istanbul;35
+119;London;36
+120;Tehran;37
+121;Baghdad;38
+122;Jeddah;39
+123;Riyadh;39
+124;Mexico City;40
+125;Los Angeles;41
+126;New York City;41
+127;Rio de Janeiro;42
+128;S�o Paulo;42
+129;Santiago;43
+130;Bogot�;44
+131;Lima;45

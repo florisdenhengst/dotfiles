@@ -1,0 +1,32 @@
+<?php
+
+/***
+ * A wrapper class for Dwoo templates, in order to set some generics.
+ */
+class TemplateWrapper{
+  protected static $TEMPLATE_PATHS = array(
+    TEMPLATE_ROOT . 'management/',
+    TEMPLATE_ROOT . 'client/'
+  );
+
+  public $dwooTpl;    // var to store the Dwoo Template File object
+  public $data;      // var to hold the data for Dwoo Template
+
+  public function __construct($tpl_file, $data){
+    // create Dwoo template
+    $tpl = new Dwoo_Template_File($tpl_file);
+    $tpl->setIncludePath(static::$TEMPLATE_PATHS);
+  }
+
+  /***
+   * Renders template containing $data.
+   * If no $data is provided, $this->data is used.
+   */
+  public function get($data=Null){
+    if($data !== Null){
+      $data = $this->data;
+    }
+    $this->dwooTpl->get($data);
+  }
+}
+?>

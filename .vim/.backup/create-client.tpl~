@@ -1,0 +1,4 @@
+{extends "management/edit-presentation.tpl"}
+{block "title"}
+  Create a new presentation
+{/block}

@@ -1,0 +1,24 @@
+Vragen
+  - Gebruik van kunstmatige data???
+    - Is het gebruik van minority classes om onderscheid te maken tussen
+      anomalies en noise okay?
+  - Is de onderzoeksvraag in orde?
+    Moeten daar ook al de technieken in besproken worden of is dat te
+    specifiek?
+  - ROC? of Precision / Recall -> Wat als deze varieren over verschillende
+    combinaties van parameters? Samen in 1 plot zetten?
+  - Optimisations -> onderdeel van methode of onderdeel van contributions?
+    - je zou kunnen beargumenteren dat je 'de beste versie van de nieuwe
+      methode' moet vergelijken met andere methodes.
+    - anderszijds is optimaliseren ook wel onderdeel van de contribution
+  - Wie van Marks groep te vragen om KIM bij te wonen?
+
+Voorbereiden
+  - Planning
+  - Methode afronden / in steigers zetten
+
+Bespreken
+  - Vragen ^
+  - Planning
+  - Zsm 1e KIM (beloofd)
+

@@ -1,0 +1,47 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models, migrations
+
+
+def get_file(file_name):
+  f = open(os.path.join(os.path.dirname(__file__), file_name))
+  query = f.read()
+  return query
+  
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('database', '0013_position_chunk'),
+    ]
+
+    operations = [
+        migrations.AlterModelTable(
+            name='longtermavailablesuccessors',
+            table='view_longtermavailablesuccessors',
+        ),
+        migrations.AlterModelTable(
+            name='longtermsuccessors',
+            table='view_longtermsuccessors',
+        ),
+        migrations.AlterModelTable(
+            name='midtermavailablesuccessors',
+            table='view_midtermavailablesuccessors',
+        ),
+        migrations.AlterModelTable(
+            name='midtermsuccessors',
+            table='view_midtermsuccessors',
+        ),
+        migrations.AlterModelTable(
+            name='shorttermavailablesuccessors',
+            table='view_shorttermavailablesuccessors',
+        ),
+        migrations.AlterModelTable(
+            name='shorttermsuccessors',
+            table='view_shorttermsuccessors',
+        ),
+    
+        migrations.RunSQL(sql = get_file("0014_rename_views_forward.sql"),
+                          reverse_sql = get_file("0014_rename_views_backwards.sql")
+                          )
+    ]

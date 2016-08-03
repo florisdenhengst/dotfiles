@@ -1,0 +1,235 @@
+<?php
+class DataObject{
+  public $id;              //each DB row should have an ID
+
+  public function __construct(){
+    // Do nothing
+  }
+
+  /***
+   * Returns all vars that are used to update a row.
+   */
+  public function getUpdateVars(){
+    return $this->_getPublicVars();
+  }
+
+  /***
+   * Returns all vars that are used to insert a new row.
+   */
+  public function getInsertVars(){
+    return $this->_getPublicVars();
+  }
+
+  /***
+   * Returns all public variables
+   */
+  protected function _getPublicVars(){
+    // Returns only the public variables in the DataObject.
+    // All public variables are stored in the DB.
+    $pubVars = call_user_func('get_object_vars', $this);
+    unset($pubVars['id']);
+    return $pubVars;
+  }
+
+  /***
+   * Generic function for creating new rows in the db.
+   * 
+   * @param PDO $dbh a PDO connection handle with a valid connection
+   * @param string $columns comma separated columns names
+   * @param string $values comma separated PDO valid values
+   */
+  public function create($dbh, $columns, $values){
+    $preparation = sprintf("INSERT INTO `%s`(%s) VALUES (%s)", 
+      static::$TABLE, $columns, $values
+    );
+    //create prepared statement
+    $statement = $dbh->prepare($preparation);
+    //format data for insertion 
+    $data = $this->getInsertVars();
+    //run query
+    $statement->execute($data);
+    return $dbh->lastInsertId(static::$TABLE);
+  }
+
+  /***
+   * Generic function for updating existing rows in the db.
+   *
+   * @param PDO $dbh an PDO connection handle with a valid connection
+   * @param array $columns 
+   * @param array $values
+   */
+  public function update($dbh, $columns, $values, $operator='='){
+    $column_values = [];
+    for($i = 0; $i < count($columns); ++$i){
+      array_push($column_values, sprintf("`%s`=:%s", $columns[$i], $values[$i]));
+    }
+    $column_values = implode(', ', $column_values);
+    $preparation = sprintf("UPDATE `%s` SET %s WHERE id %s :id", static::$TABLE, $column_values, $operator);
+    $statement = $dbh->prepare($preparation);
+    $data = $this->getUpdateVars();
+    $data['id'] = $this->id;
+    $statement->execute($data);
+    return $this->id;
+  }
+
+  /***
+   * Replaces any empty values by zeroes
+   * @param array $array an array of values to insert
+   */
+  protected function _empty_to_zero($array){
+    $arr_size = count($array);
+    foreach($array as $key => $value){
+      if(!isset($value) || $value === '' || !$value){
+        $array[$key] = 0;
+      }
+    }
+    return $array;
+  }
+
+  /***
+   * Removes the object with $id from the table this function is called on.
+   * 
+   * @param PDO $dbh a PDO connection handle with a valid connection
+   * @param integer $id the ID to remove
+   * @param string $operator an optional WHERE id ... $id operator (e.g. >, =, <=)
+   */
+  public static function delete($dbh, $id, $operator='='){
+    $preparation = sprintf("DELETE FROM `%s` WHERE id %s :id", static::$TABLE, $operator);
+    //create prepared statement
+    $statement = $dbh->prepare($preparation);
+    //format data for insertion 
+    //run query
+    $statement->execute(array('id' => $id));
+  }
+
+  /***
+   * Generic part of authorized retrieval of instances and putting them in an
+   * assoc. array
+   */
+  public static function get_all_auth_assoc($dbh, $user){
+    if($user['is_superuser']){
+      $result = static::get_all_assoc($dbh);
+    } else {
+      $preparation = sprintf('SELECT `%s`.* FROM `%s`
+                     %s
+                     WHERE `user`.`id` = :user_id',
+                     static::$TABLE,
+                     static::$TABLE,
+                     static::JOIN_TO_USER);
+      //create prepared statement
+      $statement = $dbh->prepare($preparation);
+      //run query
+      $statement->execute(array('user_id' => $user['id']));
+      //ask for assoc. array
+      $statement->setFetchMode(PDO::FETCH_ASSOC);
+      $result = array();
+      while($row = $statement->fetch()){
+        array_push($result, $row);
+      }
+    }
+    return $result;
+  }
+
+  /***
+   * Generic part of retrieval instances and putting them in an assoc. array
+   */
+  public static function get_all_assoc($dbh){
+    $qry = sprintf('SELECT * FROM `%s`', static::$TABLE);
+    $statement = $dbh->query($qry);
+    $statement->setFetchMode(PDO::FETCH_ASSOC);
+    $result = array();
+    while($row = $statement->fetch()){
+      array_push($result, $row);
+    }
+    return $result;
+  }
+
+  /***
+   * Generic part of retrieving instances and putting them in assoc. array
+   * for generating id <-> label pairs
+   */
+  public static function get_all_auth_label_assoc($dbh, $user){
+    if($user['is_superuser']){
+      $where_clause = '';
+    } else {
+      $where_clause = ' WHERE `user`.`id` = :user_id';
+    }
+    $qry = sprintf('SELECT %s.id AS value, %s.label FROM `%s`
+                    %s'. $where_clause,
+                    static::$TABLE,
+                    static::$TABLE,
+                    static::$TABLE,
+                    static::JOIN_TO_USER);
+    $statement = $dbh->prepare($qry);
+    $statement->execute(array('user_id' => $user['id']));
+    $statement->setFetchMode(PDO::FETCH_ASSOC);
+    $result = array();
+    while($row = $statement->fetch()){
+      array_push($result, $row);
+    }
+    return $result;
+  }
+
+  /***
+   * Get dropdown select options
+   */
+  public static function get_dropdown_options($dbh, $user){
+    $result = static::get_all_auth_label_assoc($dbh, $user);
+    array_unshift($result, array('value'=> '', 'label'=> ''));
+    return $result;
+  }
+  
+  /***
+   * Retrieves specific authorized instance and puts it in an assoc. array
+   */
+  public static function get_auth_assoc($dbh, $unique_id, $user, $field='id'){
+    if($user['is_superuser']){
+      $where_clause = '';
+    } else {
+      $where_clause = ' AND `user`.`id` = :user_id';
+    }
+    $preparation = sprintf('SELECT `%s`.* FROM `%s`
+                           %s
+                           WHERE `%s`.`%s` = :%s' . $where_clause,
+      static::$TABLE,
+      static::$TABLE,
+      static::JOIN_TO_USER,
+      $field,
+      $field);
+    //create prepared statement
+    $statement = $dbh->prepare($preparation);
+    if($user['is_superuser']){
+      $data = array(
+        $field    => $unique_id,
+      );
+    } else {
+      $data = array(
+        $field    => $unique_id,
+        'user_id' => $user['id'],
+      );
+    }
+    //run query
+    $statement->execute($data);
+    //ask for assoc. array
+    $statement->setFetchMode(PDO::FETCH_ASSOC);
+    return $statement->fetch();
+  }
+
+  /***
+   * Retrieves specific instance and puts it in an assoc. array
+   */
+  public static function get_assoc($dbh, $unique_id, $field='id'){
+    $preparation = sprintf('SELECT * FROM `%s` WHERE `%s` = :%s',
+      static::$TABLE,
+      $field,
+      $field);
+    //create prepared statement
+    $statement = $dbh->prepare($preparation);
+    //run query
+    $statement->execute(array($field => $unique_id));
+    //ask for assoc. array
+    $statement->setFetchMode(PDO::FETCH_ASSOC);
+    return $statement->fetch();
+  }
+}
+?>

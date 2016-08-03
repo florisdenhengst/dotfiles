@@ -1,0 +1,157 @@
+from database.models import *
+from kapstok.models import *
+from django.http import HttpResponse, HttpResponseForbidden
+import time
+import re
+import logging
+import json
+
+logger = logging.getLogger("kapstok.middleware")
+
+class RequireLoginMiddleware(object):
+  """Intercepts all requests when not logged in, and returns a 403 page. Exceptions are for the
+  login page and the root."""
+  def __init__(self):
+    self.exceptions = (
+      r'^/$',
+      r'^/api/login$',
+      r'^/app.*$',
+      r'^/api/forgot_password/$',
+      r'^/api/survey',
+    )
+  def process_view(self, request, view_func, view_args, view_kwargs):
+    # Don't intercept logged in users
+    if request.user.is_authenticated():
+      return None
+
+    # Don't intercept excepted pages
+    for url_pattern in self.exceptions:
+      if re.match(url_pattern, request.path):
+        return None
+
+    # Block all others
+    return HttpResponseForbidden("You are not logged in!", reason="Not Logged In")
+
+
+class UserExtensionMiddleware(object):
+  """Custom Middleware to extend the request.user object.
+  Builds a QuerySet describing the currently logged in users roles and stores
+  it in request.user.roles."""
+  def process_request(self, request):
+    if(request.user.is_authenticated()):
+      roles = Role.objects.filter(group__user=request.user)
+    else:
+      roles = Role.objects.none()
+    request.user.roles = roles
+
+
+class GlobalFilterMiddleware(object):
+  """Custom Middleware to add a global_filter with the current
+  selections to the request object by deserializing a received
+  set of JSON selections."""
+  def process_request(self, request):
+    request.global_filter = {}
+    request.global_filter['selections'] = {}
+    request.global_filter['timeslice'] = None
+    request.global_filter['multipositions'] = True
+    request.attrs = {}
+
+    content_type = request.META.get('CONTENT_TYPE', 'text/plain')
+    if 'application/json' in content_type:
+      post_data = json.loads(request.body.decode("utf-8") or "{}")
+
+      filter_state = post_data.pop('filter_state', {})
+
+      # Extract timeslice from global filter selection
+      if 'timeslice' in filter_state:
+        request.global_filter['timeslice'] = filter_state.pop('timeslice')
+
+      # Transform age, layer and span to tuples
+      if 'age' in filter_state and len(filter_state['age']) == 2:
+        filter_state['age'] = (filter_state['age'][0], filter_state['age'][1])
+      if 'layer' in filter_state and len(filter_state['layer']) == 2:
+        filter_state['layer'] = (filter_state['layer'][0], filter_state['layer'][1])
+      if 'span' in filter_state and len(filter_state['span']) == 2:
+        filter_state['span'] = (filter_state['span'][0], filter_state['span'][1])
+      # In the front end, manager statuses are denoted as a boolean.
+      # In the QFactory, this is represented as a range of spoc where
+      # True will be translated to span = 0 and False will be translated
+      # to direct span != 0. If the filter is None (null in front-end)
+      # it needs to be removed from the filter
+      if 'managers' in filter_state and filter_state['managers'] is None:
+        filter_state.pop('managers')
+
+      request.global_filter['multipositions'] = filter_state.pop('multiPositions', True)
+      request.global_filter['selections'] = filter_state
+
+      # Add other POST objects to request object
+      request.attrs = post_data
+
+    # When timeslice is not specified, set the most recent one as the default
+    if request.global_filter['timeslice']:
+      if 'application/json' in content_type:
+      request_from_app = post_data.get('application')
+      if request_from_app is not None:
+        required_csv_format = DataSource.required_for_app(request_from_app)
+      else:
+        required_csv_format = DataSource.CSV_CORE
+
+      last_timeslice = (Timeslice.objects
+              .filter(datasource__csv_format=required_csv_format)
+              .order_by('capture_month')
+              .last())
+      if last_timeslice is not None:
+        request.global_filter['timeslice'] = last_timeslice.id
+      else:
+        logger.error("Could not provide default timeslice in middleware. No timeslice present!")
+        raise RuntimeError("No timeslices present!")
+
+class AppAccessMiddleware(object):
+  def process_view(self, request, view_func, view_args, view_kwargs):
+    app = view_func.__module__.split(".")[0]
+
+    if not AppAccess.get_accessible_by_name(app):
+      return HttpResponse("You do not have access to this app!", status=402, reason="Not payed")
+
+
+class NonHtmlDebugToolbarMiddleware(object):
+  """
+  The Django Debug Toolbar usually only works for views that return HTML.
+  This middleware wraps any JSON response in HTML. When used in combination
+  with the Django-debug-toolbar, it is now also possible to analyze the
+  performance of pages that render JSON."""
+
+  @staticmethod
+  def process_response(request, response):
+    if response['Content-Type'] == 'application/octet-stream':
+      new_content = '<html><body>Binary Data, ' \
+          'Length: {}</body></html>'.format(len(response.content))
+      response = HttpResponse(new_content)
+    elif response['Content-Type'] == 'application/json':
+      content = response.content
+      try:
+        json_ = json.loads(content.decode())
+        content = json.dumps(json_, sort_keys=True, indent=2)
+      except ValueError:
+        pass
+      response = HttpResponse('<html><body><pre>{}'
+         '</pre></body></html>'.format(content))
+    return response
+
+class ExceptionLoggingMiddleware(object):
+  """This class writes all uncaught exceptions to the logs."""
+
+  def process_exception(self, request, exception):
+    logger.exception('Exception caught for request %s from user %s at IP %s',
+        request.path, request.user, request.META['REMOTE_ADDR'])
+
+class XForwardedForMiddleware(object):
+  """Assigns client IP to META['REMOTE_ADDR']. It is not assigned by default
+     because we execute behind a proxy"""
+
+  def process_request(self, request):
+    if 'HTTP_X_FORWARDED_FOR' in request.META:
+      request.META['REMOTE_ADDR'] = request.META['HTTP_X_FORWARDED_FOR']
+      logger.debug("XForwardedForMiddleWare: Client IP = %s",
+          request.META['HTTP_X_FORWARDED_FOR'])
+    return None

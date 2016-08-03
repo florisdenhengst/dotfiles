@@ -1,0 +1,76 @@
+/* NAVIGATION AND GENERAL PAGE STRUCTURE*/
+nav.navbar{
+  background-color: whitesmoke;
+}
+
+.navbar-default .navbar-nav>li>a, 
+.navbar-default .navbar-nav>li>a:hover, 
+.navbar-default .navbar-nav>li>a:focus,
+.navbar-default .navbar-nav>.active>a, 
+.navbar-default .navbar-nav>.active>a:hover, 
+.navbar-default .navbar-nav>.active>a:focus{
+  background-color: inherit;
+  color: #428bca;
+}
+
+.navbar-default .navbar-nav>li>a:hover,
+.navbar-default .navbar-nav>li>a:focus{
+  background-color: #ECECEC;
+  color: #54ACF7;
+}
+
+.navbar-default .navbar-nav>.active>a, 
+.navbar-default .navbar-nav>.active>a:hover, 
+.navbar-default .navbar-nav>.active>a:focus{
+  background-color: white;
+  border-bottom-color: transparent;
+}
+
+.navbar-default{
+  margin-bottom:-1px;
+}
+
+.navbar ul li.active a{
+  box-shadow:inset 0 3px 8px rgba(0, 0, 0, 0.125);
+}
+
+.navbar-collapse p{
+  display:none;
+}
+
+@media (min-width: 768px){
+  .navbar-collapse p{
+    display:inherit;
+  }
+}
+
+/* FORMS */
+.row{
+  line-height: 100%;
+  padding: 5px 0px;
+}
+
+.row.header{
+  font-weight:bold;
+}
+
+.row.even{
+  background-color:ghostwhite;
+}
+
+.row div[class*='col-']{
+  word-break: break-all;
+}
+
+
+/* Feedback for updates / inserts */
+.row.bg-success{
+  background-color: greenyellow;
+}
+
+.row.my-fade-out{
+  -webkit-transition: all 1.0s ease;
+  -moz-transition: all 1.0s ease;
+  -o-transition: all 1.0s ease;
+  transition: all 1.0s ease;
+}

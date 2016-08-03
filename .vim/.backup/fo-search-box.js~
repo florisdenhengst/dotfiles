@@ -1,0 +1,91 @@
+/**
+ * Wrap everything inside a self-executing function to prevent creating globals
+ */
+
+(function() {
+
+/**
+ * Load the kapstok module, to add our directives
+ */
+
+var kapstok = angular.module('kapstok');
+
+/**
+ * Implements a filter for the fo-search-box widget. It works
+ * as a conjuctive (OR) alternative of the regular angular filter.
+ */
+kapstok.filter('foPositionsFilter', function(){
+  return function(positions, criterion){
+    var filtered = []
+    var criterion = criterion;
+    if(criterion == [] or !criterion){
+      return filtered;
+    }
+    criterion = criterion.toLowerCase();
+    angular.forEach(positions, function(position){
+      fullName = position.firstName.v + ' ' + position.lastName.v;
+      if(fullName){
+        if(fullName.toLowerCase().indexOf(criterion) > -1){
+          filtered.push(position);
+        }
+      }
+    });
+    return filtered;
+    //return (position.firstName.v + position.lastName.v).indexOf(criterion) > 0;
+  }
+});
+
+/**
+ * Implements the fo-search-box widget. Use it as follows:
+ *
+ * <fo-search-box callback="function(id)"></fo-search-box>
+ *
+ * The callback function is called with the position ID when a user clicks on a position
+ *
+ */
+kapstok.directive('foSearchBox', ['$http', '$log', 'FilterData', 'DataTable', 'HttpPostService',
+    function($http, $log, FilterData, DataTable, HttpPostService) {
+  return {
+      restrict: 'E',
+      templateUrl: 'static/kapstok/html/widgets/fo-search-box.html',
+      replace: true,
+      scope: {
+        callback: "&"
+      },
+      controller: function($scope, $attrs) {
+        var dataURL = "/api/search_position_data/";
+
+        // Send POST request
+        HttpPostService(dataURL).success(function(data) {
+          var dataTable = new DataTable(data);
+          $scope.positions = dataTable.toAssocArayList();
+          $log.info("fo-search-box: Position data retrieved")
+        }).error(function() {
+          $log.error("fo-search-box: " + data.title + " could not be retrieved");
+        });
+
+        $scope.callFunction = function(id, layer) {
+          $scope.callback({id: id, layer: layer});
+        }
+      }
+    };
+}]);
+
+/**
+ * Text filter for highlighting search results with entered expressions
+ */
+kapstok.filter('highlight', function($sce) {
+  return function(text, phrase) {
+    if (phrase) text = text.replace(new RegExp('('+phrase+')', 'gi'),
+      '<b>$1</b>')
+    
+    return $sce.trustAsHtml(text)
+  }
+});
+
+
+/**
+ * Close and execute the wrapper function
+ */
+
+})();

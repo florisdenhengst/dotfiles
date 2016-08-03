@@ -1,0 +1,14 @@
+import time
+from database.models import *
+
+qs = Position.objects.all()
+time1 = time.time()
+l = list(qs)
+time2 = time.time()
+diff = time2 - time1
+
+print('')
+print('')
+print('')
+print('%0.3f s' % diff)
+

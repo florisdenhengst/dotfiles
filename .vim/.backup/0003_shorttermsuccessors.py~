@@ -1,0 +1,35 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+import os
+
+from django.db import models, migrations, connection
+
+def get_file(file_name):
+  f = open(os.path.join(os.path.dirname(__file__), file_name))
+  query = f.read()
+  return query
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('database', '0002_auto_20141127_1819'),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='ShortTermSuccessors',
+            fields=[
+                ('id', models.IntegerField(primary_key=True, serialize=False)),
+                ('original_name', models.CharField(db_column='originalname', null=True, max_length=200)),
+                ('description', models.CharField(null=True, max_length=200, blank=True)),
+                ('score', models.IntegerField()),
+            ],
+            options={
+                'managed': False,
+                'db_table': 'view_shorttermsuccessors',
+            },
+            bases=(models.Model,),
+        ),
+
+        migrations.RunSQL(get_file("0003_view_shorttermsuccessors.sql"),"DROP VIEW IF EXISTS view_shorttermsuccessors"),
+    ]

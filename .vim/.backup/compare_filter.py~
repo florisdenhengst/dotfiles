@@ -1,0 +1,53 @@
+from database.models import * 
+from django.db import connection
+import time
+
+
+def total_query_time(queries):
+  query_time = 0
+  n_queries = 0
+  for query in connection.queries:
+    query_time = query_time + float(query['time'])
+    n_queries = n_queries + 1
+  return (query_time, n_queries)
+
+def test():
+  location_ids = [x.id for x in Location.objects.filter(id__lt=120)]
+  business_unit_ids = [x.id for x in BusinessUnit.objects.filter(id__lt=28)]
+  functional_area_ids = [x.id for x in FunctionalArea.objects.filter(id__lt=340)] 
+  filter_state = {
+      'empty': False,
+      'age': (0, 1000),
+      'gender': ['F', 'M'],
+      #'location': location_ids,
+      #'businessUnit': business_unit_ids,
+      #'functionalArea': functional_area_ids,
+  }
+  related_field = "job__position__business_unit"
+  qs1 = Employee.objects.values(related_field).annotate(Count("id")).order_by()
+  #get_filtered_data(qs1, filter_state)
+  qs2 = Person.objects.filter(converteddatesperson__age__gt=30)
+  #get_filtered_data(qs2, filter_state)
+  qs3 = Position.objects.all()
+  get_filtered_data(qs3, filter_state)
+
+
+def get_filtered_data(query_set, filter_state):
+  print(query_set.query)
+  init_query_time = total_query_time(connection.queries)[0]
+  init_python_time = time.time()
+  print(query_set.count())
+  unfiltered_python_time = time.time() - init_python_time
+  unfiltered_query_time = total_query_time(connection.queries)[0] - init_query_time
+  unfiltered_python_time -= unfiltered_query_time
+  init_filtered_time = time.time()
+  print(query_set.filtered(filter_state).query)
+  print(query_set.filtered(filter_state).count())
+  filtered_python_time = time.time() - init_filtered_time
+  filtered_query_time = total_query_time(connection.queries)[0] - unfiltered_query_time - init_query_time
+  filtered_python_time -= filtered_query_time
+  print("unfiltered python time:%s, unfiltered sql time %s" % (unfiltered_python_time * 1000, unfiltered_query_time * 1000))
+  print("filtered python time:%s, filtered sql time %s" % (filtered_python_time * 1000, filtered_query_time * 1000))
+
+test() 
+

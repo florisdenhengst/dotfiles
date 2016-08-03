@@ -1,0 +1,11 @@
+<div class="container errorpage">
+  <ng-include src="'/static/kapstok/logos/error.svg'"></ng-include>
+  <h1>Oops!</h1>
+  <h2>This is awkward...</h2>
+  <div class="text">
+    <p>Payment is required for the page you have requested</p>
+  </div>
+  <div >
+    <a class="button" href='/'>return to home page</a>
+  </div>
+</div>

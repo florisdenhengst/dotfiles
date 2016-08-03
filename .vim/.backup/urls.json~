@@ -1,0 +1,10 @@
+{
+  "http://localhost:8000/organisation/api/": [
+		"summary/statistics/",
+		"headcount/overview/",
+    "headcount/business/",
+    "structure/overview/",
+    "structure/overview/layer/1/",
+    "structure/overview/layer/5/"
+  ]
+}

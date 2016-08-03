@@ -1,0 +1,9 @@
+
+
+<div id="learn" ng-show="learn.isVisible()"><!-- LEARN-SECTION -->
+  <div id="learn-body">
+    <h3>DATA EXPLANATION</h3>
+    <div ng-click="learn.toggle()" class="close">CLOSE</div>
+    <ng-include src="getLearnTemplateURL()"></ng-include>
+  </div><!-- learn-body --><!-- learn -->
+</div> 

@@ -1,0 +1,23 @@
+{extends "base.tpl"}
+
+{block "title"}
+  Edit {$user.username}
+{/block}
+
+{block "content"}
+  <form class="form-horizontal">
+    {include(file='forms/text-input.tpl',
+              label       = 'username',
+              input_type  = 'text',
+              input_id    = 'username',
+              placeholder = 'username',
+              value       = $user.username
+    )}
+
+    {include(file='forms/checkbox.tpl',
+              label       = 'active',
+              checked     = $user.active 
+    )}
+
+  </form>
+{/block}

@@ -1,0 +1,13 @@
+<div class="col-sm-2 control-label">
+</div>
+<div class="col-sm-4 form-control-static">
+  {include(file='forms/back.tpl',
+            button_id  = $back_button_id,
+            url        = $back_url)
+  }
+</div>
+<div class="col-sm-4 form-control-static">
+  {include(file='forms/submit.tpl',
+            button_id  = $submit_button_id)
+  }
+</div>

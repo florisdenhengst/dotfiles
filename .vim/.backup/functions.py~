@@ -1,0 +1,73 @@
+from django.core.serializers.json import DjangoJSONEncoder
+import json
+
+class TreeList:
+  """
+  This class is used to enable easy calculation of hierarchical data (currently
+  only used in Sankey diagrams).
+  The following tree ...
+                  root
+                 /    \
+                c1    c2
+               /  \    
+              c3  c4
+               |
+              c5
+  ... is represented using the following TreeList
+                   c3 − c5
+                  /
+                c1  
+               /  \ 
+          root   c4
+               \ 
+                c2
+            
+                 
+               c3 − c5
+              /
+          c1
+              \
+               c4
+            
+          c2
+          c3 − c5
+          c4
+          c5
+ 
+  """
+  # Root of true tree datastructure 
+  root = None
+  # A tree and list combined: lists all tree nodes and their subtrees
+  tree_list = None
+
+  def __init__(self, flatTree):
+    self.tree_list = flatTree
+
+    for node in flatTree:
+      node['children'] = []
+      node['countSelf'] = 0
+      node['countSubtree'] = 0
+      node['links'] = []
+
+    for child in flatTree:
+      for parent in flatTree:
+        if(child['parent_id'] == parent['id']):
+          parent['children'].append(child)
+
+      if child['parent_id'] == None:
+        self.root = child
+
+    self.set_depth(self.root, 0)
+
+
+  def set_depth(self, node, depth):
+    node['depth'] = depth
+    if len(node['children']) > 0:
+      for child in node['children']:
+        self.set_depth(child, depth + 1)
+
+  def get_tree_list(self):
+    return self.tree_list
+
+  def __str__(self):
+    return json.dumps(self.root, cls=DjangoJSONEncoder)

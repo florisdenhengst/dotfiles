@@ -1,0 +1,318 @@
+\chapter{Active learning for anomaly detection}
+\label{ch:contributions}
+This chapter contains a detailed description of the proposed method. The aim is
+for a method that satisfies the requirements described in
+Section~\ref{sec:problem_statement}, from which the following list of
+requirements was compiled . It is included for convenience and further
+reference:
+\begin{enumerate}
+  \litem{Presence of noise and anomalies}
+    The method should be able to handle data sets in which both noise and
+    anomalies are present besides normal entries. This is implied by sub goal 1
+    from Section~\ref{sec:problem_statement}.
+  \litem{No class labels present initially}
+    From sub goal 1 from Section~\ref{sec:problem_statement}, no class labels
+    are present initially.
+  \litem{Limited availability of domain expert}
+    We assume a domain expert to have limited availability: this means that a
+    domain expert is willing to label some entries, but would want to avoid
+    having to label an entire data set. We are therefore interested in the
+    trade-off between performance and the number of labelled instances.
+  \litem{Reusability of result}
+    An organisation can upload multiple data sets over time and will typically
+    do so every month. Since we are dealing with HR data, we expect both the
+    data and the definition of `anomaly' to change only slightly within the time
+    frame of a month. We aim to take advantage of this situation by using the
+    outcome of a previous result for a next data upload. A model trained on a
+    specific data set should be reusable on subsequent data uploads without
+    losing adaptivity.
+\end{enumerate}
+
+The first section of this chapter provides a high-level overview of the proposed
+framework: an unsupervised and a supervised component are combined with a
+selection mechanism to form an active learning method which outputs a
+classification to \{anomaly, non-anomaly\}. In subsequent sections we motivate
+the design decisions for the unsupervised and supervised components and the
+selection mechanism. We conclude this chapter with a description of the initial
+round, as it forms a special case. 
+
+\section{High-Level Overview}
+\label{sec:contrib_overview}
+\begin{figure}
+  \centering
+  \includegraphics[width=0.9\textwidth]{contributions/framework.pdf}
+  \caption{High-level overview of proposed framework. Unlabelled data forms
+    input for a fully unsupervised component and a component with supervision.
+    Any available labelled data forms additional input to the component with
+    supervision. Together with a selection mechanism, the anomaly scores of
+    these components lead to an instance to be labelled by the expert. Dotted
+    lines indicate how the final binary classification is constructed after
+    training.}
+  \label{fig:framework}
+\end{figure}
+
+The proposed framework consists of the following parts: an unsupervised
+component, a supervised component and a selection mechanism. For a graphical
+depiction, see Figure~\ref{fig:framework}. Any unsupervised method that
+generates an anomaly rank or score can be used for the unsupervised component.
+For a motivation of the anomaly rank or score requirement, see
+Section~\ref{sec:selection_mechanism}. The unsupervised method is necessitated
+by requirements one and two from the start of this chapter. The supervised
+component is necessary by the domain-specific nature of the separation between
+`anomaly' and `noise'. It can be any supervised method that produces an anomaly
+rank or score due to similar considerations as for the unsupervised method. The
+selection mechanism is used to determine which points should be labelled next
+by the expert. These components are described in more detail below. For an
+overview of requirements and chosen methods, see
+Table~\ref{tab:method_overview}.
+
+
+From these separate component outputs however, a final anomaly score is still to
+be constructed. This is represented as a separate component in our framework, as
+multiple strategies can be considered. For example, a weighted average of the
+scores produced by both components could be used. The weight could be set once,
+determined as a function of the number of labelled exampled, etc. Since the only
+requirement for this component is that it can turn the outputs of the other
+components into a binary \{anomaly, non-anomaly\} classification, we refrain
+from describing it further in this chapter.
+
+\begin{table}[]
+\centering
+\caption{Comparison of methods from Chapter~\ref{ch:related_work} based on
+requirements from the start of this chapter.}
+\label{tab:method_overview}
+\begin{tabular}{M|l|l|l|l|l|l|l|l}
+\cline{2-9}
+& \multicolumn{8}{|l}{Fully Unsupervised methods}  \\
+\cline{3-9}
+& \multicolumn{1}{|l}{} & \multicolumn{7}{|l}{Fully Supervised methods (including C-SVC)}  \\
+\cline{4-9}
+& \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{6}{|l}{K-means clustering} \\
+\cline{5-9}
+& \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{5}{|l}{Fuzzy Rough C-means clustering} \\
+\cline{6-9}
+& \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} &\multicolumn{4}{|l}{SSAD} \\
+\cline{7-9}
+& \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} &\multicolumn{3}{|l}{SVDD} \\
+\cline{8-9}
+& \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{2}{|l}{Active Learning EM} \\
+\cline{9-9}
+& \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{} & \multicolumn{1}{|l}{LOCI and SVM} \\
+\midrule[1pt]
+Presence of noise and anomalies (req. 1)               &                               & \ON                         & \ON         & \ON & \ON  & \ON  & \ON    & \ON      \\   \hline
+No class labels initially (req. 2)                     & \ON                           &                             & \ON         & \ON & \ON  & \ON  & \ON    & \ON      \\   \hline
+Efficiently query labels (req. 3)                      &                               &                             &             &     & \ON  & \ON  & \ON    & \ON      \\   \hline
+Robust against new classes of anomalies (req. 4)       &                               &                             &             &     & \ON  &      &        &          \\   \hline
+Anomaly score as output possible                       & \ON                           & \ON                         & \ON         & \ON & \ON  & \ON  & \ON    & \ON      \\   \hline
+Convex formulation to prevent convergence to local optima & N/A                        & N/A                         & N/A         & N/A & \ON  &      & N/A    & \ON      \\   \hline
+\end{tabular}
+\end{table}
+
+\section{Unsupervised Component}
+% check whether there are global correlations using PCA -> there appear to be
+% some patterns, but not all variance is captures, hence we can't fully rely on
+% PCA. Use as data-preprocessing step? <- Nope, due to insufficiently pleasing
+% results.
+%
+% There are very no globally consistent correlations in the data as is the
+% outcome of a PCA analysis of the data sets involved. 
+% 
+% Probabilistic methods require a lot of assumptions on underlying distribution
+% -- this can only be estimated on a per-attribute basis, so no true
+% multidimensional outlier detection (too high dimensional)
+%
+% Extreme value methods and proximity-based methods remain...
+% LOF should be > 10 -> will we find outliers?
+% 
+% We expect to see some differences in local density from a domain perspective
+% and this is confirmed by some graphical analysis of the data.
+As argued in Section~\ref{sec:unsupervised_scenario}, all unsupervised methods
+are based on implicit assumptions on characteristics of the data. The proximity
+methods from Section~\ref{subsec:proximity_model} are robust to differences in
+local density and make very little assumptions on data characteristics: they
+only assume a clustered shape and perform well on data with a lack of global
+correlations.
+
+Because of above considerations, the LOF and LOCI methods seem most appropriate
+for the unsupervised component. Both are capable of returning per-point anomaly
+scores. For LOF, the original authors suggest to use a range for parameter
+$k$ and select the maximum $\text{LOF}_k(i)$ of Equation~\ref{eq:LOF} over all
+$k$s in the range for determining a final outlier score. LOCI defines outlier
+scores using an MDEF score over a range of radii $r$ (see
+Equation~\ref{eq:loci_mdef}) and provides a normalized standard deviation (see
+Equation~\ref{eq:loci_mdef_sigma}) of these scores. We can convert these into an
+outlier score $S_{\text{LOCI}}$ for each instance $i$ in the following way
+\cite{janssens2013outlier}:
+\begin{equation}
+  \label{eq:loci_outlier_score}
+  S_{\text{LOCI}}(i) = \underset{r \in \mathbb{R}}{max} \Big\{
+                  \frac{
+                    \text{MDEF}(i, \alpha, r)}
+                    {\sigma_{\text{MDEF}(i, \alpha, r)}}
+                  \Big\}
+\end{equation}
+We will compare these methods and select the method that gives most promising
+results.
+
+
+\section{Supervised Component}
+\label{sec:supervised_component}
+% The semi-supervised approach of SSAD is most promising because...
+A supervised component is required to separate anomalies from non-anomalies
+(i.e. noise and normal points). This supervised component cannot consist of a
+fully-supervised method, as those methods require all instances to be labelled.
+From requirements two and three, we can deem this impossible: labelling an
+entire data set would be too costly and would not be an improvement over the
+current situation. The semi-supervised and active learning methods from
+Sections~\ref{subsec:semi_supervised} and \ref{subsec:active_learning} do meet
+these requirements. From the remainder of this chapter, a supervised method that
+can handle missing labels (i.e. a semi-supervised or active learning method) is
+meant when describing the supervised component.
+
+Requirement five from the start of this chapter implies that it is possible for
+new `classes' of anomalous and normal points to be introduced after training via
+subsequent data uploads. This means that the supervised component should be
+robust to the introduction of new data points as well. The SSAD method uniquely
+combines robustness to introduction of previously unknown data with a
+semi-supervised approach and is therefore selected as a supervised component.
+
+SSAD is rather novel and its performance characteristics have not been studied
+thoroughly. We therefore include a well-known state-of-the-art classifier that
+functions as a baseline for comparing performance. Since SSAD is a special kind
+of an SVM-based classifier, we select a more general SVM classifier (C-SVC) as a
+baseline for the supervised component.
+
+\section{Selection Mechanism}
+\label{sec:selection_mechanism}
+% Combination of LOF and margin strategy.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=0.7\textwidth]{contributions/margin_strategy.png}
+  \caption{Active Learning with SVM in a linearly separable example. The
+    \emph{version space} lies between the dashed lines marked by $H_{1}$ and
+    $H_{2}$. The label for the unlabelled point closest to the margin (marked by
+    red circle) is the most informative, as it is expected to halve the version
+    space, irregardless of the actual label being positive or negative. Image
+    taken from
+		\protect\cite{ertekin2007learning}.}
+  \label{fig:margin_strategy}
+\end{figure}
+
+The selection mechanism should enable the method to reach a good performance
+whilst requiring only little queries to the domain expert. It is the main driver
+for performance with respect to requirement three from the start of this
+chapter.  In this section we propose a selection mechanism that combines
+\emph{rank-based disagreement} with the \emph{margin strategy}.
+
+The margin strategy is an active-learning approach for SVMs. It was first
+presented in \cite{tong2002support}. See Figure~\ref{fig:margin_strategy} for a
+graphical depiction. SVMs are binary classifiers that can find the optimal
+decision boundary between two classes. The solid line marked `margin' forms the
+optimal decision boundary for the purple squares and the yellow dots in
+Figure~\ref{fig:margin_strategy}. They do so by maximizing the distance from the
+decision boundary to labelled instances. The optimal decision boundary is one
+out of many separations that are consistent with the data. All consistent
+decision boundaries place all labelled instances at the correct side of the
+decision boundary, but the distance between the decision boundary and these
+points is not necessarily maximized. These possible separations lie in an area
+of feature space known as the \emph{version space}. In
+Figure~\ref{fig:margin_strategy}, the version space lies between the dashed
+lines marked with $H_{1}$ and $H_{2}$. In the semi-supervised scenario,
+unlabelled points about which the classifier is uncertain lie closer to the
+decision boundary than the labelled instances that helped calculating the
+optimal one. In \cite{tong2002support} it is shown that the maximal classifier
+improvement can be achieved by dividing the version space into two equal parts
+in the uninformed scenario.  This can be understood intuitively by considering
+that a query to the expert for the triangle encircled in
+Figure~\ref{fig:margin_strategy} can lead to a positive and negative label: a
+negative label will move the decision boundary roughly halfway towards the
+positive side whereas a positive label will move it roughly halfway away from
+the positive side. This strategy thus leads to the highest expected improvement
+to performance, given the current model and assuming no additional knowledge on
+the unclassified instances. Because of this it is often described as a `greedy
+optimal' strategy. 
+
+The active learning extension to the proposed supervised component SSAD from
+\cite{gornitz2013toward} (see Section~\ref{subsec:active_learning}) therefore
+combines the \emph{margin strategy} with a $k$NN-based heuristic in order to
+both investigate instances the classifier is uncertain about and focus on
+previously unseen parts of the data set respectively. This $k$NN-based strategy,
+however, implicitly assumes that all instances reside in equally dense parts of
+the data set -- similarly to the $k$NN methods described in
+Section~\ref{subsec:proximity_model}. We propose a method that is more robust to
+differences in local density by using using rank-based disagreement as a
+heuristic.
+
+We assume both the supervised and unsupervised components can provide a
+per-instance \emph{anomaly rank} and that the unsupervised component is robust
+to differences in local density. By comparing each instance's anomaly ranks from
+the supervised and unsupervised components, we calculate a metric of
+\emph{disagreement} of both methods. By alternating queries for new labels using
+this \emph{rank-based disagreement} and the margin strategy a similar scheme as
+the \emph{interleave} method from \cite{pelleg2004active} is achieved: instances
+about which the supervised method is uncertain and regions which appear to have
+not yet been properly included in training the supervised method will be
+selected in an alternating fashion. If methods $A$ and $B$ produce ranks
+$R_A(i)$ and $R_B(i)$, their rank-based disagreement $D(i)$ is denoted as:
+\begin{equation}
+  \label{eq:rank_based_disagreement}
+  D(i) = |R_A(i) - R_B(i)|
+\end{equation}
+
+Note that both LOF and LOCI are robust to differences in local density and can
+generate anomaly ranks by ordering the instances based on outlier scores. The
+SSAD method can generate anomaly scores by using the distance to the decision
+boundary.
+
+\section{Initial Round}
+\label{sec:initial_round}
+Because the supervised component needs \emph{some} class labels, the very first
+round of learning forms a special case. The selection mechanism used in the
+initial round cannot be neither \emph{disagreement} nor the margin strategy as
+both are based on a trained supervised model.
+
+The solution is to fall back to a second unsupervised method in the initial
+round and start with the \emph{disagreement} mechanism. Since the SSAD method is
+based on the unsupervised SVDD method, it is a natural fit to use this as the
+secondary unsupervised method in the initial round.  For the baseline C-SVC
+method, there is no such fallback: we therefore set its performance to $0$ until
+examples from both classes are available.
+
+% DONE: how to bootstrap method?
+% - SSAD uses all points as support vector when only labelled examples are
+%   provided <- cannot specifiy slack variables explicitly :(
+%   - Possible to use vanilla SVDD first
+%   - Consider how performance changes between round 0 and 1
+% - Should the 'strictness' parameter of the SSAD be updated in every round?
+% - How to construct a single outlier score from the distances to the margin and
+%   the LOF/unsupervised outlier score?
+% - Should this change in every round? <- what could we gain from that?
+% - How do these selection criteria relate to the 'low likelihood' and
+%   'ambiguity'?
+%
+% Affecting parameters: 
+% use cross-validation
+% RBF / SSAD
+% - gamma 'rbf' kernel parameter: defines the 'peakiness' of the data in kernel
+%   space
+%   logarithmic 'grid search' through [10^-3, 10^3]
+% - C (svdd) [Cu / Cp /Cn] slack variable penalty parameter, i.e. smoothing
+%   parameter encoded in the kernel. <- Note that this C is not equal to the
+%   classical binary SVM C.
+%   Lower C -> don't penalize classification mistakes that harshly (higher error
+%   but also more generalisation).
+%   Higher C -> less error, but less generalisation (more overfit).
+%   logarithmic 'grid search' through [1/N, 1.0].
+%
+%    1.0 leads to hard margin whereas 1/N leads to every point possibly being an
+%    outlier
+
+%   DONE: how to compare C with Cu, Cp, Cn ???? <- should probably be a separate
+%   thing.
+% - Kappa (SSAD) -- 'importance of the margin'
+%   - it appears to somehow express how (see above)
+%
+% LOF
+% - minK, maxK <- moves AUC-PR
+% - 'threshold' <- should set by using F1 score.

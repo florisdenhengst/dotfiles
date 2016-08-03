@@ -1,0 +1,45 @@
+{extends "menu-page.tpl"}
+
+{block "title"}
+  Edit client {if $client.label == ""}{$client.id}{else}{$client.label}{/if}
+{/block}
+
+{block "content"}
+  <form class=""
+        method="POST">
+    <div class="form-group form-group-md">
+      {if isset($client.id)}
+        <input type='hidden' value="{$client.id}"> 
+      {/if}
+      <div class="row">
+        {include(file='forms/dropdown.tpl',
+                  label       = 'group',
+                  input_id    = 'group',
+                  input_name  = 'group',
+                  options     = $groups
+                  selected    = $client.group
+                  required    = TRUE,
+                  autofocus   = TRUE
+        )}
+      </div>
+      <div class="row">
+        {include(file='forms/text-input.tpl',
+                  label       = 'label',
+                  input_type  = 'text',
+                  input_name  = 'label',
+                  input_id    = 'label',
+                  placeholder = 'label',
+                  value       = $client.label,
+        )}
+      </div>
+      <div class="row">
+        {include(file='forms/back-submit.tpl',
+                  submit_button_id    = '',
+                  back_button_id      = '',
+                  back_url            = '/management/clients'
+        )}
+      </div>
+    </div>
+
+  </form>
+{/block}

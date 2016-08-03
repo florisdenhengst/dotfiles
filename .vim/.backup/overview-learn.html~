@@ -1,0 +1,52 @@
+<div>
+  <h1>structure - overview</h1>
+  <p>
+  In this overview, each tile represents a reporting layer. A reporting layer is a simple
+  way to show an organisation structure: the CEO is reporting layer 1, all direct reports
+  to the CEO are reporting level 2, and so on.
+  </p>
+  <p>
+  Each tile shows the average span of control. For details on span of control, please go
+  to the learn function in the span of control section for more details.
+  </p>
+  <p>
+  If you click on learn more, the tiles are expanded and you will see all details per
+  reporting layer.
+  </p>
+</div>
+
+  <div ng-show="st.overview.activeLayer">
+    <h1>structure - overview - layer</h1>
+    <p>
+    This section shows you relevant employee information in reviewing your organisation
+    structure. The information included in the tiles are the name of the employee, the 
+    direct span of control, the employees that directly report into this person, the 
+    indirect span of control, the gender, age and job title.
+    </p>
+    <p>
+    Each of these elements has informative value. The direct and indirect span of control
+    will help you to identify how many employees can be reached through this one person. The
+    higher in the organization, the more people will be directly influenced by this person.
+    If there are performance weaknesses, they often correlate with a span of control that is
+    too wide or too small in comparison to the reporting level.
+    </p>
+    <p>
+    Crunchr also lists the names of all direct reports, so that easy navigation through 
+    employment trees are possible.
+    </p>
+    <p>
+    Gender and age are useful diversity metrics. In this area they are included to assess
+    reporting layer diversity and age distributions, but an easier way to make diversity 
+    analyses is by using the headcount function in this application.
+    </p>
+    <p>
+    The job title is useful to link individuals to functions. The reason for not basing the 
+    structure on job title is to reduce the error margin in your reporting± not all
+    employees have clear job titles, causing gaps in the data. In addition, HRIS systems 
+    indicate employees reporting into employees. If you feel that it should actually be 
+    positions that report into positions, you are absolutely right: the problem is that the 
+    data is often not good enough, so Crunchr takes no risk.
+    </p>
+  </div>
+</div>
+
