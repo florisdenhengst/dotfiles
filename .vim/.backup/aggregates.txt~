@@ -6,7 +6,7 @@ PostgreSQL specific aggregation functions
    :synopsis: PostgreSQL specific aggregation functions
 
 These functions are described in more detail in the `PostgreSQL docs
-<http://www.postgresql.org/docs/current/static/functions-aggregate.html>`_.
+<https://www.postgresql.org/docs/current/static/functions-aggregate.html>`_.
 
 .. note::
 
@@ -22,20 +22,26 @@ General-purpose aggregation functions
 ``ArrayAgg``
 ------------
 
-.. class:: ArrayAgg(expression, ordering=None, **extra)
+.. class:: ArrayAgg(expression, distinct=False, ordering=None, **extra)
 
     Returns a list of values, including nulls, concatenated into an array.
-    Ordering within the array is unspecified by default. Has one optional
-    parameter:
 
+    .. attribute:: distinct
+
+        .. versionadded:: 2.0
+
+        An optional boolean argument that determines if array values
+        will be distinct. Defaults to ``False``.
+    
     .. attribute:: ordering
 
-        .. versionadded:: 1.11
+        .. versionadded:: 2.0
 
-        By default the ordering of elements within the returned list is
-        unspecified.  When an ``ordering`` expression
-        (``F('some_field).asc()``) is provided, the elements in the returned
-        list are ordered by expression.
+        By default, the ordering of the elements within the returned list is
+        unspecified. When an ``ordering`` expression is provided, these
+        elements are returned in the specified order, e.g.
+        ``F('some_field').desc()``, ``'-some_field'``, ``['some_field',
+        'other_field']`` or ``('some_field', 'other_field')``.
 
 ``BitAnd``
 ----------
@@ -69,14 +75,22 @@ General-purpose aggregation functions
     Returns ``True`` if at least one input value is true, ``None`` if all
     values are null or if there are no values, otherwise ``False``.
 
+``JSONBAgg``
+------------
+
+.. class:: JSONBAgg(expressions, **extra)
+
+    .. versionadded:: 1.11
+
+    Returns the input values as a ``JSON`` array. Requires PostgreSQL ≥ 9.5.
+
 ``StringAgg``
 -------------
 
 .. class:: StringAgg(expression, delimiter, distinct=False, ordering=None)
 
     Returns the input values concatenated into a string, separated by the
-    ``delimiter`` string. Ordering of the elements in the aggregation is
-    unspecified by default:
+    ``delimiter`` string.
 
     .. attribute:: delimiter
 
@@ -91,13 +105,13 @@ General-purpose aggregation functions
 
     .. attribute:: ordering
 
-        .. versionadded:: 1.11
+        .. versionadded:: 2.0
 
-        By default the ordering of the elements that form the string is
-        unspecified. When an ``ordering`` expression (e.g.
-        ``F('some_field').desc()``) is provided, these elements are
-        concatenated in the specified order.
-
+        By default, the ordering of the elements that form the string is
+        unspecified. When an ``ordering`` expression is provided, these
+        elements are concatenated in the specified order, e.g.
+        ``F('some_field').desc()``, ``'-some_field'``, ``['some_field',
+        'other_field']`` or ``('some_field', 'other_field')``.
 
 Aggregate functions for statistics
 ==================================

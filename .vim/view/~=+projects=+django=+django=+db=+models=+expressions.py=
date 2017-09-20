@@ -82,6 +82,7 @@ setlocal rightleftcmd=search
 setlocal noscrollbind
 setlocal shiftwidth=4
 setlocal noshortname
+setlocal signcolumn=auto
 setlocal nosmartindent
 setlocal softtabstop=4
 setlocal nospell
@@ -107,12 +108,12 @@ setlocal nowinfixwidth
 setlocal wrap
 setlocal wrapmargin=0
 silent! normal! zE
-let s:l = 503 - ((14 * winheight(0) + 10) / 21)
+let s:l = 861 - ((19 * winheight(0) + 21) / 42)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-503
-normal! 09|
+861
+normal! 0
 lcd ~/projects/django/django/contrib/postgres
 let &so = s:so_save | let &siso = s:siso_save
 doautoall SessionLoadPost

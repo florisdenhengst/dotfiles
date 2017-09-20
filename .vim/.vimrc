@@ -97,9 +97,9 @@ syntax enable
 au BufWinLeave * silent! :mkview
 au BufWinEnter * silent! :loadview
 
-:set softtabstop=2
-:set tabstop=2
-:set shiftwidth=2
+:set softtabstop=4
+:set tabstop=4
+:set shiftwidth=4
 :set expandtab
 
 nnoremap <silent> <C-l> :nohl<CR><C-l>
@@ -136,4 +136,30 @@ set term=screen-256color-bce
 let g:solarized_termcolors=256
 set t_Co=256
 set background=dark
-colorscheme default 
+colorscheme default
+
+
+execute pathogen#infect()
+
+" Syntastic stuff
+set statusline+=%#warningmsg#
+set statusline+=%{SyntasticStatuslineFlag()}
+set statusline+=%*
+
+let g:syntastic_always_populate_loc_list = 1
+let g:syntastic_auto_loc_list = 1
+let g:syntastic_check_on_open = 0
+let g:syntastic_check_on_wq = 0
+
+let g:elm_syntastic_show_warnings = 1
+let g:elm_format_autosave = 1
+let g:elm_format_fail_silently = 0
+
+" Hit ctrl+w E to start error checking 
+let g:syntastic_mode_map = { 'mode': 'passive', 'active_filetypes': [],'passive_filetypes': [] }
+nnoremap <C-w>E :SyntasticCheck<CR> :SyntasticToggleMode<CR>
+
+" Set backupcopy to replace file in order to trigger file watches for autoloading webpack etc.
+set backupcopy=yes
+
+"

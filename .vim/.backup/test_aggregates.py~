@@ -1,13 +1,19 @@
-from django.contrib.postgres.aggregates import (
-    ArrayAgg, BitAnd, BitOr, BoolAnd, BoolOr, Corr, CovarPop, RegrAvgX,
-    RegrAvgY, RegrCount, RegrIntercept, RegrR2, RegrSlope, RegrSXX, RegrSXY,
-    RegrSYY, StatAggregate, StringAgg,
-)
+import json
+from contextlib import suppress
+
 from django.db.models.expressions import F, Value
+from django.test.testcases import skipUnlessDBFeature
 from django.test.utils import Approximate
 
 from . import PostgreSQLTestCase
 from .models import AggregateTestModel, StatTestModel
+
+with suppress(ImportError):  # psycopg2 is not installed
+    from django.contrib.postgres.aggregates import (
+        ArrayAgg, BitAnd, BitOr, BoolAnd, BoolOr, Corr, CovarPop, JSONBAgg,
+        RegrAvgX, RegrAvgY, RegrCount, RegrIntercept, RegrR2, RegrSlope,
+        RegrSXX, RegrSXY, RegrSYY, StatAggregate, StringAgg,
+    )
 
 
 class TestGeneralAggregate(PostgreSQLTestCase):
@@ -22,43 +28,22 @@ class TestGeneralAggregate(PostgreSQLTestCase):
         values = AggregateTestModel.objects.aggregate(arrayagg=ArrayAgg('char_field'))
         self.assertEqual(values, {'arrayagg': ['Foo1', 'Foo2', 'Foo4', 'Foo3']})
 
-    def test_array_agg_charfield_descending(self):
-        values = AggregateTestModel.objects.aggregate(
-            arrayagg=ArrayAgg('char_field', F('char_field').desc())
+    def test_array_agg_charfield_ordering(self):
+        ordering_test_cases = (
+            (F('char_field').desc(), ['Foo4', 'Foo3', 'Foo2', 'Foo1']),
+            (F('char_field').asc(), ['Foo1', 'Foo2', 'Foo3', 'Foo4']),
+            (F('char_field'), ['Foo1', 'Foo2', 'Foo3', 'Foo4']),
+            ([F('boolean_field'), F('char_field').desc()], ['Foo4', 'Foo2', 'Foo3', 'Foo1']),
+            ((F('boolean_field'), F('char_field').desc()), ['Foo4', 'Foo2', 'Foo3', 'Foo1']),
+            ('char_field', ['Foo1', 'Foo2', 'Foo3', 'Foo4']),
+            ('-char_field', ['Foo4', 'Foo3', 'Foo2', 'Foo1']),
         )
-        self.assertEqual(values, {'arrayagg': ['Foo4', 'Foo3', 'Foo2', 'Foo1']})
-
-    def test_array_agg_charfield_ascending(self):
-        values = AggregateTestModel.objects.aggregate(
-            arrayagg=ArrayAgg('char_field', F('char_field').asc())
-        )
-        self.assertEqual(values, {'arrayagg': ['Foo1', 'Foo2', 'Foo3', 'Foo4']})
-
-    def test_array_agg_charfield_no_direction(self):
-        values = AggregateTestModel.objects.aggregate(
-            arrayagg=ArrayAgg('char_field', F('char_field'))
-        )
-        self.assertEqual(values, {'arrayagg': ['Foo1', 'Foo2', 'Foo3', 'Foo4']})
-
-    def test_array_agg_multiple_orderings(self):
-        values = AggregateTestModel.objects.aggregate(
-            arrayagg=ArrayAgg('char_field', [F('boolean_field'), F('char_field').desc()])
-        )
-        self.assertEqual(values, {'arrayagg': ['Foo4', 'Foo2', 'Foo3', 'Foo1']})
-
-    def test_array_agg_charfield_ordering_by_string_asc(self):
-        values = AggregateTestModel.objects.aggregate(
-            arrayagg=ArrayAgg('char_field', 'char_field')
-        )
-        self.assertEqual(values, {'arrayagg': ['Foo1', 'Foo2', 'Foo3', 'Foo4']})
-
-    @skip('TODO remove skip or test')
-    def test_array_agg_charfield_ordering_by_string_desc(self):
-        #TODO: change into assertRaises
-        values = AggregateTestModel.objects.aggregate(
-            arrayagg=ArrayAgg('char_field', '-char_field')
-        )
-        self.assertEqual(values, {'arrayagg': ['Foo1', 'Foo2', 'Foo3', 'Foo4']})
+        for ordering, expected_output in ordering_test_cases:
+            with self.subTest(ordering=ordering, expected_output=expected_output):
+                values = AggregateTestModel.objects.aggregate(
+                        arrayagg=ArrayAgg('char_field', ordering=ordering)
+                )
+                self.assertEqual(values, {'arrayagg': expected_output})
 
     def test_array_agg_integerfield(self):
         values = AggregateTestModel.objects.aggregate(arrayagg=ArrayAgg('integer_field'))
@@ -74,23 +59,17 @@ class TestGeneralAggregate(PostgreSQLTestCase):
         values = AggregateTestModel.objects.aggregate(arrayagg=ArrayAgg('boolean_field'))
         self.assertEqual(values, {'arrayagg': [True, False, False, True]})
 
-    def test_array_agg_booleanfield_ascending(self):
-        values = AggregateTestModel.objects.aggregate(
-            arrayagg=ArrayAgg('boolean_field', ordering=F('boolean_field').asc())
+    def test_array_agg_booleanfield_ordering(self):
+        ordering_test_cases = (
+            (F('boolean_field').asc(), [False, False, True, True]),
+            (F('boolean_field').desc(), [True, True, False, False]),
+            (F('boolean_field'), [False, False, True, True]),
         )
-        self.assertEqual(values, {'arrayagg': [False, False, True, True]})
-
-    def test_array_agg_booleanfield_descending(self):
-        values = AggregateTestModel.objects.aggregate(
-            arrayagg=ArrayAgg('boolean_field', ordering=F('boolean_field').desc())
-        )
-        self.assertEqual(values, {'arrayagg': [True, True, False, False]})
-
-    def test_array_agg_booleanfield_no_direction(self):
-        values = AggregateTestModel.objects.aggregate(
-            arrayagg=ArrayAgg('boolean_field', ordering='boolean_field')
-        )
-        self.assertEqual(values, {'arrayagg': [False, False, True, True]})
+        for ordering, expected_output in ordering_test_cases:
+            with self.subTest(ordering=ordering, expected_output=expected_output):
+                values = AggregateTestModel.objects.aggregate(arrayagg=ArrayAgg('boolean_field',
+                                                              ordering=ordering))
+                self.assertEqual(values, {'arrayagg': expected_output})
 
     def test_array_agg_empty_result(self):
         AggregateTestModel.objects.all().delete()
@@ -167,23 +146,17 @@ class TestGeneralAggregate(PostgreSQLTestCase):
         values = AggregateTestModel.objects.aggregate(stringagg=StringAgg('char_field', delimiter=';'))
         self.assertEqual(values, {'stringagg': 'Foo1;Foo2;Foo4;Foo3'})
 
-    def test_string_agg_charfield_descending(self):
-        values = AggregateTestModel.objects.aggregate(
-            stringagg=StringAgg('char_field', delimiter=';', ordering=F('char_field').desc())
+    def test_string_agg_charfield_ordering(self):
+        ordering_test_cases = (
+            (F('char_field').desc(), 'Foo4;Foo3;Foo2;Foo1'),
+            (F('char_field').asc(), 'Foo1;Foo2;Foo3;Foo4'),
+            (F('char_field'), 'Foo1;Foo2;Foo3;Foo4'),
         )
-        self.assertEqual(values, {'stringagg': 'Foo4;Foo3;Foo2;Foo1'})
-
-    def test_string_agg_charfield_ascending(self):
-        values = AggregateTestModel.objects.aggregate(
-            stringagg=StringAgg('char_field', delimiter=';', ordering=F('char_field').asc())
-        )
-        self.assertEqual(values, {'stringagg': 'Foo1;Foo2;Foo3;Foo4'})
-
-    def test_string_agg_charfield_no_direction(self):
-        values = AggregateTestModel.objects.aggregate(
-            stringagg=StringAgg('char_field', delimiter=';', ordering=F('char_field'))
-        )
-        self.assertEqual(values, {'stringagg': 'Foo1;Foo2;Foo3;Foo4'})
+        for ordering, expected_output in ordering_test_cases:
+            with self.subTest(ordering=ordering, expected_output=expected_output):
+                values = AggregateTestModel.objects.aggregate(stringagg=StringAgg('char_field',
+                                                              delimiter=';', ordering=ordering))
+                self.assertEqual(values, {'stringagg': expected_output})
 
     def test_string_agg_empty_result(self):
         AggregateTestModel.objects.all().delete()
@@ -196,8 +169,18 @@ class TestGeneralAggregate(PostgreSQLTestCase):
         )
         self.assertEqual(values, {'arrayagg': [0, 1, 0, 2]})
 
+    @skipUnlessDBFeature('has_jsonb_agg')
+    def test_json_agg(self):
+        values = AggregateTestModel.objects.aggregate(jsonagg=JSONBAgg('char_field'))
+        self.assertEqual(values, {'jsonagg': ['Foo1', 'Foo2', 'Foo4', 'Foo3']})
 
-class TestStringAggregateDistinct(PostgreSQLTestCase):
+    @skipUnlessDBFeature('has_jsonb_agg')
+    def test_json_agg_empty(self):
+        values = AggregateTestModel.objects.none().aggregate(jsonagg=JSONBAgg('integer_field'))
+        self.assertEqual(values, json.loads('{"jsonagg": []}'))
+
+
+class TestAggregateDistinct(PostgreSQLTestCase):
     @classmethod
     def setUpTestData(cls):
         AggregateTestModel.objects.create(char_field='Foo')
@@ -213,6 +196,14 @@ class TestStringAggregateDistinct(PostgreSQLTestCase):
         values = AggregateTestModel.objects.aggregate(stringagg=StringAgg('char_field', delimiter=' ', distinct=True))
         self.assertEqual(values['stringagg'].count('Foo'), 1)
         self.assertEqual(values['stringagg'].count('Bar'), 1)
+
+    def test_array_agg_distinct_false(self):
+        values = AggregateTestModel.objects.aggregate(arrayagg=ArrayAgg('char_field', distinct=False))
+        self.assertEqual(sorted(values['arrayagg']), ['Bar', 'Foo', 'Foo'])
+
+    def test_array_agg_distinct_true(self):
+        values = AggregateTestModel.objects.aggregate(arrayagg=ArrayAgg('char_field', distinct=True))
+        self.assertEqual(sorted(values['arrayagg']), ['Bar', 'Foo'])
 
 
 class TestStatisticsAggregate(PostgreSQLTestCase):

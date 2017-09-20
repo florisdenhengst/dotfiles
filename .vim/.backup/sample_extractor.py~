@@ -7,7 +7,7 @@ AUDIO_FORMAT = 'mp3'
 OUTPUT_FORMAT = '{count:}.%(ext)s'
 COMMAND_OPTIONS = ['-x', '--audio-format', AUDIO_FORMAT, '-o']
 DL_COMMAND = "youtube-dl"
-DELIMITER = ' -- '
+DELIMITER = ','
 TIME_FORMAT = '0{}.{}.0'
 
 EXTRACT_COMMAND = "mp3splt"
@@ -28,8 +28,8 @@ def download_audio(count, url):
 def split(filename, start_t, end_t):
     (name, extension) = os.path.splitext(filename)
     output = name + "-split"
-    (start_mins, start_secs) = start_t.split('.')[1]
-    (end_mins, end_secs) = end_t.split('.')[1]
+    (start_mins, start_secs) = start_t.split('.')
+    (end_mins, end_secs) = end_t.split('.')
     start_t = TIME_FORMAT.format(start_mins, start_secs)
     end_t = TIME_FORMAT.format(end_mins, end_secs)
     cmd = [EXTRACT_COMMAND, filename, start_t, end_t, "-o", output, '-X']
@@ -63,8 +63,7 @@ def process_elem(count, artist, title, url, start_t, end_t):
 # read file
 with open(args.input_file[0]) as input_file:
     for c,line in enumerate(input_file):
-        (artist, title, url, timerange) = line.split(DELIMITER)
-        (start_time, end_time) = timerange.split('-')
+        (_, artist, title, url, start_time, end_time) = line.split(DELIMITER)
         start_time = start_time.strip()
         end_time = end_time.strip()
-        process_elem(c, artist, title, url, start_time, end_time)
+        process_elem(c+1, artist, title, url, start_time, end_time)

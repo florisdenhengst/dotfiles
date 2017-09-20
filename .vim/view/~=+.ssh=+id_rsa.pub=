@@ -35,6 +35,7 @@ setlocal expandtab
 if &filetype != ''
 setlocal filetype=
 endif
+setlocal fixendofline
 setlocal foldcolumn=0
 setlocal foldenable
 setlocal foldexpr=0
@@ -48,6 +49,7 @@ setlocal foldtext=foldtext()
 setlocal formatexpr=
 setlocal formatoptions=cqt
 setlocal formatlistpat=^\\s*\\d\\+[\\]:.)}\\t\ ]\\s*
+setlocal formatprg=
 setlocal grepprg=
 setlocal iminsert=0
 setlocal imsearch=0
@@ -62,6 +64,7 @@ setlocal nolinebreak
 setlocal nolisp
 setlocal lispwords=
 setlocal nolist
+setlocal makeencoding=
 setlocal makeprg=
 setlocal matchpairs=(:),{:},[:]
 setlocal modeline
@@ -81,6 +84,7 @@ setlocal rightleftcmd=search
 setlocal noscrollbind
 setlocal shiftwidth=2
 setlocal noshortname
+setlocal signcolumn=auto
 setlocal smartindent
 setlocal softtabstop=2
 setlocal nospell
@@ -95,6 +99,7 @@ if &syntax != ''
 setlocal syntax=
 endif
 setlocal tabstop=2
+setlocal tagcase=
 setlocal tags=
 setlocal textwidth=98
 setlocal thesaurus=

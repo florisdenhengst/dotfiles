@@ -91,7 +91,10 @@ xset -b
 
 source ~/.dotfiles/bash/git-completion.bash
 
-# virtualenvwrapper stuff
-export WORKON_HOME=~/envs
-source /usr/bin/virtualenvwrapper.sh
+# virtualenvwrapper stuff -- disabled after installing anaconda
+#export WORKON_HOME=~/envs
+#source /usr/bin/virtualenvwrapper.sh
 
+mdtopdf() {
+  ~/.luarocks/bin/lunamark $1 > temp.html && wkhtmltopdf temp.html $2 && rm -rf temp.html
+}

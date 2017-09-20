@@ -1,29 +1,17 @@
-<html>
+<!DOCTYPE html>
+<html lang="en-us" class="mdc-typography">
   <head>
-    <meta charset='utf-8'>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    
-    <title>{block "title"}Control centre{/block}</title>
-
-    <!-- jQuery -->
-    <script 
-      src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js">
-    </script>
-    
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet"
-      href="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
-    <!-- Bootstrap JavaScript -->
-    <script 
-      src="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js">
-    </script>
+    <meta charSet="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Semmy - the Compliance Checking Bot</title>
+    <meta name="description" content="Semmy - Semantic Compliance Bot"/>
+    <meta name="author" content="CoreBank University Knowledge Engineering"/>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico"/>
   </head>
-
-  <h1>{block "title"}Welcome!{/block}</h1>
   <body>
-    <div class='container-fluid'>
-      {block "content"}
-      {/block}
-    </div>
+    <div id="main"></div>
+    <script src="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.js"></script>
+    <script>window.mdc.autoInit();</script>
   </body>
 </html>

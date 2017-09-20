@@ -1,11 +1,49 @@
-from database.models import *
+from database.access import autojoin, Avg, Min
+from database.attributes import jep as JEP
+from database.attributes import EmployeeGrade, Age, PositionGrade, BaseSalary
+from database.attributes import authorize, global_filter_to_valuesets
+from sqlalchemy import select
+from functools import reduce
+from sqlalchemy.sql import and_
+from database.access.util import print_pg
 
-for ts in Timeslice.objects.all():
-    previous = Timeslice.objects.filter(capture_month__lt=ts.capture_month).order_by('-capture_month')
-    if previous.count() > 0:
-        previous = previous.first()
-    else:
-        previous = None
-    ts.previous = previous
-    ts.save()
-    
+global_filter = { 
+    "timeslice": 1,
+    "selections": {
+        "leaveType": []
+    }
+}
+role_ids = [1]
+
+
+y_axes = [Age().as_aggregate(Avg), Age().as_aggregate(Min)]
+
+print(BaseSalary())
+
+components = autojoin(
+    "",
+    JEP.JOB,
+    {'x_axis': PositionGrade(),
+     'y_axis': y_axes}
+)
+
+print(components['join_clause'])
+
+for bc in components['y_axis'][0].base_columns:
+  print('tttt',bc.base_columns.pop())
+
+query = select(
+    [components["x_axis"], *components["y_axis"]]
+).select_from(
+    components["join_clause"]
+).group_by(
+    components["x_axis"]
+).order_by(
+    components["x_axis"]
+)
+
+print(query)
+
+print_pg(query)
+
+

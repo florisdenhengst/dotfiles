@@ -107,12 +107,12 @@ setlocal nowinfixwidth
 setlocal wrap
 setlocal wrapmargin=0
 silent! normal! zE
-let s:l = 132 - ((20 * winheight(0) + 21) / 42)
+let s:l = 228 - ((16 * winheight(0) + 21) / 42)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-132
-normal! 023|
+228
+normal! 0
 lcd ~/Documents/masterthesis/reports/working_doc
 let &so = s:so_save | let &siso = s:siso_save
 doautoall SessionLoadPost

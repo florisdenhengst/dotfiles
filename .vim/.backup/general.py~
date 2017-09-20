@@ -1,63 +1,69 @@
+from django.contrib.postgres.fields import JSONField
 from django.db.models.aggregates import Aggregate
+from django.db.models.expressions import F, OrderBy
 
 __all__ = [
-    'ArrayAgg', 'BitAnd', 'BitOr', 'BoolAnd', 'BoolOr', 'StringAgg',
+    'ArrayAgg', 'BitAnd', 'BitOr', 'BoolAnd', 'BoolOr', 'JSONBAgg', 'StringAgg',
 ]
 
 
-class OrderableAgg(Aggregate):
-    template = "%(function)s(%(expressions)s %(ordering)s)"
+class OrderableAggMixin:
+    template = '%(function)s(%(expressions)s %(ordering)s)'
 
-    def __init__(self, expression, ordering=None, **extra):
-        if not isinstance(ordering, list) and ordering is not None:
+    def __init__(self, expression, ordering=(), **extra):
+        if not isinstance(ordering, (list, tuple)):
             ordering = [ordering]
+        ordering = ordering or []
+        # Transform minus sign prefixed strings into an OrderBy() expression
+        ordering = [
+            (OrderBy(F(o[1:]), descending=True) if isinstance(o, str) and o[0] == '-' else o)
+            for o in ordering
+        ]
+        super().__init__(expression, **extra)
+        self.ordering = self._parse_expressions(*ordering)
 
-        super(OrderableAgg, self).__init__(
-            expression,
-            ordering=ordering,
-            **extra
-        )
-
-    def resolve_expression(self, query=None, allow_joins=True, reuse=None, summarize=False, for_save=False):
-        # resolve the ordering if it's there
-        ordering = self.extra.pop('ordering', None)
-        if ordering is not None:
-            # TODO: remove comments
-            # parse, so that string-based orderings are also supported
-            parsed_orderings = [self._parse_expressions(an_ordering)[0] for an_ordering in ordering]
-            resolved_ordering = [parsed_ordering.resolve_expression(query, allow_joins, reuse, summarize) for parsed_ordering in parsed_orderings]
-
-            self.extra['ordering'] = resolved_ordering
-
-        return super(OrderableAgg, self).resolve_expression(query, allow_joins, reuse, summarize, for_save)
+    def resolve_expression(self, *args, **kwargs):
+        self.ordering = [expr.resolve_expression(*args, **kwargs) for expr in self.ordering]
+        return super().resolve_expression(*args, **kwargs)
 
     def as_sql(self, compiler, connection):
-        # turn ordering parameter to ORDER BY sql clause
-        if 'ordering' in self.extra:
-            ordering_sql = [ordering_element.as_sql(compiler, connection)[0] for ordering_element in self.extra['ordering']]
+        # Turn ordering parameter to ORDER BY SQL clause.
+        if self.ordering:
+            ordering_sql = [ordering_element.as_sql(compiler, connection)[0] for ordering_element in self.ordering]
             self.extra['ordering'] = 'ORDER BY ' + ', '.join(ordering_sql)
         else:
             self.extra['ordering'] = ''
 
-        return super(OrderableAgg, self).as_sql(compiler, connection)
+        return super().as_sql(compiler, connection)
 
     def get_source_expressions(self):
-        #TODO check how this is supposed to work
-#        print("=========")
-#        print(self.extra['ordering'])
-#        print(type(self.extra['ordering']))
-#        print("=========")
-        return self.source_expressions + self.extra['ordering']
+        return self.source_expressions + self.ordering
 
-#        return (self.source_expressions, *tuple(self.extra['ordering']))
+    def set_source_expressions(self, exprs):
+        ordering_exprs_i = self._get_ordering_expressions_index()
+        self.expression, self.ordering = exprs[:ordering_exprs_i], exprs[ordering_exprs_i:]
 
-#    def set_source_expressions(self, exprs):
-        #TODO check how this is supposed to work
-#        self.expression, self.extra['ordering'] = exprs[0], exprs[1:]
+    def get_source_fields(self):
+        # Filter out fields contributed by the ordering expressions as
+        # these should not be used to determine which the return type of the
+        # expression.
+        return [
+            e._output_field_or_none
+            for e in self.get_source_expressions()[:self._get_ordering_expressions_index()]
+            ]
+
+    def _get_ordering_expressions_index(self):
+        """Return the index at which the ordering expressions start."""
+        source_expressions = self.get_source_expressions()
+        return len(source_expressions) - len(self.ordering)
 
 
-class ArrayAgg(OrderableAgg):
+class ArrayAgg(OrderableAggMixin, Aggregate):
     function = 'ARRAY_AGG'
+    template = '%(function)s(%(distinct)s%(expressions)s %(ordering)s)'
+
+    def __init__(self, expression, distinct=False, **extra):
+        super().__init__(expression, distinct='DISTINCT ' if distinct else '', **extra)
 
     def convert_value(self, value, expression, connection, context):
         if not value:
@@ -81,13 +87,23 @@ class BoolOr(Aggregate):
     function = 'BOOL_OR'
 
 
-class StringAgg(OrderableAgg):
+class JSONBAgg(Aggregate):
+    function = 'JSONB_AGG'
+    _output_field = JSONField()
+
+    def convert_value(self, value, expression, connection, context):
+        if not value:
+            return []
+        return value
+
+
+class StringAgg(OrderableAggMixin, Aggregate):
     function = 'STRING_AGG'
     template = "%(function)s(%(distinct)s%(expressions)s, '%(delimiter)s'%(ordering)s)"
 
     def __init__(self, expression, delimiter, distinct=False, **extra):
         distinct = 'DISTINCT ' if distinct else ''
-        super(StringAgg, self).__init__(expression, delimiter=delimiter, distinct=distinct, **extra)
+        super().__init__(expression, delimiter=delimiter, distinct=distinct, **extra)
 
     def convert_value(self, value, expression, connection, context):
         if not value:

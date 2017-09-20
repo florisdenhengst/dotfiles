@@ -90,3 +90,8 @@ alias ll='ls -l'
 xset -b 
 
 source ~/.dotfiles/bash/git-completion.bash
+
+# virtualenvwrapper stuff -- disabled after installing anaconda
+#export WORKON_HOME=~/envs
+#source /usr/bin/virtualenvwrapper.sh
+

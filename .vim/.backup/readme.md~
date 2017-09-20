@@ -1,5 +1,34 @@
-# Bash coloring
-For correct coloring of `ls`:
+Semantic Bank RDF Server
+------------------------
+
+#### Running the server 
+
+To run the server the following maven command can be used. It requires Java 8 JDK and at least maven 3.1.
+
 ```
-$ eval `dircolors`
+mvn -DFUSEKI_BASE=./fuseki dependency:copy-dependencies jetty:run-war
 ```
+
+#### Loading data
+
+1. Start fuseki server
+2. Go to http://localhost:3030
+3. Go to 'manage datasets'
+4. Click on 'add new dataset'
+5. Enter dataset name and choose the persistent option to keep the data after closing fuseki
+6. Click 'Create dataset'
+7. Click 'upload data'
+8. Drag the 'Payment_Services_Business.ttl' file located in the data folder to the web page
+9. Press 'upload now' 
+
+
+or run the following curl command:
+
+```
+curl -X PUT \
+     -H Content-Type:text/turtle \
+     -T ./data/Payment_Services_Business.ttl \
+     -G http://localhost:3030/ds/data \
+     -d default
+```
+

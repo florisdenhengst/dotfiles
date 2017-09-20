@@ -35,6 +35,7 @@ setlocal expandtab
 if &filetype != 'text'
 setlocal filetype=text
 endif
+setlocal fixendofline
 setlocal foldcolumn=0
 setlocal foldenable
 setlocal foldexpr=0
@@ -81,6 +82,7 @@ setlocal rightleftcmd=search
 setlocal noscrollbind
 setlocal shiftwidth=2
 setlocal noshortname
+setlocal signcolumn=auto
 setlocal nosmartindent
 setlocal softtabstop=2
 setlocal nospell
@@ -95,6 +97,7 @@ if &syntax != 'text'
 setlocal syntax=text
 endif
 setlocal tabstop=2
+setlocal tagcase=
 setlocal tags=
 setlocal textwidth=78
 setlocal thesaurus=
@@ -105,12 +108,12 @@ setlocal nowinfixwidth
 setlocal wrap
 setlocal wrapmargin=0
 silent! normal! zE
-let s:l = 17 - ((16 * winheight(0) + 11) / 22)
+let s:l = 9 - ((8 * winheight(0) + 21) / 42)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-17
-normal! 0
+9
+normal! 014|
 let &so = s:so_save | let &siso = s:siso_save
 doautoall SessionLoadPost
 " vim: set ft=vim :

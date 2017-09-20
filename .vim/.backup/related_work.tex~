@@ -15,7 +15,7 @@ outliers have been studied extensively as a result.
 Historically, this study was focused on estimating parameters of underlying
 distributions of observations. With the rise of information technology, advances
 in statistics and growth of both data and computational power a wide variety of
-outlier analysis methodologies has been developed. Outlier detection is used in
+outlier analysis methodologies have been developed. Outlier detection is used in
 various domains, ranging from finance and health care to astrophysics, and has
 now surpassed its original use as a preparation step for further statistical
 analysis. Applications in intrusion detection for web servers
@@ -46,7 +46,7 @@ multitude of different concepts is contained.
 In this chapter, we will give an overview of the available methods for outlier
 analysis. In the first section we compare some outlier detection methods
 suitable which can be used for exploratory purposes: when no labelled instances
-are present, an assumption on what an constitutes an outlier should be made.
+are present, an assumption on what constitutes an outlier should be made.
 This leads to various different \emph{models} of outlier analysis in the
 \emph{unsupervised scenario}: probabilistic, extreme value, subspace- and
 proximity-based models are described with some exemplary methods.
@@ -60,8 +60,7 @@ Section~\ref{sec:problem_statement}.
 Most techniques are presented separately for the sake of a comprehensible
 overview. In reality, however, these techniques are combined and arranged in
 multiple ways to improve performance and robustness. We will see some examples
-of this as well throughout the discussion of the methods in this chapter, but
-do not provide a comprehensive overview 
+of this as well throughout the discussion of the methods in this chapter.
 
 \include*{related_work/sections/unsupervised_scenario}
 

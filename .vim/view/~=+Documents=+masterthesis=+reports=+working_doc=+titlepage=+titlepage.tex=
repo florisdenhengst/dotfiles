@@ -35,6 +35,7 @@ setlocal expandtab
 if &filetype != 'tex'
 setlocal filetype=tex
 endif
+setlocal fixendofline
 setlocal foldcolumn=0
 setlocal foldenable
 setlocal foldexpr=0
@@ -81,6 +82,7 @@ setlocal rightleftcmd=search
 setlocal noscrollbind
 setlocal shiftwidth=2
 setlocal noshortname
+setlocal signcolumn=auto
 setlocal nosmartindent
 setlocal softtabstop=2
 setlocal nospell
@@ -95,6 +97,7 @@ if &syntax != 'tex'
 setlocal syntax=tex
 endif
 setlocal tabstop=2
+setlocal tagcase=
 setlocal tags=
 setlocal textwidth=98
 setlocal thesaurus=
@@ -105,12 +108,13 @@ setlocal nowinfixwidth
 setlocal wrap
 setlocal wrapmargin=0
 silent! normal! zE
-let s:l = 14 - ((13 * winheight(0) + 21) / 42)
+let s:l = 66 - ((9 * winheight(0) + 21) / 42)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-14
-normal! 010|
+66
+normal! 0
+lcd ~/Documents/masterthesis/reports/working_doc
 let &so = s:so_save | let &siso = s:siso_save
 doautoall SessionLoadPost
 " vim: set ft=vim :

@@ -1,34 +1,8 @@
-pick f8e268a Moved exporter to components directory
-pick a06f311 Completed the move of modals to their own fo.modal component
-pick c32f856 Moved stat and statbox to components/stat
-pick 5b806d7 Removed unused less file
-pick f88093c Move compare to its own component
-pick 8405b18 Remove unused file
-pick 924aac6 Remove empty file
-pick 6a8478f Added foInclude to the fo.http component and moved it all to the components directory
-pick f4f3a2f Made foInclude an explicit dependency of all tested dependants, which in turn required me to mock it out in the foFilterBar tests
-pick 6972426 Moved compare.less and sorted kapstok.less a bit
-pick 9d8ad13 Changed compare.less path in kapstok.less and removed reference to removed file
-pick f7a5726 Use child_process.spawn() to create child proceses that run pip3, npm, bower and ./manage.py runserver, because child_process.exec() has a maximum buffer size that is exceeded after generating x bytes of output.
-pick ab2aae5 Remove --upgrade from pip3 command in the python package update step because we don't want to upgrade to the latest version, but we want to use the version specified in python_deps.txt
-pick 2de1015 Set npm packages to a specific version because gulp's build task does not update the packages anymore as long as the version of the installed package matches the semver. We should update this file regularly.
-pick a72c312 Changed method that prepends the static dir to paths so that it will also work for 'negated globs'. Also changed method name to _prependStaticDir as it is a 'private' method
-pick b24b45e Added execution of workon.sh script before running the server in gulpfile (I accidentally removed it a few commits ago)
-pick 5f018f5 Changed file detections for the resource copying method (html, images, etc.) are now based on SHA-1 hash, which seems to solve the problem of unnecessary copies
-pick 0760be0 Added a debounce (using npm module 'debounce') on all watches so as to prevent unnecessary compiling, copying, and browser reloading/injecting operations.
-pick f4291c0 Removed stupid whitespace in gulpfile
-pick 73b9fef Put a 'require' in gulpfile at the top of the file
-pick 3e136dc Set a version for karma-babel-preprocessor in package.json
-pick 5699798 Make sure bower dependencies are updated after a change to bower.json before reloading the browser
-pick 72ad429 Translated karma.conf.js to ES5 and removed babel and babel-bin NPM packages
-pick 8a4da4f Made our testing infrastructure TypeScript-compatible. Tested it with toHtmlAttributeSafe, which now is type-aware.
-pick 1a6dbe5 Remove assert from tests that TypeScript broke
-pick d6f86c0 Move test report to generated/tests/frontend
-pick abc661c Move coverage report to generated/tests/frontend/coverage
-pick d0562c8 Oops deleted bower!
-pick bdfa563 Altered calculation of visible Employees and Position in Role admin list view.
+pick c4d8fa3ff9 Fix #26067 -- Ordering within StringAgg, ArrayAgg
+pick 751e3dae9b Refactor ArrayAgg and StringAgg ordering tests by using subTest
+pick 66023b03e7 Turn orderable aggregate into mixin
 
-# Rebase b083df0..bdfa563 onto b083df0 (29 command(s))
+# Rebase 2328f2faf8..66023b03e7 onto 2328f2faf8 (3 commands)
 #
 # Commands:
 # p, pick = use commit

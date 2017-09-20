@@ -1,13 +1,9 @@
-Added descriptions of how/why artificial data set.
+
 # Please enter the commit message for your changes. Lines starting
 # with '#' will be ignored, and an empty message aborts the commit.
-# On branch master
-# Your branch is up-to-date with 'origin/master'.
 #
+# On branch 14-values-of-lists-in-graph
 # Changes to be committed:
-#	modified:   method/method.tex
-#	modified:   references/main.bib
-#
-# Changes not staged for commit:
-#	modified:   revision.tex
+#	modified:   src/xlinq/permissions/server/visualisation.clj
+#	new file:   test/xlinq/permissions/server/visualisation_test.clj
 #
