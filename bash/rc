@@ -98,3 +98,6 @@ source ~/.dotfiles/bash/git-completion.bash
 mdtopdf() {
   ~/.luarocks/bin/lunamark $1 > temp.html && wkhtmltopdf temp.html $2 && rm -rf temp.html
 }
+
+alias rdfcat='~/Documents/ing/apache-jena-3.6.0/bin/rdfcat'
+alias not='notify-send "Done!" "Wipe please!"'
